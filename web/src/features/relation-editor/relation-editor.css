@@ -1,0 +1,471 @@
+/* ── RelationTypeBadge ── */
+
+.relation-type-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #fff;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.relation-type-badge-sm {
+  font-size: 9px;
+  padding: 2px 5px;
+}
+
+.relation-type-badge-md {
+  font-size: 11px;
+  padding: 3px 7px;
+}
+
+/* ── DescriptionEditor ── */
+
+.desc-editor {
+  width: 100%;
+  max-width: 320px;
+}
+
+.desc-editor-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.desc-editor-display {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+  min-height: 28px;
+  word-break: break-word;
+}
+
+.desc-editor-display:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border);
+}
+
+.desc-editor-display:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.desc-editor-readonly {
+  cursor: default;
+}
+
+.desc-editor-readonly:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
+.desc-editor-placeholder .desc-editor-text {
+  color: var(--color-text-dim);
+  font-style: italic;
+}
+
+.desc-editor-text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-text);
+}
+
+.desc-editor-edit-icon {
+  color: var(--color-text-dim);
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.desc-editor-display:hover .desc-editor-edit-icon {
+  opacity: 1;
+}
+
+.desc-editor-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.desc-editor-textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-text);
+  background: var(--color-surface);
+  resize: vertical;
+  outline: none;
+}
+
+.desc-editor-textarea:focus {
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15);
+}
+
+.desc-editor-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  outline: none;
+}
+
+.desc-editor-input:focus {
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15);
+}
+
+.desc-editor-error {
+  font-size: 11px;
+  color: var(--color-error);
+  padding: 2px 0;
+}
+
+.desc-editor-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── RelationEditor ── */
+
+.relation-editor {
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+}
+
+.relation-editor-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 10px;
+}
+
+.relation-editor-error {
+  font-size: 12px;
+  color: var(--color-error);
+  background: #fef2f2;
+  padding: 6px 8px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.relation-editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.relation-editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.relation-editor-field-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.relation-editor-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.relation-editor-required {
+  color: var(--color-error);
+}
+
+.relation-editor-input {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.relation-editor-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+}
+
+.relation-editor-input:disabled {
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.relation-editor-input[readonly] {
+  background: var(--color-bg);
+  cursor: default;
+}
+
+.relation-editor-mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.relation-editor-checkbox {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.relation-editor-checkbox:disabled {
+  cursor: not-allowed;
+}
+
+.relation-editor-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+/* ── RelationList ── */
+
+.relation-list {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.relation-list-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font-sans);
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.relation-list-header:hover {
+  background: var(--color-surface-hover);
+}
+
+.relation-list-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-muted);
+}
+
+.relation-list-count {
+  font-size: 10px;
+  color: var(--color-text-dim);
+  background: var(--color-bg);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.relation-list-items {
+  list-style: none;
+}
+
+.relation-list-item {
+  border-top: 1px solid #f1f5f9;
+}
+
+.relation-list-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+  min-height: 32px;
+}
+
+.relation-list-row:hover {
+  background: var(--color-surface-hover);
+}
+
+.relation-list-row:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.relation-list-endpoint {
+  flex: 1;
+  font-size: 12px;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.relation-list-cardinality {
+  font-size: 10px;
+  color: var(--color-text-dim);
+  background: var(--color-bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.relation-list-confidence {
+  font-size: 10px;
+  color: var(--color-info);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.relation-list-verified {
+  color: var(--color-success);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.relation-list-lock {
+  color: var(--color-text-dim);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.relation-list-chevron {
+  font-size: 10px;
+  color: var(--color-text-dim);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+
+.relation-list-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+/* ── RelationList Details ── */
+
+.relation-list-details {
+  padding: 0 12px 8px 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.relation-list-details-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  font-size: 11px;
+  padding: 6px 0;
+}
+
+.relation-list-details-grid dt {
+  color: var(--color-text-dim);
+  font-weight: 500;
+}
+
+.relation-list-details-grid dd {
+  color: var(--color-text);
+}
+
+.relation-list-mono {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  word-break: break-all;
+}
+
+.relation-list-actions {
+  display: flex;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.relation-list-confirm-delete {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-error);
+}
+
+.relation-list-delete-error {
+  font-size: 11px;
+  color: var(--color-error);
+  padding: 4px 0;
+}
+
+/* 候选关系分组：整块用琥珀色左边框标出，不再靠行内小徽章区分。 */
+.relation-list.is-candidate-group {
+  border-left: 3px solid var(--color-warning);
+  padding-left: 8px;
+  background: #fffbeb;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.relation-list-candidate-hint {
+  margin: 0 0 4px;
+  font-size: 11px;
+  color: #92400e;
+}
+
+.relation-list-batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+}
+
+.relation-list-batch-count {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.relation-list-batch-error {
+  font-size: 11px;
+  color: var(--color-danger, #dc2626);
+}
+
+/* 已忽略分组：中性灰左边框——这些边已经被人处理过，不该再像候选那样要求注意。 */
+.relation-list.is-ignored-group {
+  border-left: 3px solid var(--color-border);
+  padding-left: 8px;
+  opacity: 0.75;
+}
+
+.relation-list-ignored-hint {
+  margin: 0 0 4px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+

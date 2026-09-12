@@ -1,0 +1,97 @@
+kind: PolicyRuleSet
+id: default-schema-policy
+title: Default schema policy
+version: "1"
+dbType: mysql
+match:
+  dbTypeAny: [mysql]
+defaults: {}
+sources: []
+rules:
+  # scope: change 是命名类的默认值（写在这里是为了看得见）——只对 design review /
+  # migration lint 送进来的新 DDL 生效。改成 all 会连存量图谱一起查：遗留库上
+  # 那些表名不会为了规则去改，实测一次跑出 1215 条、豁免 0 条，之后没人再跑。
+  - id: naming_convention
+    title: 表、字段和索引命名
+    category: naming_convention
+    severity: warning
+    enforcement: advisory
+    scope: change
+    when: {}
+    statement:
+      tableNameRegex: "^[a-z][a-z0-9_]*$"
+      columnNameRegex: "^[a-z][a-z0-9_]*$"
+      indexNameRegex: "^[a-z][a-z0-9_]*$"
+    remediation: 使用小写 snake_case 名称
+    tags: [naming]
+    sources: []
+  - id: required_business_columns
+    title: 业务表必备审计字段及定义
+    category: required_business_columns
+    severity: error
+    enforcement: required
+    when:
+      tableTypeAny: [base_table]
+      tableTagsAny: [business]
+    statement:
+      columns:
+        - name: created_at
+          type: datetime
+          nullable: false
+          defaultValue: CURRENT_TIMESTAMP
+          comment: 创建时间
+        - name: updated_at
+          type: datetime
+          nullable: false
+          defaultValue: CURRENT_TIMESTAMP
+          onUpdate: CURRENT_TIMESTAMP
+          comment: 更新时间
+    remediation: 添加创建时间和更新时间字段
+    tags: [audit]
+    sources: []
+  - id: money_type_decimal
+    title: 金额字段使用定点数
+    category: money_type_decimal
+    severity: error
+    enforcement: blocking
+    when:
+      columnNameRegex: "(?i)(amount|money|price)"
+    statement:
+      allowedTypes: [decimal, numeric]
+    remediation: 将浮点字段迁移为 decimal/numeric
+    tags: [money]
+    sources: []
+  - id: primary_key_required
+    title: 业务表必须有主键
+    category: primary_key_required
+    severity: error
+    enforcement: required
+    when:
+      tableTagsAny: [business]
+    statement: {}
+    remediation: 为业务表增加稳定主键
+    tags: [integrity]
+    sources: []
+  - id: sensitive_column_policy
+    title: 敏感字段声明保护策略
+    category: sensitive_column_policy
+    severity: error
+    enforcement: required
+    when:
+      columnNameRegex: "(?i)(phone|mobile|email|secret|password)"
+    statement:
+      policyAttribute: sensitivePolicy
+    remediation: 设置 semanticType，并在 attributes.sensitivePolicy 声明保护策略
+    tags: [security]
+    sources: []
+  - id: fact_table_grain_required
+    title: 事实表必须声明粒度
+    category: fact_table_grain_required
+    severity: warning
+    enforcement: advisory
+    when:
+      tableTagsAny: [fact]
+    statement: {}
+    remediation: 用 `sql-cli <alias> schema edit --grain '一行代表…'` 声明表粒度
+    tags: [metric]
+    sources: []

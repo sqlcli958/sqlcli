@@ -1,0 +1,402 @@
+/* App Shell：顶部上下文条 + 左侧一级导航 + 主内容区。
+   颜色沿用 App.css 的 :root token，这里只补壳层需要的尺寸变量。 */
+
+.shell {
+  --shell-header-h: 52px;
+  --shell-nav-w: 188px;
+  --shell-gap: 20px;
+  --shell-radius: 6px;
+
+  /* height 而不是 min-height：用 min-height 时栅格会被内容顶长，
+     下面所有 height:100% 都失去约束，.shell-main 的 overflow:auto 形同虚设——
+     表一多就变成整页滚，顶栏和左侧导航一起滚出视野。
+     主区自己滚本来就是这套布局的意图（.shell-main 一直写着 overflow: auto）。 */
+  height: 100vh;
+  display: grid;
+  grid-template-columns: var(--shell-nav-w) minmax(0, 1fr);
+  grid-template-rows: var(--shell-header-h) minmax(0, 1fr);
+  grid-template-areas:
+    'header header'
+    'nav    main';
+  background: var(--color-bg);
+}
+
+/* ── 顶部 ── */
+
+.shell-header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  gap: var(--shell-gap);
+  padding: 0 18px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.shell-brand {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-primary);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.shell-brand:focus-visible,
+.shell-nav-item:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.shell-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.shell-source-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.shell-source-input {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 4px 8px;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--shell-radius);
+  min-width: 200px;
+}
+
+.shell-source-input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.shell-status {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+/* 状态灯：图谱 / 连接 / 索引。绿=正常，黄=可用但需注意或未知，红=不可用。
+   说明文字放 title，鼠标停留才看得到——颜色本身就是状态。 */
+.shell-dot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  /* 圆点只有 9px，靠 padding 把可悬浮区域撑到能瞄准的大小 */
+  padding: 6px 4px;
+  cursor: help;
+}
+
+/* 悬浮气泡：立即出现，不等原生 title 的延迟 */
+.shell-dot::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  padding: 5px 9px;
+  border-radius: 5px;
+  background: #1e293b;
+  color: #f8fafc;
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+
+.shell-dot:hover::after,
+.shell-dot:focus-visible::after {
+  opacity: 1;
+}
+
+.shell-dot:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+.shell-dot-mark {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid rgb(0 0 0 / 12%);
+}
+
+.shell-dot[data-tone='ok'] .shell-dot-mark { background: #22c55e; }
+.shell-dot[data-tone='warn'] .shell-dot-mark { background: #f59e0b; }
+.shell-dot[data-tone='bad'] .shell-dot-mark { background: #ef4444; }
+
+.shell-lock {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.shell-meta {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--color-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 左侧导航 ── */
+
+.shell-nav {
+  grid-area: nav;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  padding: 8px 10px 12px;
+  overflow-y: auto;
+}
+
+/* 折叠按钮靠右贴边：展开时它在导航项右上角，收起后正好落在图标列上方。 */
+/* 折叠开关是这一栏里最次要的东西：七个导航项才是主体。带边框和底色的话，
+   一个 24px 的按钮方块压在七个无边框图标上面，主次正好反过来。
+   只留一支箭头，悬停才浮出底色；点击热区不变（padding 还在），轻的是视觉不是手感。
+   写成 .btn.shell-nav-toggle 是为了盖过 .btn:hover 那条的边框色，
+   不依赖两个 css 文件谁先加载。 */
+.btn.shell-nav-toggle {
+  margin: 0 0 4px auto;
+  display: flex;
+  padding: 3px;
+  color: var(--color-text-dim);
+  border-color: transparent;
+  background: transparent;
+}
+
+.btn.shell-nav-toggle:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--color-text);
+}
+
+.shell-nav-icon {
+  flex: none;
+}
+
+.shell[data-nav-collapsed] {
+  --shell-nav-w: 56px;
+}
+
+.shell[data-nav-collapsed] .shell-nav {
+  padding-inline: 8px;
+}
+
+.shell[data-nav-collapsed] .shell-nav-toggle {
+  margin-inline: auto;
+}
+
+/* 收起后图标向内旋 180°，同一个箭头表达两个方向，不用第二个图标 */
+.shell[data-nav-collapsed] .shell-nav-toggle svg {
+  transform: rotate(180deg);
+}
+
+.shell[data-nav-collapsed] .shell-nav-item {
+  justify-content: center;
+  padding-inline: 0;
+  border-left-width: 0;
+  border-radius: var(--shell-radius);
+}
+
+/* 标签留在 DOM 里给读屏，只是不占位——收起状态下页面名进了 title */
+.shell[data-nav-collapsed] .shell-nav-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.shell[data-nav-collapsed] .shell-nav-item.is-active {
+  color: var(--color-primary);
+  box-shadow: inset 2px 0 0 var(--color-primary);
+}
+
+.shell-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shell-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border-radius: var(--shell-radius);
+  font-size: 13.5px;
+  color: var(--color-text);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+}
+
+/* 待审批角标：外观在 App.css 跟 .tabs-badge 共用，这里只管位置。
+   收起后导航只剩图标，角标要跟着浮到右上角——它是这套界面里唯一「有事等着我」的
+   常驻信号，收起状态下更不能消失 */
+.shell-nav-badge {
+  margin-left: auto;
+  flex: none;
+}
+
+.shell[data-nav-collapsed] .shell-nav-badge {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  margin-left: 0;
+}
+
+.shell-nav-item:hover {
+  background: var(--color-surface-hover);
+}
+
+.shell-nav-item.is-active {
+  background: var(--color-surface-hover);
+  border-left-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.shell-nav-item.is-disabled {
+  color: var(--color-text-dim);
+  cursor: not-allowed;
+}
+
+.shell-nav-item.is-disabled:hover {
+  background: transparent;
+}
+
+
+/* ── 主内容 ── */
+
+.shell-main {
+  grid-area: main;
+  min-width: 0;
+  overflow: auto;
+}
+
+/* 知识图谱页自己撑满并管理内部滚动，不要外层再加内边距 */
+.shell-main > .page {
+  padding: 22px 26px 60px;
+  max-width: 1180px;
+}
+
+@media (max-width: 820px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'header'
+      'nav'
+      'main';
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .shell-nav {
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    padding: 8px;
+  }
+
+  .shell-nav ul {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  /* 窄屏导航已经是横排一行，再折叠只会剩一排没有标题的图标 */
+  .shell-nav-toggle {
+    display: none;
+  }
+
+  .shell[data-nav-collapsed] {
+    --shell-nav-w: auto;
+  }
+
+  .shell[data-nav-collapsed] .shell-nav-label {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+  }
+
+  .shell-nav-item {
+    border-left: none;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+  }
+
+  .shell-nav-item.is-active {
+    border-left-color: transparent;
+    border-bottom-color: var(--color-primary);
+  }
+
+  .shell-header {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 10px 14px;
+  }
+
+  .shell-status {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+/* ── 待审批提示（AppShell 的 PendingApprovalNotice）── */
+
+/*
+ * 黄=可用但需注意，跟状态灯同一套色：这次保存没丢，只是还没生效。
+ * 贴在顶栏下沿通栏一条，写操作有十个入口而提示只该有一份。
+ */
+.shell-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12.5px;
+}
+
+.shell-notice a {
+  color: inherit;
+  font-weight: 500;
+}
+
+.shell-notice button {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 2px;
+}

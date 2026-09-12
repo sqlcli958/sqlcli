@@ -1,0 +1,232 @@
+/* 评估页。颜色沿用 App.css 的 :root token，图的三个色在 charts.tsx 里（那份是校验过的配色）。 */
+
+.eval-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(1100px, 100%);
+  margin: 0 auto;
+  padding: 28px 32px 48px;
+}
+
+.eval-page h1 {
+  font-size: 22px;
+  margin: 0;
+}
+
+.eval-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.eval-meta {
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.eval-empty {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.eval-cmd {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-surface-hover);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--color-text);
+}
+
+/* ── KPI 行 ── */
+
+/* 一行排完，不留孤儿。auto-fit + minmax 在 6 个 tile 时会折成 5+1，
+   第二行那个孤零零的卡片看起来像出了错。窄屏才允许换行。 */
+.eval-kpis {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.eval-kpi {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 4px 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.eval-kpi-name {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.eval-kpi-value {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.eval-spark {
+  display: block;
+  margin-bottom: 3px;
+}
+
+/* ── 分块 ── */
+
+.eval-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.eval-block h2 {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ── 趋势折线（单轴，端点直接标注数值） ── */
+
+.eval-trend {
+  overflow: visible;
+}
+
+.eval-axis {
+  font-size: 10px;
+  fill: var(--color-text-dim);
+}
+
+.eval-end-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ── 探针分布：横条就是 div 宽度 ── */
+
+.eval-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.eval-bars li {
+  display: grid;
+  grid-template-columns: auto 190px 1fr 34px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.eval-bars code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eval-bar-track {
+  height: 10px;
+  border-radius: 3px;
+  background: var(--color-surface-hover);
+}
+
+.eval-bar-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 3px;
+  background: #2a78d6;
+}
+
+.eval-bars b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 工作队列 ── */
+
+.eval-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.eval-table th {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.eval-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.eval-table tr:last-child td {
+  border-bottom: none;
+}
+
+.eval-table td code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.eval-table td:first-child {
+  white-space: nowrap;
+}
+
+.eval-target {
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
+.eval-fix {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.eval-fix code {
+  flex: 1;
+  word-break: break-all;
+  color: var(--color-text-muted);
+}
+
+/* 窄屏放弃一行排完——挤到 100px 以下数字就看不清了 */
+@media (max-width: 1100px) {
+  .eval-kpis {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}
+
+/* 只有一个探针时不画条，行收窄成一句计数 */
+.eval-bars.is-bare li {
+  grid-template-columns: auto auto 1fr;
+}

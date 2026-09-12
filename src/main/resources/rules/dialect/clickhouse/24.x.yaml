@@ -1,0 +1,58 @@
+kind: dialect-ruleset
+id: clickhouse-24
+title: ClickHouse 24.x dialect guidance
+version: "1"
+dbType: clickhouse
+match:
+  productNameIncludes: [clickhouse]
+  productVersionRegex: "^24\\."
+rules:
+  - id: clickhouse-pagination
+    title: ClickHouse pagination
+    category: dialect_sql_pattern
+    statement:
+      topic: pagination
+      matchRegex: "(?is)\\bFETCH\\s+(FIRST|NEXT)\\b"
+      message: "ClickHouse 24.x pagination uses LIMIT with optional OFFSET"
+  - id: clickhouse-identifier
+    title: ClickHouse identifier quoting
+    category: dialect_sql_pattern
+    statement:
+      topic: identifier
+      matchRegex: "(?is)\\[[A-Za-z_][A-Za-z0-9_]*\\]"
+      message: "ClickHouse identifiers use backticks or double quotes when quoting is required"
+  - id: clickhouse-schema
+    title: ClickHouse database selection
+    category: dialect_sql_pattern
+    statement:
+      topic: schema
+      matchRegex: "(?is)\\bSET\\s+search_path\\b"
+      message: "ClickHouse uses a database-qualified name or USE database"
+  - id: clickhouse-datetime
+    title: ClickHouse datetime functions
+    category: dialect_sql_pattern
+    statement:
+      topic: datetime
+      matchRegex: "(?is)\\b(SYSDATE|GETDATE)\\s*\\("
+      message: "ClickHouse uses now(), today() and related functions"
+  - id: clickhouse-json
+    title: ClickHouse JSON syntax
+    category: dialect_sql_pattern
+    statement:
+      topic: json
+      matchRegex: "(?is)(->>|::\\s*jsonb\\b)"
+      message: "ClickHouse 24.x uses JSONExtract and related functions"
+  - id: clickhouse-upsert
+    title: ClickHouse replacement semantics
+    category: dialect_sql_pattern
+    statement:
+      topic: upsert
+      matchRegex: "(?is)\\b(ON\\s+CONFLICT|ON\\s+DUPLICATE\\s+KEY)\\b"
+      message: "ClickHouse does not provide transactional ON CONFLICT upsert semantics"
+  - id: clickhouse-ddl
+    title: ClickHouse common DDL
+    category: dialect_sql_pattern
+    statement:
+      topic: ddl
+      matchRegex: "(?is)\\bADD\\s+CONSTRAINT\\s+.*FOREIGN\\s+KEY\\b"
+      message: "ClickHouse does not enforce traditional foreign-key constraints"

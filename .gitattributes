@@ -1,0 +1,5 @@
+# vite 在 Windows 上会把构建产物写成 CRLF，而仓库里存的是 LF，
+# 导致每次 `mvn package`（web profile 默认启用）都产生一次纯换行符的无意义 diff。
+# 声明为 LF 文本后 git 在暂存时归一化，构建不再污染工作树状态。
+web/dist/index.html text eol=lf
+web/dist/vite.svg   text eol=lf

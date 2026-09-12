@@ -1,0 +1,119 @@
+# 检索评估集：真实评估集，配 SearchEvalRegressionTest.java 里手搭的电商 fixture 工作区
+# （alias=shop-eval，schema=app，表：orders/users/products/payments/logistics）使用。
+# 格式同 docs/search-eval-cases.example.yaml，见那份文件顶部注释。
+cases:
+  # ---- 中文单词：表名/业务名 ----
+  - query: "订单"
+    expect:
+      - table:shop-eval:app.orders
+  - query: "用户"
+    expect:
+      - table:shop-eval:app.users
+  - query: "商品"
+    expect:
+      - table:shop-eval:app.products
+  - query: "物流"
+    expect:
+      - table:shop-eval:app.logistics
+  - query: "昵称"
+    expect:
+      - column:shop-eval:app.users.nickname
+
+  # ---- 中文多词：跨字段/跨字组合 ----
+  - query: "买家手机"
+    expect:
+      - column:shop-eval:app.orders.buyer_phone
+  - query: "订单状态"
+    expect:
+      - column:shop-eval:app.orders.status
+  - query: "支付渠道"
+    expect:
+      - column:shop-eval:app.payments.pay_channel
+  - query: "支付流水"
+    expect:
+      - table:shop-eval:app.payments
+  - query: "商品价格"
+    expect:
+      - column:shop-eval:app.products.price
+  - query: "下单时间"
+    expect:
+      - column:shop-eval:app.orders.created_at
+
+  # ---- 英文表名/列名 ----
+  - query: "orders"
+    expect:
+      - table:shop-eval:app.orders
+  - query: "products"
+    expect:
+      - table:shop-eval:app.products
+  - query: "payments"
+    expect:
+      - table:shop-eval:app.payments
+  - query: "logistics"
+    expect:
+      - table:shop-eval:app.logistics
+  - query: "users"
+    expect:
+      - table:shop-eval:app.users
+  - query: "buyer_phone"
+    expect:
+      - column:shop-eval:app.orders.buyer_phone
+  - query: "phone"
+    expect:
+      - column:shop-eval:app.orders.buyer_phone
+      - column:shop-eval:app.users.phone
+  - query: "amount"
+    expect:
+      - column:shop-eval:app.orders.amount
+      - column:shop-eval:app.payments.pay_amount
+      - column:shop-eval:app.products.price
+
+  # ---- 业务名命中 ----
+  - query: "库存数量"
+    expect:
+      - column:shop-eval:app.products.stock
+  - query: "运单号"
+    expect:
+      - column:shop-eval:app.logistics.tracking_no
+
+  # ---- 注释命中（字段名/业务名都不含查询词，只有 comment 里有） ----
+  - query: "剩余库存"
+    expect:
+      - column:shop-eval:app.products.stock
+  - query: "支付方式"
+    expect:
+      - column:shop-eval:app.payments.pay_channel
+  - query: "快递公司名称"
+    expect:
+      - column:shop-eval:app.logistics.courier
+  - query: "运单编号"
+    expect:
+      - column:shop-eval:app.logistics.tracking_no
+
+  # ---- 语义类型命中（中文标签，字段名/业务名都是英文或不同措辞） ----
+  - query: "手机号"
+    expect:
+      - column:shop-eval:app.orders.buyer_phone
+      - column:shop-eval:app.users.phone
+  - query: "金额"
+    expect:
+      - column:shop-eval:app.orders.amount
+      - column:shop-eval:app.payments.pay_amount
+      - column:shop-eval:app.products.price
+  - query: "数量"
+    expect:
+      - column:shop-eval:app.products.stock
+  - query: "状态"
+    expect:
+      - column:shop-eval:app.orders.status
+
+  # ---- 负例：应该找不到任何结果 ----
+  - query: "qwzxjkvb"
+    expect:
+      - table:shop-eval:app.orders
+  - query: "螺旋桨发动机"
+    expect:
+      - table:shop-eval:app.orders
+  - query: "blockchain nft crypto"
+    expect:
+      - table:shop-eval:app.orders

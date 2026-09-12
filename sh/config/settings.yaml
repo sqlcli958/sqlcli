@@ -1,0 +1,49 @@
+# sql-cli 主配置文件
+# 文档: https://github.com/your-repo/sql-cli
+
+# Java 运行时路径（安装脚本自动检测并写入，也可手动指定）
+# 示例: /usr/lib/jvm/java-17-openjdk 或 /Applications/IntelliJ IDEA.app/Contents/jbr/Contents/Home
+# 为空时按 JAVA_HOME → 本地 JRE → PATH 的顺序查找
+javaHome:
+
+# 别名配置文件路径
+aliasesPath: aliases.yaml
+
+# 主密码环境变量名（用于解密 encrypted 类型的密码）
+masterPasswordEnv: SQLCLI_MASTER_PASSWORD
+
+# Schema Graph 存储路径
+schemaGraphPath: config/schema-graphs
+
+# 驱动默认配置（按数据库类型自动选择驱动）
+driverDefaults:
+  oracle: oracle6
+  postgresql: pg42
+  mysql: mysql8
+
+# JDBC 驱动配置
+# jars 路径相对于 sql-cli.jar 所在目录
+drivers:
+  mysql8:
+    dbType: mysql
+    driverClass: com.mysql.cj.jdbc.Driver
+    jars:
+    - ./drivers/mysql/mysql-connector-j-8.3.0.jar
+  pg42:
+    dbType: postgresql
+    driverClass: org.postgresql.Driver
+    jars:
+    - ./drivers/postgresql/postgresql-42.7.1.jar
+  oracle6:
+    dbType: oracle
+    driverClass: oracle.jdbc.OracleDriver
+    jars:
+    - ./drivers/oracle/ojdbc6-11.2.0.4.jar
+  oracle19:
+    dbType: oracle
+    driverClass: oracle.jdbc.OracleDriver
+    jars:
+    - ./drivers/oracle/ojdbc8-19.22.jar
+
+# 加密密码存储（使用 sql-cli crypto 命令管理）
+secrets: {}

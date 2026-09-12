@@ -1,0 +1,62 @@
+# 任务评估作答模板（sql-cli <alias> schema task-eval --cases <tasks.yaml> --answers <本文件>）
+#
+# 这里装的是 **agent 的产出**，不是答案。答案在 cases 文件的 expect 里。
+#
+# 谁来填：外部 harness（Claude Code）。sql-cli 不跑 agent——它只判分。
+# 每个 case 起两个 agent，各跑一遍同一个 task，产出分别填进两组：
+#   control  只给 sql-cli skill 和图谱（不给库、不给答案）
+#   cheat    同上，外加把 cases 里这条的 expect.tables 抄给它（只藏 JOIN 和值域）
+# 两组的意义是归因：control✗/cheat✓ = 图谱信息不足；两组都✗ = skill 问题。
+# 只填 control 也能跑，但失败的 case 会全部落进「无法归因」——归因才是这套评估最值钱的东西。
+#
+# 每组四个字段，都只是文本，怎么写不影响判分逻辑，只影响能不能匹配上：
+#   tables  用到的表（写不写 schema 前缀都认，按表名末段比）
+#   joins   连接条件，一条一行；判据是两端都在同一行里出现且顺序不反
+#   sql     可选。给了的话它也参与 JOIN 与 pitfall 匹配——agent 本来就要写 SQL，顺手贴上
+#   values  可选。关键字段取什么值，`字段: 说明`。**值域类的坑靠它才判得出来**：
+#           只看 tables/joins 测不出「把 is_scan 的 0 和 1 理解反了」
+#
+# 下面两条演示三种归因。要跑真的，把 sql-cli 真跑出来的产出替换进去。
+
+answers:
+  # 通过：对照组就做对了（作弊组可以省，归因只在失败时才需要它）
+  scan-required-plans:
+    control:
+      tables:
+        - erp_prop_task_plan
+      joins: []
+      sql: "SELECT id, title FROM erp_prop_task_plan WHERE is_scan = 1"
+      values:
+        erp_prop_task_plan.is_scan: "0=免扫码, 1=必须扫码；取 1"
+    cheat:
+      tables:
+        - erp_prop_task_plan
+      joins: []
+      sql: "SELECT id, title FROM erp_prop_task_plan WHERE is_scan = 1"
+      values:
+        erp_prop_task_plan.is_scan: "0=免扫码, 1=必须扫码；取 1"
+
+  # 图谱侧失败：对照组选错了表（配置态当执行态），给了正确表集合就做对了
+  # → 说明图谱在「定位」这一环缺东西，补三张相似表的业务描述 / 术语
+  inspect-completion-rate:
+    control:
+      tables:
+        - erp_prop_task_plan
+        - erp_prop_task_point
+      joins:
+        - "erp_prop_task_point.plan_id = erp_prop_task_plan.id"
+      sql: "SELECT p.id, COUNT(*) FROM erp_prop_task_point tp JOIN erp_prop_task_plan p ON tp.plan_id = p.id GROUP BY p.id"
+    cheat:
+      tables:
+        - erp_prop_task_plan
+        - erp_prop_plan_point
+      joins:
+        - "erp_prop_plan_point.plan_id = erp_prop_task_plan.id"
+      sql: |
+        SELECT p.id,
+               SUM(CASE WHEN pp.is_result = 1 THEN 1 ELSE 0 END) / COUNT(*) AS rate
+        FROM erp_prop_plan_point pp
+        JOIN erp_prop_task_plan p ON pp.plan_id = p.id
+        GROUP BY p.id
+      values:
+        erp_prop_plan_point.is_result: "点位有没有做完"

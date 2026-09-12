@@ -1,0 +1,72 @@
+# erp_plush_test 巡检域搜索评估集
+#
+# 用途：度量「用业务词能不能找到对的表」。agent 往图谱里写了 5 个巡检域术语，
+# 这份评估集就是判断那些术语值不值的尺子——每个 case 的 query 是一个业务说法，
+# expect 是这次搜索真正该落到的图谱对象。
+#
+# 跑法：
+#   sql-cli erp_plush_test schema search-eval --cases docs/search-eval-erp-inspection.yaml
+# 全部命中退出码 0，有完全未命中的 case 退出码 1（可以进 CI）。
+#
+# expect 的选法：只写「查这个词的人真正要打开的那张表/那个字段」，不写沾边的。
+# 一个 case 里多个 expect 是「任一命中即算」，用来容纳同一件事的两种正当落点
+# （比如「巡检计划」既可能要计划主表、也可能要计划下挂的点位清单）。
+cases:
+  # 计划主表：title=计划名称、is_scan=是否扫码、is_order=是否顺序巡检 都在这张表
+  - query: "巡检计划"
+    expect:
+      - table:erp_plush_test:erp_plush_test.erp_prop_task_plan
+      - table:erp_plush_test:erp_plush_test.erp_prop_task_point
+  - query: "巡查计划"
+    expect:
+      - table:erp_plush_test:erp_plush_test.erp_prop_task_plan
+      - table:erp_plush_test:erp_plush_test.erp_prop_task_point
+
+  # 顺序巡检是计划上的一个开关，落点是那个字段本身
+  - query: "顺序巡检"
+    expect:
+      - column:erp_plush_test:erp_plush_test.erp_prop_task_plan.is_order
+
+  # 点位：配置态（计划勾了哪些点）和执行态（这次任务的点位实例）都算对
+  - query: "巡查点位"
+    expect:
+      - table:erp_plush_test:erp_plush_test.erp_prop_plan_point
+      - table:erp_plush_test:erp_plush_test.erp_prop_task_point
+  - query: "点位执行"
+    expect:
+      - table:erp_plush_test:erp_plush_test.erp_prop_plan_point
+
+  # 检查项：标准（定义）与结果（实例）两张表
+  - query: "检查项"
+    expect:
+      - table:erp_plush_test:erp_plush_test.erp_prop_common_stand
+      - table:erp_plush_test:erp_plush_test.erp_prop_plan_object_inspect
+  - query: "检查标准"
+    expect:
+      - table:erp_plush_test:erp_plush_test.erp_prop_common_stand
+
+  # 扫码：巡检域的扫码是点位打卡，不是考勤打卡——这个 case 专门用来抓串域
+  - query: "扫码"
+    expect:
+      - column:erp_plush_test:erp_plush_test.erp_prop_task_plan.is_scan
+      - column:erp_plush_test:erp_plush_test.erp_prop_plan_point.start_time
+  - query: "扫码打卡"
+    expect:
+      - column:erp_plush_test:erp_plush_test.erp_prop_task_plan.is_scan
+      - column:erp_plush_test:erp_plush_test.erp_prop_plan_point.start_time
+
+  # ---- 防倒退：钉住 S5 里唯一真正落过地的那条 ----
+
+  # 「顺序巡检」这条术语已由用户在 2026-08-27 删除（审批 #226），内容并进
+  # erp_prop_task_plan.is_order 的 businessName「是否顺序巡检」。术语名走
+  # WEIGHT_NAME(40)、businessName 走 WEIGHT_BUSINESS_NAME(35)，分是降了，
+  # 但术语本身没了，该字段应当反而升到 Top1。**删一条术语必须留下这样一条 case**，
+  # 否则「businessName 只是复制粘贴、其实没生效」没有任何地方会发现。
+  #
+  # 这条起初写成 query: "顺序"，是错的：库里 29 个 `sort` 列的注释正是「顺序」，
+  # 精确命中压过 businessName 的部分匹配。而在这个库里搜「顺序」的人本来就可能
+  # 要任何一个 `sort` 列——按本文件开头「只写查这个词的人真正要打开的那个字段」的
+  # 选法，那条 case 断言了引擎不该给的东西，是 case 错不是引擎错。
+  - query: "顺序巡检"
+    expect:
+      - column:erp_plush_test:erp_plush_test.erp_prop_task_plan.is_order

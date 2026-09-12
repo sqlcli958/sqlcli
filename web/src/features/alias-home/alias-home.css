@@ -1,0 +1,267 @@
+.alias-add-page {
+  min-height: 100%;
+  padding: 4px 0 32px;
+}
+
+.alias-form {
+  width: min(760px, 100%);
+  display: grid;
+  gap: 18px;
+}
+
+/* ── 头部：图标返回 + 标题，不放副标题 ── */
+.alias-form-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.alias-form-header h1 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 640;
+  font-family: var(--font-mono);
+  letter-spacing: -0.01em;
+  min-width: 0;
+  word-break: break-all;
+}
+
+.alias-form-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
+}
+
+/* ── 分组：连接 / 认证 / 行为 ── */
+.alias-section {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.alias-section h2 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+}
+
+.alias-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.alias-section label {
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--color-text-muted);
+  min-width: 0;
+}
+
+.alias-section input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.alias-section input:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -1px;
+  background: var(--color-surface);
+}
+
+.alias-section input:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.alias-section input::placeholder {
+  color: var(--color-text-dim);
+}
+
+.alias-mono {
+  font-family: var(--font-mono);
+  font-size: 12px !important;
+}
+
+/* ── 只读开关：比裸 checkbox 更能表达「这是个模式」 ── */
+.alias-switch {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.alias-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.alias-switch-track {
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 19px;
+  border-radius: 999px;
+  background: var(--color-border);
+  transition: background 0.15s;
+}
+
+.alias-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 25%);
+  transition: transform 0.15s;
+}
+
+.alias-switch input:checked + .alias-switch-track {
+  background: var(--color-primary);
+}
+
+.alias-switch input:checked + .alias-switch-track::after {
+  transform: translateX(15px);
+}
+
+.alias-switch input:focus-visible + .alias-switch-track {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.alias-switch small {
+  display: block;
+  font-weight: 400;
+  font-size: 11.5px;
+  color: var(--color-text-dim);
+}
+
+.alias-form-error {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 6px;
+  color: #b91c1c;
+  background: #fef2f2;
+  font-size: 13px;
+}
+
+.alias-form-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* sqlite 路径预检：文件不存在时的提示——不是错误（新建库是合法用途），但要显眼 */
+.alias-form-warn {
+  color: var(--color-warning);
+}
+
+/* ── sqlite 路径输入框旁的「浏览…」按钮：输入框继续吃满宽度，按钮不参与拉伸 ── */
+.alias-path-row {
+  display: flex;
+  gap: 8px;
+}
+
+.alias-path-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── sqlite 路径选择器：内联展开面板，见 AliasAddPage.tsx 里 SqlitePathBrowser 的注释 ── */
+.alias-file-browser {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+}
+
+.alias-file-browser-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.alias-file-browser-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.alias-file-browser-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  display: grid;
+  gap: 1px;
+}
+
+.alias-file-browser-hint {
+  padding: 6px 4px;
+  font-size: 12.5px;
+  color: var(--color-text-dim);
+}
+
+.alias-file-browser-entry {
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.alias-file-browser-entry:hover {
+  background: var(--color-surface-hover);
+}
+
+.alias-file-browser-entry.is-dir {
+  font-weight: 560;
+}
+
+.alias-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.alias-form-actions .btn:disabled { cursor: wait; }
+
+@media (max-width: 640px) {
+  .alias-grid-2 { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,191 @@
+# erp_plush_test 巡检域 · 任务级评估集（初稿，待你增删改）
+#
+# 这份评估集测的是最终目标：**只给图谱、不给库，agent 能不能一次做对一个真实任务。**
+# 检索评估（search-eval）测的是「找得到」，这份测的是「找到之后用对了没有」。
+#
+# 怎么用：
+#   1. harness（Claude Code）对每个 task 起**两个** agent，都只能用 `sql-cli <alias> schema *`，
+#      不给连库：control 只给 skill 和图谱，cheat 额外把 expect.tables 抄给它
+#   2. 让它们产出：要用哪几张表、怎么 JOIN、关键字段取什么值（可选带上 SQL）
+#   3. 填进 answers.yaml（模板 docs/task-eval-answers.example.yaml），再判分：
+#        sql-cli <alias> schema task-eval --cases 本文件 --answers <answers.yaml>
+#
+# 判分口径（一次做对 = 三条全中）：
+#   tables  期望表集合是 agent 产出的子集（多带一张不算错，少一张算错），按表名末段比
+#   joins   每条期望连接的两端都出现在作答的同一条 JOIN 或 SQL 里，且左端在右端之前（方向）
+#   pitfalls 一条都没踩中
+#
+# 字段说明：
+#   pitfalls 是这份评估集的核心。它把「安静地出错数」这类失败变成可判定的——
+#   agent 选错一张名字相近的表、或者把一个值域理解反了，SQL 照样能跑、照样出数，
+#   只有明确写出「错在哪」才测得出来。
+#
+#   每条 pitfall 三个字段，desc 给人看，另外两个给机器判（必须至少有一个，否则解析直接报错——
+#   判不了的判据等于没有判据）：
+#     desc     原话，报告里原样打出来
+#     forbid   不该出现的表 / 字段 / 写法，任一串出现在作答里即判踩中
+#     require  必须出现的字段 / 条件，任一串在作答里找不到即判踩中（用来判「漏了」这类坑）
+#   匹配前两边都去掉空白并转小写，所以 `is_scan = 0` 和 `is_scan=0` 是同一件事。
+#   forbid 的串要挑「正确作答里绝不会出现」的，否则会误判。
+#
+#   skillRef 是这个 task 失败（两组都失败）时该改的那份技能文档。
+#
+# ⚠️ 置信度标注：
+#   [已验证] = 我这次实际 describe / search 确认过的表和字段
+#   [待确认] = 从表名和描述推断的，你改之前我不会拿它判分
+#
+# 这三张名字极像的表是整个巡检域最大的坑，多数 task 的 pitfalls 都围着它们转：
+#   erp_prop_task_plan   计划主表    —— 计划本身（title/is_scan/is_order/cyc_type）
+#   erp_prop_task_point  计划点位配置 —— 计划勾选了哪些点位（配置态）
+#   erp_prop_plan_point  任务点位实例 —— 这次任务的点位执行记录（执行态，is_result/start_time）
+
+tasks:
+  # ---------- 执行态 vs 配置态：最容易选错的一组 ----------
+  - id: inspect-completion-rate
+    task: "统计上个月每个巡检计划的点位完成率"
+    confidence: 已验证
+    skillRef: skills/sql-cli/references/query.md
+    expect:
+      tables:
+        - erp_prop_task_plan      # 计划名称
+        - erp_prop_plan_point     # is_result 点位是否完成，分母分子都在这
+      joins:
+        - "erp_prop_plan_point → erp_prop_task_plan（任务点位实例回溯到计划）[待确认: 中间是否还隔着任务表]"
+      pitfalls:
+        - desc: "用 erp_prop_task_point 算完成率——那是计划勾了哪些点位（配置态），没有完成状态，算出来恒等于 100%"
+          forbid: [erp_prop_task_point]
+        - desc: "把 is_result 当成巡检结论（合格/不合格），它是「点位有没有做完」"
+          forbid: ["合格"]
+
+  - id: unscanned-points
+    task: "找出昨天没有扫码的巡检点位"
+    confidence: 已验证
+    skillRef: skills/sql-cli/references/query.md
+    expect:
+      tables:
+        - erp_prop_plan_point     # start_time 点位扫码时间、user_id 扫码人
+      joins: []
+      pitfalls:
+        - desc: "去 erp_shift_* 找扫码——那是考勤打卡，跟巡检扫码是两个域"
+          forbid: [erp_shift_]
+        - desc: "忽略 erp_prop_task_plan.is_scan：计划本身可能设了免扫码，这批点位不该算进未扫码"
+          require: [is_scan]
+
+  # ---------- 值域陷阱 ----------
+  - id: scan-required-plans
+    task: "列出所有强制扫码的巡检计划"
+    confidence: 已验证
+    skillRef: skills/sql-cli/references/query.md
+    expect:
+      tables:
+        - erp_prop_task_plan      # is_scan 值域 0=免扫码,1=必须扫码
+      joins: []
+      pitfalls:
+        # forbid 抓「把值域说反了」，require 抓「按反过来的值筛」。
+        # 注意不能 forbid "is_scan = 0"：正确作答的 values 里写着 `is_scan: 0=免扫码,1=必须扫码`，
+        # 去空白后同样含 `is_scan=0`，会误判。
+        - desc: "把 is_scan 的语义取反（0 当成必须扫码）"
+          forbid: ["0=必须扫码", "1=免扫码"]
+          require: ["is_scan = 1"]
+        - desc: "把 is_scan 当成「本次是否扫了码」——它是计划级配置，不是执行结果"
+          forbid: [erp_prop_plan_point]
+
+  - id: ordered-inspection-plans
+    task: "哪些巡检计划要求按顺序巡检"
+    confidence: 已验证
+    skillRef: skills/sql-cli/references/query.md
+    expect:
+      tables:
+        - erp_prop_task_plan      # is_order 是否顺序巡检
+      joins: []
+      pitfalls:
+        - desc: "去点位表找顺序字段——顺序是计划级属性"
+          forbid: [erp_prop_task_point, erp_prop_plan_point]
+
+  # ---------- 三层展开：标准 → 对象 → 结果 ----------
+  - id: failed-check-items
+    task: "上周巡检中不合格的检查项有哪些，分别属于哪个巡查对象"
+    confidence: 已验证
+    skillRef: skills/sql-cli/references/query.md
+    expect:
+      tables:
+        - erp_prop_plan_object_inspect   # result_value 逐项检查结果
+        - erp_prop_plan_object           # 巡查对象实例
+        - erp_prop_common_stand          # 检查标准（检查项定义）
+      joins:
+        - "erp_prop_plan_object_inspect → erp_prop_plan_object [待确认: 外键列名]"
+        - "erp_prop_plan_object_inspect → erp_prop_common_stand（结果回溯到标准定义）[待确认]"
+      pitfalls:
+        - desc: "用 erp_prop_common_stand 直接统计不合格——它是标准定义（模板），没有结果；判据是作答里必须真的读到逐项结果列 result_value"
+          require: [result_value]
+        - desc: "用 erp_prop_plan_object.inspect_resutl 代替逐项结果——那是对象级汇总，粒度不对（注意这个字段名拼写就是 resutl）"
+          forbid: [inspect_resutl]
+
+  - id: object-check-config
+    task: "某个巡查对象配置了哪些检查项"
+    confidence: 已验证
+    skillRef: skills/sql-cli/references/query.md
+    expect:
+      tables:
+        - erp_prop_common_object   # 巡查对象字典
+        - erp_prop_common_stand    # 按 object_id 挂的检查标准
+      joins:
+        - "erp_prop_common_stand.object_id → erp_prop_common_object [待确认: 列名]"
+      pitfalls:
+        - desc: "去 erp_prop_plan_object* 找配置——那两张是任务生成后的实例，不是配置"
+          forbid: [erp_prop_plan_object]
+
+  # ---------- 跨实体：点位的多种载体 ----------
+  - id: qr-code-source
+    task: "公共区域点位的二维码从哪张表取，怎么校验扫码结果"
+    confidence: 已验证
+    skillRef: skills/sql-cli/references/query.md
+    expect:
+      tables:
+        - erp_prop_public          # qr_code 是扫码校验的权威数据源
+      joins: []
+      pitfalls:
+        - desc: "从 erp_prop_task_point.qr_code 取——那是建计划时从点位实体拷过来的快照，可能过期"
+          forbid: [erp_prop_task_point]
+
+  - id: point-object-binding
+    task: "一个点位下面挂了哪些巡查对象"
+    confidence: 已验证
+    skillRef: skills/sql-cli/references/query.md
+    expect:
+      tables:
+        - erp_prop_point_object    # 点位与巡查对象字典的绑定关系
+      joins:
+        - "erp_prop_point_object → erp_prop_common_object [待确认: 列名]"
+      pitfalls:
+        - desc: "用 erp_prop_plan_object——那是任务生成后按这张绑定表展开的实例"
+          forbid: [erp_prop_plan_object]
+
+  # ---------- 关联到其他域 ----------
+  - id: inspection-reports
+    task: "巡检过程中上报的异常报事，关联到具体哪个点位"
+    confidence: 已验证
+    skillRef: skills/sql-cli/references/query.md
+    expect:
+      tables:
+        - erp_prop_report          # option_id 回填 erp_prop_plan_point.id
+        - erp_prop_plan_point
+      joins:
+        - "erp_prop_report.option_id → erp_prop_plan_point.id"
+      pitfalls:
+        - desc: "按 point_id_name 关联——那是冗余的名称字段，不是外键"
+          forbid: [point_id_name]
+
+  - id: inspector-workload
+    task: "统计各巡检人上个月的巡检工作量"
+    confidence: 待确认
+    skillRef: skills/sql-cli/references/query.md
+    expect:
+      tables:
+        - erp_prop_inspection_history   # handler_user_id 巡检人、work_type 巡检工作类型
+      joins: []
+      pitfalls:
+        - desc: "用 erp_prop_plan_point.user_id（扫码人）当巡检人——扫码人不一定是任务负责人 [待确认: 两者关系需要你确认]"
+          forbid: [erp_prop_plan_point]
+        - desc: "忽略 work_type 的取值分布（0扫码/1附件上报/2报事…），把不同类型的工作等权相加"
+          require: [work_type]

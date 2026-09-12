@@ -1,0 +1,58 @@
+kind: dialect-ruleset
+id: oracle-19c
+title: Oracle 19c dialect guidance
+version: "1"
+dbType: oracle
+match:
+  productNameIncludes: [oracle]
+  productVersionRegex: "^19\\."
+rules:
+  - id: oracle-pagination
+    title: Oracle pagination
+    category: dialect_sql_pattern
+    statement:
+      topic: pagination
+      matchRegex: "(?is)\\bLIMIT\\s+\\d+\\b"
+      message: "Oracle 19c pagination uses OFFSET ... FETCH or ROWNUM"
+  - id: oracle-identifier
+    title: Oracle identifier quoting
+    category: dialect_sql_pattern
+    statement:
+      topic: identifier
+      matchRegex: "(?is)`[A-Za-z_][A-Za-z0-9_]*`"
+      message: "Oracle quoted identifiers use double quotes"
+  - id: oracle-schema
+    title: Oracle schema selection
+    category: dialect_sql_pattern
+    statement:
+      topic: schema
+      matchRegex: "(?is)\\b(SET\\s+search_path|USE\\s+[A-Za-z_])"
+      message: "Oracle uses schema-qualified names or ALTER SESSION SET CURRENT_SCHEMA"
+  - id: oracle-datetime
+    title: Oracle datetime functions
+    category: dialect_sql_pattern
+    statement:
+      topic: datetime
+      matchRegex: "(?is)\\b(NOW|GETDATE)\\s*\\("
+      message: "Oracle uses SYSDATE, SYSTIMESTAMP or CURRENT_TIMESTAMP"
+  - id: oracle-json
+    title: Oracle JSON syntax
+    category: dialect_sql_pattern
+    statement:
+      topic: json
+      matchRegex: "(?is)\\bJSON_EXTRACT\\s*\\("
+      message: "Oracle 19c uses JSON_VALUE, JSON_QUERY and JSON_TABLE"
+  - id: oracle-upsert
+    title: Oracle upsert
+    category: dialect_sql_pattern
+    statement:
+      topic: upsert
+      matchRegex: "(?is)\\b(ON\\s+CONFLICT|ON\\s+DUPLICATE\\s+KEY)\\b"
+      message: "Oracle 19c upsert uses MERGE"
+  - id: oracle-ddl
+    title: Oracle common DDL
+    category: dialect_sql_pattern
+    statement:
+      topic: ddl
+      matchRegex: "(?is)\\b(AUTO_INCREMENT|SERIAL)\\b"
+      message: "Oracle 19c uses identity columns or sequences"

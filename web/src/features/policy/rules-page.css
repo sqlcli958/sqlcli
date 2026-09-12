@@ -1,0 +1,89 @@
+/* 页面自己撑满并管理内部滚动：不加 overflow:hidden 的话内容会把 .shell-main 顶开，
+   整页一起滚，顶部工具条和左侧列表都会滚出视野。 */
+.rules-page { display: grid; grid-template-columns: 260px minmax(0, 1fr); height: 100%; overflow: hidden; background: var(--color-bg); }
+.rules-page.is-collapsed { grid-template-columns: 44px minmax(0, 1fr); }
+
+/* ── 左侧列表 ── */
+.rules-side { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--color-border); background: var(--color-surface); }
+/* 和右侧工具条同高，两条下边框拉平 —— 左右各自一个高度会显得整页没对齐。 */
+.rules-side-head { display: flex; align-items: center; gap: 4px; height: var(--toolbar-height); padding: 0 8px; border-bottom: 1px solid var(--color-border); }
+.rules-tree { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; display: grid; align-content: start; gap: 4px; }
+.rules-error { margin: 0; padding: 8px; color: var(--color-error); }
+.rules-warn { margin: 0 0 12px; padding: 10px 12px; border-left: 2px solid var(--color-warning); background: var(--color-surface); color: var(--color-text-muted); line-height: 1.7; }
+.rules-empty { margin: 0; padding: 8px; color: var(--color-text-muted); }
+
+/* 规则讲解：树里的第一项，和规则集平级 —— 它是「怎么配」的说明书，不是某个规则集的附属。 */
+.rules-catalog-link { display: flex; align-items: center; gap: 7px; width: 100%; padding: 7px 8px; margin-bottom: 4px; border: 0; border-radius: 6px; background: none; text-align: left; cursor: pointer; color: var(--color-text); }
+.rules-catalog-link:hover { background: var(--color-surface-hover); }
+.rules-catalog-link.is-active { background: var(--color-surface-hover); color: var(--color-primary); font-weight: 600; }
+
+
+.rules-set { margin-bottom: 6px; }
+.rules-set-head { display: flex; align-items: center; gap: 2px; border-radius: 6px; }
+.rules-set-head:hover, .rules-set-head.is-active { background: var(--color-surface-hover); }
+.rules-set-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; border: 0; background: none; padding: 7px 8px; text-align: left; cursor: pointer; color: var(--color-text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rules-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--color-text-dim); }
+.rules-dot[data-tone='ok'] { background: var(--color-success); }
+.rules-dot[data-tone='warn'] { background: var(--color-warning); }
+
+.rules-list { list-style: none; margin: 2px 0 0; padding: 0 0 0 14px; display: grid; gap: 1px; }
+.rules-list li { display: flex; align-items: center; gap: 2px; border-radius: 5px; }
+.rules-list li:hover { background: var(--color-surface-hover); }
+.rules-list li > button:first-child { flex: 1; min-width: 0; display: grid; gap: 1px; border: 0; background: none; padding: 5px 8px; text-align: left; cursor: pointer; border-left: 2px solid transparent; }
+.rules-list li > button:first-child.is-active { border-left-color: var(--color-primary); }
+.rules-list code { font-family: var(--font-mono); font-size: 11px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; }
+.rules-list small { color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 右侧 ── */
+.rules-main { min-width: 0; min-height: 0; overflow-y: auto; }
+.rules-bar { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; height: var(--toolbar-height); padding: 0 24px; background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+.rules-bar code { font-family: var(--font-mono); color: var(--color-text-muted); }
+.rules-sep { color: var(--color-text-dim); }
+.rules-spacer { flex: 1; }
+.rules-toggle { display: flex; align-items: center; gap: 5px; color: var(--color-text-muted); cursor: pointer; }
+.rules-form { max-width: 900px; padding: 20px 24px 40px; }
+
+.rules-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; margin-top: 12px; }
+.rules-pick { display: grid; gap: 3px; padding: 10px 12px; text-align: left; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-surface); cursor: pointer; color: var(--color-text); }
+.rules-pick:hover { border-color: var(--color-primary); }
+.rules-pick code { font-family: var(--font-mono); font-size: 12px; }
+.rules-pick small { color: var(--color-text-muted); }
+
+/* ── 表单（RuleForm 共用） ── */
+.rf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.rf-field { display: grid; gap: 4px; align-content: start; color: var(--color-text-muted); }
+.rf-field > span { display: flex; align-items: baseline; gap: 4px; }
+.rf-wide { grid-column: 1 / -1; }
+.rf-field input { width: 100%; border: 1px solid var(--color-border); border-radius: 5px; padding: 7px; font: inherit; color: var(--color-text); background: var(--color-surface); }
+.rf-readonly { background: var(--color-bg) !important; color: var(--color-text-muted) !important; font-family: var(--font-mono); }
+.rf-help { color: var(--color-text-dim); font-weight: 400; }
+.rf-block { margin-top: 22px; }
+.rf-block-title { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; font-weight: 600; color: var(--color-text); }
+.rf-block-title small { font-weight: 400; color: var(--color-text-muted); }
+.rf-note { margin: 0; color: var(--color-text-muted); }
+.rf-checks { display: flex; flex-wrap: wrap; gap: 4px 14px; padding-top: 4px; }
+.rf-checks label { display: flex; align-items: center; gap: 5px; color: var(--color-text); cursor: pointer; }
+.rf-list { display: grid; gap: 8px; justify-items: start; }
+.rf-row { display: flex; align-items: start; gap: 8px; width: 100%; padding: 12px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-surface); }
+.rf-row .rf-grid { flex: 1; min-width: 0; }
+
+@media (max-width: 720px) { .rules-page, .rules-page.is-collapsed { grid-template-columns: 1fr; } }
+/* 勾选项不许折行——「普通表」被拆成三行竖排比没有标签还难认。 */
+.rf-checks label { white-space: nowrap; }
+/* 行内删除图标默认压低存在感，指到那一行才亮起来。 */
+.rules-list .btn.is-danger, .rf-row .btn.is-danger { opacity: 0; color: var(--color-text-dim); border-color: transparent; }
+.rules-list li:hover .btn.is-danger, .rf-row:hover .btn.is-danger { opacity: 1; color: var(--color-error); }
+.rules-list .btn.is-danger:focus-visible, .rf-row .btn.is-danger:focus-visible { opacity: 1; color: var(--color-error); }
+.rules-prefill { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; color: var(--color-text-muted); }
+
+/* 必备字段：一行一个字段的表格，单元格里的输入框不带边框——边框由行分隔线担着。 */
+.rf-columns { width: 100%; border-collapse: collapse; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-surface); }
+.rf-columns th { padding: 6px 8px; text-align: left; font-weight: 500; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); white-space: nowrap; }
+.rf-columns td { padding: 2px 4px; border-bottom: 1px solid var(--color-border); }
+.rf-columns tbody tr:last-child td { border-bottom: 0; }
+.rf-columns td input[type='text'], .rf-columns td input:not([type]) { width: 100%; min-width: 90px; border: 1px solid transparent; border-radius: 4px; padding: 6px; font: inherit; color: var(--color-text); background: transparent; }
+.rf-columns td input:not([type]):focus { border-color: var(--color-primary); background: var(--color-bg); outline: 0; }
+.rf-columns-check { text-align: center; width: 72px; }
+.rf-columns tfoot td { padding: 4px 6px; border-top: 1px solid var(--color-border); }
+.rf-columns .btn.is-danger { opacity: 0; color: var(--color-text-dim); border-color: transparent; }
+.rf-columns tr:hover .btn.is-danger, .rf-columns .btn.is-danger:focus-visible { opacity: 1; color: var(--color-error); }

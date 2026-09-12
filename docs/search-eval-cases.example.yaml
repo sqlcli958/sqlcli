@@ -1,0 +1,29 @@
+# 检索评估集模板（sql-cli <alias> schema search-eval --cases <本文件>）
+#
+# 每个 case 是一次真实的找表/找字段提问：
+#   query  — 用户会输入的业务词（中文按二元切词，多词可跨字段命中）
+#   expect — 期望命中的图谱对象 id 列表，任意一个进入结果即算该 case 命中
+#
+# id 格式（与 add-relation 的端点引用一致）：
+#   表:   table:<alias>:<schema>.<table>
+#   字段: column:<alias>:<schema>.<table>.<column>
+#   术语: term:<alias>:<name>
+#
+# 指标：Top1 / Top5 命中率、MRR。全部 case 有命中退出码 0，
+# 存在完全未命中的 case 退出码 1（badcase 会逐条列出），可直接接 CI。
+#
+# 这份是模板，跑不了（app-dev 这个 alias 不存在）。真正接了 CI 的评估集在
+# src/test/resources/search-eval-cases.shop.yaml，配 SearchEvalRegressionTest.java
+# 里手搭的电商 fixture 工作区（订单/用户/商品/支付/物流），断言 Top1/Top5/MRR 下限，
+# 顺带钉住实时引擎与索引引擎的排序一致性。
+cases:
+  - query: "买家手机"
+    expect:
+      - column:app-dev:app.orders.buyer_phone
+  - query: "订单状态"
+    expect:
+      - column:app-dev:app.orders.status
+  - query: "订单"
+    expect:
+      - table:app-dev:app.orders
+      - term:app-dev:order

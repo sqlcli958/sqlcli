@@ -1,0 +1,14 @@
+/config/schema-graphs/
+/.DS_Store
+/**/.DS_Store
+/dependency-reduced-pom.xml
+/target/
+/tests/reports/
+/.claude/
+/.sql-cli/
+/web/node_modules/
+/.idea/
+/dist/
+/web/dist/
+ui-out.log
+ui-err.log

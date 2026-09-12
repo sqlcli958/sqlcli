@@ -1,0 +1,459 @@
+/* 工作台页。颜色沿用 App.css 的 :root token。 */
+
+.wb {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.wb-head h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  font-family: var(--font-mono);
+}
+
+.wb-head p {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: 14.5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wb-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wb-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wb-section-title {
+  margin: 0;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.wb-link {
+  font-size: 13px;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.wb-link:hover {
+  text-decoration: underline;
+}
+
+/* ── 指标条 ── */
+
+.wb-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 1px;
+  background: var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.wb-metric {
+  background: var(--color-surface);
+  padding: 14px 16px;
+}
+
+.wb-metric-v {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.wb-metric-k {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+
+/* ── 完整性覆盖率 ── */
+
+.wb-coverage {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 12px 16px;
+}
+
+.wb-coverage-row {
+  display: grid;
+  grid-template-columns: 14px 96px 1fr 96px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+
+.wb-coverage-label {
+  color: var(--color-text-muted);
+}
+
+.wb-coverage-bar {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.wb-coverage-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.wb-coverage-bar-fill[data-tone='ok'] { background: var(--color-success); }
+.wb-coverage-bar-fill[data-tone='warn'] { background: var(--color-warning); }
+.wb-coverage-bar-fill[data-tone='bad'] { background: var(--color-error); }
+
+.wb-coverage-count {
+  text-align: right;
+  font-family: var(--font-mono);
+  color: var(--color-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 关注卡片 ── */
+
+.wb-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(258px, 1fr));
+  gap: 12px;
+}
+
+.wb-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-text-dim);
+  border-radius: 6px;
+  padding: 15px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.wb-card[data-tone='ok'] { border-left-color: var(--color-success); }
+.wb-card[data-tone='warn'] { border-left-color: var(--color-warning); }
+.wb-card[data-tone='bad'] { border-left-color: var(--color-error); }
+.wb-card[data-tone='info'] { border-left-color: var(--color-border); }
+
+.wb-card[data-tone='info'] h3,
+.wb-card[data-tone='info'] p {
+  color: var(--color-text-muted);
+}
+
+.wb-card h3 {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 620;
+}
+
+.wb-card p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.62;
+  color: var(--color-text-muted);
+}
+
+.wb-card-note {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--color-text-dim) !important;
+}
+
+.wb-card-action {
+  margin-top: 3px;
+}
+
+/* ── 数据源目录 ── */
+
+.wb-sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+  gap: 12px;
+}
+
+.wb-source {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wb-source-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wb-source-top h2 {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 620;
+}
+
+.wb-source-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.wb-source-stat {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.wb-source-stat b {
+  font-family: var(--font-mono);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-source-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.wb-tag {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.wb-tag.is-lock {
+  color: var(--color-warning);
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+/* ── SQL 编辑器 ── */
+
+.wb-sql {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  tab-size: 2;
+}
+
+.wb-sql:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.wb-sql-wrap {
+  position: relative;
+}
+
+/* 补全浮层。left/top 由 caretCoords 现算，跟着插入点走，不引 Monaco/第三方补全库。 */
+.wb-autocomplete {
+  position: absolute;
+  z-index: 20;
+  margin: 2px 0 0;
+  padding: 4px;
+  list-style: none;
+  min-width: 260px;
+  max-width: 460px;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.wb-autocomplete li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.wb-autocomplete li.is-active,
+.wb-autocomplete li:hover {
+  background: var(--color-bg);
+}
+
+.wb-autocomplete li.is-active .wb-ac-name {
+  color: var(--color-primary);
+}
+
+/* 表/列的区分标记。用字而不是图标：两个汉字比自造两个 12px 图标好认。 */
+.wb-ac-kind {
+  font-family: var(--font-sans, inherit);
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  border-radius: 3px;
+  background: var(--color-bg);
+  color: var(--color-text-dim);
+}
+
+.wb-ac-name {
+  white-space: nowrap;
+}
+
+/* 业务名 / 类型：靠右、压暗、放不下就截断——它是补充不是主角 */
+.wb-ac-detail {
+  justify-self: end;
+  color: var(--color-text-dim);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wb-approval {
+  margin: 0;
+  padding: 9px 13px;
+  border: 1px solid #fde68a;
+  border-left: 3px solid var(--color-warning);
+  border-radius: 5px;
+  background: #fffbeb;
+  color: var(--color-warning);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 写操作确认面板。红边不是报错，是“接下来会改数据”。 */
+.wb-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 15px 17px;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-error);
+  border-radius: 6px;
+  background: var(--color-surface);
+}
+
+.wb-confirm h3 {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 620;
+}
+
+.wb-confirm-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.wb-confirm-facts dt {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+
+.wb-confirm-facts dd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0 0;
+  font-size: 13.5px;
+  font-family: var(--font-mono);
+}
+
+/* ── 通用 ── */
+
+
+.wb-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 28px;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: 6px;
+}
+
+.wb-hint,
+.wb-foot {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.wb-foot {
+  font-size: 12px;
+  color: var(--color-text-dim);
+}
+
+.wb-muted {
+  color: var(--color-text-dim);
+}
+
+.wb-alert {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--color-error);
+}
+
+.wb code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--color-bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* 规则提示：advisory 级违规不改变结果，用警告色的左边线和执行失败的红区分开。 */
+.wb-notices { margin: 8px 0 0; padding: 6px 12px; list-style: none; border-left: 2px solid var(--color-warning); background: var(--color-surface); color: var(--color-text-muted); font-size: 12px; line-height: 1.7; white-space: pre-wrap; }

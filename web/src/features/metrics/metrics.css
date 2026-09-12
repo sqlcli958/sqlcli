@@ -1,0 +1,59 @@
+/* 指标页。列表/表单沿用 knowledge.css 的 term-list 与 metric 前缀通用样式
+   （MetricList 是从图谱页搬过来的，那套类名本来就是给这块内容用的）。
+   这里只补页头和图表这两块新东西。 */
+
+.metrics-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.metrics-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.metrics-head h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.metric-link {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.metric-link:hover {
+  text-decoration: underline;
+}
+
+.metric-chart-block {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-border);
+}
+
+.metric-range-group {
+  display: flex;
+  gap: 4px;
+}
+
+.metric-chart-wrap {
+  margin-top: 10px;
+}
+
+.metric-approval {
+  margin: 8px 0 0;
+  padding: 9px 13px;
+  border: 1px solid #fde68a;
+  border-left: 3px solid var(--color-warning);
+  border-radius: 5px;
+  background: #fffbeb;
+  color: var(--color-warning);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}

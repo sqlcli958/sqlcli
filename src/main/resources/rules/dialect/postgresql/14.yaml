@@ -1,0 +1,58 @@
+kind: dialect-ruleset
+id: postgresql-14
+title: PostgreSQL 14 dialect guidance
+version: "1"
+dbType: postgresql
+match:
+  productNameIncludes: [postgresql]
+  productVersionRegex: "^14\\."
+rules:
+  - id: postgresql-pagination
+    title: PostgreSQL pagination
+    category: dialect_sql_pattern
+    statement:
+      topic: pagination
+      matchRegex: "(?is)\\b(TOP\\s+\\d+|ROWNUM)\\b"
+      message: "PostgreSQL 14 pagination uses LIMIT with optional OFFSET"
+  - id: postgresql-identifier
+    title: PostgreSQL identifier quoting
+    category: dialect_sql_pattern
+    statement:
+      topic: identifier
+      matchRegex: "(?is)`[A-Za-z_][A-Za-z0-9_]*`"
+      message: "PostgreSQL quoted identifiers use double quotes"
+  - id: postgresql-schema
+    title: PostgreSQL schema selection
+    category: dialect_sql_pattern
+    statement:
+      topic: schema
+      matchRegex: "(?is)\\bUSE\\s+[A-Za-z_][A-Za-z0-9_]*\\b"
+      message: "PostgreSQL selects schemas with search_path or schema-qualified names"
+  - id: postgresql-datetime
+    title: PostgreSQL datetime functions
+    category: dialect_sql_pattern
+    statement:
+      topic: datetime
+      matchRegex: "(?is)\\b(SYSDATE|GETDATE)\\s*\\("
+      message: "PostgreSQL uses CURRENT_TIMESTAMP or clock_timestamp()"
+  - id: postgresql-json
+    title: PostgreSQL JSON syntax
+    category: dialect_sql_pattern
+    statement:
+      topic: json
+      matchRegex: "(?is)\\bJSON_EXTRACT\\s*\\("
+      message: "PostgreSQL uses json/jsonb operators and functions"
+  - id: postgresql-upsert
+    title: PostgreSQL upsert
+    category: dialect_sql_pattern
+    statement:
+      topic: upsert
+      matchRegex: "(?is)\\bON\\s+DUPLICATE\\s+KEY\\b"
+      message: "PostgreSQL 14 upsert uses ON CONFLICT"
+  - id: postgresql-ddl
+    title: PostgreSQL common DDL
+    category: dialect_sql_pattern
+    statement:
+      topic: ddl
+      matchRegex: "(?is)\\bAUTO_INCREMENT\\b"
+      message: "PostgreSQL uses identity columns instead of AUTO_INCREMENT"

@@ -1,0 +1,43 @@
+#!/usr/bin/env sh
+
+set -eu
+
+# Resolve symlink to get actual script directory
+SCRIPT_PATH="$0"
+while [ -L "$SCRIPT_PATH" ]; do
+  SCRIPT_PATH=$(readlink "$SCRIPT_PATH")
+done
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)
+JAR_PATH="$SCRIPT_DIR/target/sql-cli.jar"
+
+if [ ! -f "$JAR_PATH" ]; then
+  echo "sql-cli jar not found: $JAR_PATH" >&2
+  echo "Run: mvn -q -DskipTests package" >&2
+  exit 1
+fi
+
+if [ -n "${JAVA_HOME:-}" ] && [ -x "${JAVA_HOME}/bin/java" ]; then
+  JAVA_BIN="${JAVA_HOME}/bin/java"
+else
+  JAVA_BIN="java"
+fi
+
+# 检查是否有 debug 参数，提前设置日志级别
+JAVA_OPTS=""
+for arg in "$@"; do
+  if [ "$arg" = "-d" ] || [ "$arg" = "--debug" ]; then
+    JAVA_OPTS="-DSQLCLI_DEBUG=DEBUG"
+    break
+  fi
+done
+
+# 跳过代理的 IP 地址列表（Java 使用 | 分隔，支持 * 通配符）
+# 用于 Clash Verge 等本地代理软件
+# 默认包含 172.100.1.x（公网 IP，不在 Java 默认私有 IP 范围内）
+NON_PROXY_HOSTS="${SQLCLI_NON_PROXY_HOSTS:-172.100.1.*}"
+JAVA_OPTS="$JAVA_OPTS -Dhttp.nonProxyHosts=$NON_PROXY_HOSTS -DsocksNonProxyHosts=$NON_PROXY_HOSTS"
+
+# 配置与驱动都按 ~/.sql-cli 解析（SettingsConfig.configRoot），跟当前目录无关。
+# 这里仍然 cd 一下只是为了让相对路径的 --file / --output 有个稳定基准。
+cd "$SCRIPT_DIR"
+exec "$JAVA_BIN" $JAVA_OPTS -jar "$JAR_PATH" "$@"

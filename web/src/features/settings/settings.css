@@ -1,0 +1,189 @@
+.settings { display: flex; flex-direction: column; gap: 22px; }
+
+.settings-head { display: flex; flex-direction: column; gap: 14px; }
+
+.settings-head h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  font-family: var(--font-mono);
+}
+
+.settings-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--color-border); }
+
+.settings-tabs button {
+  font: inherit;
+  font-size: 13.5px;
+  padding: 7px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+
+.settings-tabs button:hover:not(:disabled) { color: var(--color-text); }
+.settings-tabs button.is-active { color: var(--color-primary); border-bottom-color: var(--color-primary); font-weight: 600; }
+.settings-tabs button:disabled { opacity: 0.45; cursor: not-allowed; }
+.settings-tabs button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+
+.settings-block { display: flex; flex-direction: column; gap: 14px; }
+.settings-block-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.settings-block-head h2 { margin: 0; font-size: 15px; font-weight: 620; }
+
+.settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 13.5px;
+}
+
+.settings-table th {
+  text-align: left;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  padding: 10px 14px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.settings-table td { padding: 11px 14px; border-bottom: 1px solid var(--color-border); vertical-align: middle; color: var(--color-text-muted); }
+.settings-table tr:last-child td { border-bottom: none; }
+.settings-table thead tr:first-child th:first-child { border-top-left-radius: 6px; }
+.settings-table thead tr:first-child th:last-child { border-top-right-radius: 6px; }
+
+.settings-name { font-family: var(--font-mono); color: var(--color-text); font-weight: 560; display: block; }
+.settings-table td small { display: block; margin-top: 2px; font-size: 12px; color: var(--color-text-dim); }
+.settings-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.settings-dim { color: var(--color-text-dim); }
+/*
+ * 挂在 td **里面的 div** 上，不是 td 本身。
+ * `display:flex` 打在 td 上会让它不再是 table-cell，浏览器补一个匿名单元格包住它——
+ * 于是这一格的 border-bottom 按自己的盒子画，和同行其它格的分隔线错开一截。
+ */
+.settings-row-actions { position: relative; display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* 次要操作收进「⋯」菜单：主行只留编辑与测试连接，避免一行挤 5 个按钮。 */
+.settings-test-ok, .settings-test-fail { flex-basis: 100%; margin: 4px 0 0; font-size: 12px; text-align: right; }
+.settings-test-ok { color: var(--color-success); }
+.settings-test-fail { color: var(--color-error); }
+.settings-secret { flex-basis: 100%; display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; }
+.settings-secret input { flex: 0 1 200px; padding: 4px 8px; }
+.settings-secret small { flex-basis: 100%; text-align: right; color: var(--color-error); }
+
+
+.settings-gap {
+  border: 1px dashed var(--color-border);
+  border-radius: 6px;
+  padding: 15px 18px;
+  background: var(--color-surface);
+}
+
+.settings-gap h3 { margin: 0 0 8px; font-size: 13.5px; font-weight: 620; }
+.settings-gap p { margin: 0 0 8px; font-size: 13px; color: var(--color-text-muted); }
+.settings-gap ul { margin: 0 0 8px; padding-left: 20px; }
+.settings-gap li { font-size: 13px; color: var(--color-text-muted); margin-bottom: 4px; }
+.settings-gap code { font-family: var(--font-mono); font-size: 12.5px; background: var(--color-bg); padding: 1px 5px; border-radius: 3px; }
+
+.settings-hint { margin: 0; font-size: 13px; color: var(--color-text-muted); }
+.settings-alert { margin: 0; font-size: 13.5px; color: var(--color-error); }
+
+.settings-mono { font-family: var(--font-mono); font-size: 12px; word-break: break-all; }
+
+/* ── 驱动表单：与别名表单同一套分组样式（复用 alias-section / alias-grid-2） ── */
+.driver-form-page {
+  width: min(760px, 100%);
+  display: grid;
+  gap: 18px;
+}
+
+.driver-jar-list {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.driver-jar-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+}
+
+.driver-jar-list code {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.driver-jar-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 上传按钮是 label 包 input[type=file]，要自己撑出按钮的手型和内边距 */
+.driver-jar-add > label.btn {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.driver-jar-add > input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.driver-jar-or {
+  font-size: 12px;
+  color: var(--color-text-dim);
+  flex-shrink: 0;
+}
+
+.driver-jar-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-dim);
+}
+
+/* 三个审批开关。挤在一格里，靠 title 说明各管什么，不占版面。 */
+.settings-switches {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.settings-switches label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.settings-switches input:checked + * ,
+.settings-switches label:has(input:checked) {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.settings-switches small {
+  color: #b91c1c;
+}

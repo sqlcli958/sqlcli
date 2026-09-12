@@ -1,0 +1,18 @@
+aliases:
+  pct-mysql:
+    dbType: mysql
+    driverRef: mysql8
+    url: jdbc:mysql://localhost:53306/dev_qm_pct
+    username: root
+    secretRef: keyring:pct-mysql
+    description: PCT开发环境MySQL
+    readonly: false
+    params:
+      useSSL: 'false'
+      serverTimezone: Asia/Shanghai
+      maximumPoolSize: '3'
+      minimumIdle: '0'
+      connectionTimeoutMs: '5000'
+      idleTimeoutMs: '120000'
+      maxLifetimeMs: '600000'
+      defaultQueryLimit: '100'

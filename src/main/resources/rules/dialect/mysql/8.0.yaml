@@ -1,0 +1,58 @@
+kind: dialect-ruleset
+id: mysql-8
+title: MySQL 8.0 dialect guidance
+version: "1"
+dbType: mysql
+match:
+  productNameIncludes: [mysql]
+  productVersionRegex: "^8\\."
+rules:
+  - id: mysql-pagination
+    title: MySQL pagination
+    category: dialect_sql_pattern
+    statement:
+      topic: pagination
+      matchRegex: "(?is)\\bFETCH\\s+(FIRST|NEXT)\\b"
+      message: "MySQL 8.0 pagination uses LIMIT with optional OFFSET"
+  - id: mysql-identifier
+    title: MySQL identifier quoting
+    category: dialect_sql_pattern
+    statement:
+      topic: identifier
+      matchRegex: "(?is)\"[A-Za-z_][A-Za-z0-9_]*\""
+      message: "MySQL identifiers should use backticks when quoting is required"
+  - id: mysql-schema
+    title: MySQL catalog selection
+    category: dialect_sql_pattern
+    statement:
+      topic: schema
+      matchRegex: "(?is)\\bSET\\s+search_path\\b"
+      message: "MySQL selects a catalog with USE or a catalog-qualified object name"
+  - id: mysql-datetime
+    title: MySQL datetime functions
+    category: dialect_sql_pattern
+    statement:
+      topic: datetime
+      matchRegex: "(?is)\\bSYSTIMESTAMP\\b"
+      message: "MySQL uses CURRENT_TIMESTAMP for the current timestamp"
+  - id: mysql-json
+    title: MySQL JSON syntax
+    category: dialect_sql_pattern
+    statement:
+      topic: json
+      matchRegex: "(?is)(::\\s*jsonb\\b|\\bjsonb_[A-Za-z_]+\\b)"
+      message: "MySQL uses the JSON type and JSON_* functions"
+  - id: mysql-upsert
+    title: MySQL upsert
+    category: dialect_sql_pattern
+    statement:
+      topic: upsert
+      matchRegex: "(?is)\\bON\\s+CONFLICT\\b"
+      message: "MySQL 8.0 upsert uses ON DUPLICATE KEY UPDATE"
+  - id: mysql-ddl
+    title: MySQL common DDL
+    category: dialect_sql_pattern
+    statement:
+      topic: ddl
+      matchRegex: "(?is)\\bCREATE\\s+INDEX\\s+CONCURRENTLY\\b"
+      message: "MySQL does not support CREATE INDEX CONCURRENTLY"

@@ -1,0 +1,170 @@
+/* 执行记录。评审页的第三个标签，颜色沿用 App.css 的 :root token。
+   筛选条用评审页公共的 .review-bar，分页条用全局 .pager，这里只管列表本身。 */
+
+.exec-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+/* 翻页中保留旧数据，压暗表示正在取下一页——比整块闪成"加载中"稳定。 */
+.exec-list[data-stale] {
+  opacity: 0.55;
+}
+
+.exec-row {
+  display: grid;
+  grid-template-columns: 14px 150px 62px minmax(0, 1fr) 62px 62px auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.exec-row:last-child {
+  border-bottom: none;
+}
+
+.exec-row[data-open] {
+  background: var(--color-surface-alt, #f6f8fa);
+}
+
+.exec-row time {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.exec-type {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+/* SQL 单元格本身是展开开关，所以是 button——但要长得像一段代码 */
+.exec-sql {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.exec-sql code {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exec-sql:hover code {
+  text-decoration: underline;
+}
+
+.exec-rows,
+.exec-ms {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-dim);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 展开面板与回滚面板都跨满整行，落在这条记录下方 */
+.exec-detail,
+.exec-recovery,
+.exec-row .rerun-panel {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.exec-detail,
+.exec-recovery {
+  padding: 8px 0 4px;
+}
+
+.exec-detail h4,
+.exec-recovery h4 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 10px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.exec-detail h4:first-child,
+.exec-recovery h4:first-child {
+  margin-top: 0;
+}
+
+.exec-detail h4 small,
+.exec-recovery h4 small {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.exec-detail pre,
+.exec-recovery pre {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 5px;
+  background: var(--color-bg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.exec-error {
+  color: var(--color-error);
+}
+
+.exec-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+.exec-facts dt {
+  color: var(--color-text-muted);
+}
+
+.exec-facts dd {
+  margin: 0;
+}
+
+.exec-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.exec-link {
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .exec-row {
+    grid-template-columns: 14px minmax(0, 1fr);
+    gap: 4px 10px;
+  }
+  .exec-rows,
+  .exec-ms {
+    text-align: left;
+  }
+}

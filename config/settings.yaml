@@ -1,0 +1,51 @@
+aliasesPath: aliases.yaml
+masterPasswordEnv: SQLCLI_MASTER_PASSWORD
+schemaGraphPath: config/schema-graphs
+driverDefaults:
+  oracle: oracle6
+  postgresql: pg42
+  clickhouse: clickhouse09
+  mysql: mysql8
+  sqlite: sqlite3
+drivers:
+  mysql8:
+    dbType: mysql
+    driverClass: com.mysql.cj.jdbc.Driver
+    jars:
+    - ./drivers/mysql/mysql-connector-j-8.3.0.jar
+  pg42:
+    dbType: postgresql
+    driverClass: org.postgresql.Driver
+    jars:
+    - ./drivers/postgresql/postgresql-42.7.1.jar
+  oracle6:
+    dbType: oracle
+    driverClass: oracle.jdbc.OracleDriver
+    jars:
+    - ./drivers/oracle/ojdbc6-11.2.0.4.jar
+  oracle19:
+    dbType: oracle
+    driverClass: oracle.jdbc.OracleDriver
+    jars:
+    - ./drivers/oracle/ojdbc8-19.22.jar
+  clickhouse09:
+    dbType: clickhouse
+    driverClass: com.clickhouse.jdbc.ClickHouseDriver
+    jars:
+    - ./drivers/clickhouse/clickhouse-jdbc-0.6.3-all.jar
+  sqlite3:
+    dbType: sqlite
+    driverClass: org.sqlite.JDBC
+    jars: []
+secrets:
+  pct-mysql:
+    type: aes-gcm
+    salt: HOZHsHPwGV+h46WT7AHaEA==
+    iv: eqK0PxBcbMaqVJ4E
+    ciphertext: Y6rQ+sJPu61yX2jhF/kX2mx1UbCv/V79+4NZHW7oWls=
+  yearning-token-yearning:
+    type: plaintext
+    salt: null
+    iv: null
+    ciphertext: null
+    value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODIzMTcyNzAsIm5hbWUiOiJTaGVuamlmZWkiLCJyb2xlIjoiZ3Vlc3QifQ.Hdzp9UeTiHRQDKcxOEiILC0_MmhOnAgtX7Dum2OwhXE

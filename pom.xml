@@ -1,0 +1,522 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.sqlcli</groupId>
+    <artifactId>sql-cli</artifactId>
+    <version>1.0.3-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>sql-cli</name>
+    <description>A lightweight multi-database CLI tool for agents and humans</description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <picocli.version>4.7.5</picocli.version>
+        <snakeyaml.version>2.2</snakeyaml.version>
+        <slf4j.version>2.0.9</slf4j.version>
+        <logback.version>1.4.14</logback.version>
+        <hikaricp.version>5.1.0</hikaricp.version>
+        <jackson.version>2.16.1</jackson.version>
+        <lombok.version>1.18.30</lombok.version>
+        <!-- 只在 it-clickhouse profile 里用到；默认构建不解析这两个版本对应的 jar。 -->
+        <testcontainers.version>1.20.4</testcontainers.version>
+        <clickhouse-jdbc.version>0.9.8</clickhouse-jdbc.version>
+    </properties>
+
+    <dependencies>
+        <!-- CLI Framework -->
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <version>${picocli.version}</version>
+        </dependency>
+
+        <!-- Configuration -->
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>${snakeyaml.version}</version>
+        </dependency>
+
+        <!-- Logging -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${logback.version}</version>
+        </dependency>
+
+        <!-- Connection Pool (Optional) -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>${hikaricp.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.78.1</version>
+        </dependency>
+
+        <!-- SQL Parser -->
+        <dependency>
+            <groupId>com.github.jsqlparser</groupId>
+            <artifactId>jsqlparser</artifactId>
+            <version>4.9</version>
+        </dependency>
+
+        <!-- Jackson for JSON/YAML -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- 运行库（sql_execution / task_run / graph_change_log）。
+             缺了它 RunStateStore 的写入会静默失败（异常被降级成 debug 日志），
+             UI 的运行记录页就永远是空的。 -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.46.1.3</version>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>5.17.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>net.bytebuddy</groupId>
+            <artifactId>byte-buddy-agent</artifactId>
+            <version>1.17.5</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <profiles>
+        <!-- Web frontend build profile: mvn package -Pweb -->
+        <profile>
+            <id>web</id>
+            <!--
+                四个执行都挂 prepare-package 而不是 generate-resources：
+                后者会让每一次 `mvn test` 都跑 npm ci + vite build——后端测试根本不需要
+                重建前端，白等几十秒，而且并行开发时会把 web/node_modules 搅坏
+                （实测有两个并行任务因此跑不了测试，只能加 -P '!web' 绕开）。
+                prepare-package 在 package 之前、test 之后：`mvn test` 够不到它，
+                `mvn package` 仍然会在打 jar 前把 web/dist 拷进 target/classes/web。
+            -->
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>npm-ci</id>
+                                <phase>prepare-package</phase>
+                                <goals><goal>exec</goal></goals>
+                                <configuration>
+                                    <workingDirectory>${project.basedir}/web</workingDirectory>
+                                    <executable>npm</executable>
+                                    <arguments>
+                                        <argument>ci</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>npm-build</id>
+                                <phase>prepare-package</phase>
+                                <goals><goal>exec</goal></goals>
+                                <configuration>
+                                    <workingDirectory>${project.basedir}/web</workingDirectory>
+                                    <executable>npm</executable>
+                                    <arguments>
+                                        <argument>run</argument>
+                                        <argument>build</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- bundle 文件名每次构建都换 hash，不先清理会在 target/classes/web
+                         里越堆越多并全部打进 jar（实测堆到 20 多份历史 bundle）。 -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-clean-plugin</artifactId>
+                        <version>3.3.2</version>
+                        <executions>
+                            <execution>
+                                <id>clean-web-dist</id>
+                                <phase>prepare-package</phase>
+                                <goals><goal>clean</goal></goals>
+                                <configuration>
+                                    <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                                    <filesets>
+                                        <fileset>
+                                            <directory>${project.build.outputDirectory}/web</directory>
+                                        </fileset>
+                                    </filesets>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>copy-web-dist</id>
+                                <phase>prepare-package</phase>
+                                <goals><goal>copy-resources</goal></goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.outputDirectory}/web</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${project.basedir}/web/dist</directory>
+                                            <filtering>false</filtering>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+            CH-P1-027：ClickHouse Testcontainers 集成测试，默认不参与构建。
+
+            开启方式：mvn -Pit-clickhouse verify（需要本机 Docker）。
+            CI 按需加这个 profile；本地没 Docker 的开发机跑 mvn test / mvn package
+            完全不受影响——既不下载 testcontainers/clickhouse-jdbc，也不编译、
+            不执行任何 *IT.java。
+
+            为什么默认不受影响，两层保险：
+            1. 依赖只声明在这个 profile 里，profile 不激活就不解析、不下载。
+            2. 上面 maven-compiler-plugin 默认把 **/*IT.java 排除出 testCompile；
+               只有这里用 combine.self="override" 清空排除列表，这些文件才会被编译
+               ——避免了"依赖不在但源码还在编译范围内"这种编译期直接失败的情况。
+
+            集成测试跑在 maven-failsafe-plugin（verify 阶段），不是 surefire（test 阶段）：
+            两者分工清楚，`mvn test` 永远只碰单元测试，`mvn verify -Pit-clickhouse`
+            才会碰真容器。failsafe 对 *IT.java 是内置默认 include，不用额外配置。
+        -->
+        <profile>
+            <id>it-clickhouse</id>
+            <dependencies>
+                <dependency>
+                    <groupId>org.testcontainers</groupId>
+                    <artifactId>testcontainers</artifactId>
+                    <version>${testcontainers.version}</version>
+                    <scope>test</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.testcontainers</groupId>
+                    <artifactId>junit-jupiter</artifactId>
+                    <version>${testcontainers.version}</version>
+                    <scope>test</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.testcontainers</groupId>
+                    <artifactId>clickhouse</artifactId>
+                    <version>${testcontainers.version}</version>
+                    <scope>test</scope>
+                </dependency>
+                <!--
+                    只有集成测试需要真正连接 ClickHouse，所以驱动只在这个 profile 里声明。
+                    生产路径仍然是 config/settings.yaml 里的 driverRef + ./drivers/ 下的外部 jar
+                    （DriverLoader 用隔离 ClassLoader 加载），这里走 Maven 依赖只是为了让测试进程的
+                    DriverManager 能直接找到驱动，两条路径不冲突、也不改动生产加载机制。
+                -->
+                <dependency>
+                    <groupId>com.clickhouse</groupId>
+                    <artifactId>clickhouse-jdbc</artifactId>
+                    <version>${clickhouse-jdbc.version}</version>
+                    <classifier>all</classifier>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <testExcludes combine.self="override"/>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <version>3.2.5</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <systemPropertyVariables>
+                                <picocli.ansi>false</picocli.ansi>
+                                <sqlcli.home>${project.build.directory}/test-sqlcli-home</sqlcli.home>
+                                <sqlcli.configRoot>${project.build.directory}/test-sqlcli-config</sqlcli.configRoot>
+                        <!--
+                            兜底第三层：把 user.home 也指走。
+
+                            上面两条是「按属性隔离」，前提是每个用例都不破坏那两个属性。
+                            2026-09-07 实测这个前提不成立：单跑 SqlCliTest 一行都不漏，
+                            跑全量套件却往真实运行库写了 41 行（surefire 复用同一个 JVM，
+                            某个用例改了属性没还干净，顺序一变就漏）。找出那个用例不划算，
+                            因为下一个漏的人还会出现。
+
+                            指走 user.home 之后，连绕过 sqlcli.home 的代码路径也只能解析到
+                            build 目录——**结构上够不着开发机的 ~/.sql-cli**，这才是
+                            上面那条注释说的「不可能漏」。
+                        -->
+                        <user.home>${project.build.directory}/test-user-home</user.home>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <build>
+        <plugins>
+            <!-- Compiler Plugin -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>17</source>
+                    <target>17</target>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    <!--
+                        CH-P1-027：*IT.java 是 Testcontainers 集成测试，依赖只在 it-clickhouse
+                        profile 里声明（见下方 profiles）。默认构建（mvn test / package）
+                        不排除它们的话，testCompile 阶段就会因为 classpath 上没有
+                        testcontainers/clickhouse-jdbc 而直接编译失败——不是"跳过"而是"炸"，
+                        比没做还差。这里默认排除编译，it-clickhouse profile 里用
+                        combine.self="override" 清空这条排除，让它们参与编译。
+                    -->
+                    <testExcludes>
+                        <testExclude>**/*IT.java</testExclude>
+                    </testExcludes>
+                </configuration>
+            </plugin>
+
+            <!--
+                sqlcli.configRoot 把测试进程的 config/ 隔离到 build 目录后，测试默认看不到
+                仓库里已提交的 config/settings.yaml——但 DriverResolverTest/AliasResolverTest
+                这类用例要靠里面的驱动定义（clickhouse09 之类 driverRef）才能跑通。
+
+                复制一份到隔离目录：写坏的是这份副本，写不到仓库里已提交的那份。
+                **不复制 aliases.yaml**——那是要保护的对象本身，也不该在测试里预置真实生产别名，
+                测试该看到的是一个空的别名表，自己按需 seed。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-test-settings</id>
+                        <phase>process-test-resources</phase>
+                        <goals><goal>copy-resources</goal></goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/test-sqlcli-config/config</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/config</directory>
+                                    <includes>
+                                        <include>settings.yaml</include>
+                                    </includes>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Surefire Plugin - configure for Mockito on JDK 17+ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <argLine>
+                        -javaagent:${settings.localRepository}/net/bytebuddy/byte-buddy-agent/1.17.5/byte-buddy-agent-1.17.5.jar
+                        --add-opens java.base/java.lang=ALL-UNNAMED
+                        --add-opens java.base/java.lang.reflect=ALL-UNNAMED
+                    </argLine>
+                    <systemPropertyVariables>
+                        <!-- 断言帮助文本的测试需要无色输出；Git Bash 的 TERM 会让 picocli 误判为终端 -->
+                        <picocli.ansi>false</picocli.ansi>
+                        <!--
+                            全局把运行库指向 build 目录，测试永远碰不到开发机的 ~/.sql-cli/sqlcli.db。
+
+                            2026-08-26 实测：多数用例用 RunStateStore 默认路径，只有少数几个类自己设了
+                            sqlcli.home，于是真实运行库里攒下大量测试别名的行——graph_change_log 里
+                            unit 3519 / commands 565 / e2e-test 366，而真别名 erp_plush_test 只有 70。
+                            后果不只是脏数据：图谱变更流水 98% 是测试行，按它查审计等于没有。
+
+                            修在这里而不是逐个测试类加 @BeforeEach——漏一个就前功尽弃，
+                            这一行是结构上不可能漏。
+                        -->
+                        <sqlcli.home>${project.build.directory}/test-sqlcli-home</sqlcli.home>
+                        <!--
+                            同上一条，但堵的是另一半：SettingsConfig/AliasConfigStore 用相对路径
+                            定位 config/settings.yaml、config/aliases.yaml，以仓库根为 CWD 跑测试时
+                            会直接写到真实别名配置（里面是生产库地址 + secretRef）。
+                            sqlcli.home 只隔离了运行库，这一条把 config/ 也隔离掉。
+                        -->
+                        <sqlcli.configRoot>${project.build.directory}/test-sqlcli-config</sqlcli.configRoot>
+                        <!--
+                            兜底第三层：把 user.home 也指走。
+
+                            上面两条是「按属性隔离」，前提是每个用例都不破坏那两个属性。
+                            2026-09-07 实测这个前提不成立：单跑 SqlCliTest 一行都不漏，
+                            跑全量套件却往真实运行库写了 41 行（surefire 复用同一个 JVM，
+                            某个用例改了属性没还干净，顺序一变就漏）。找出那个用例不划算，
+                            因为下一个漏的人还会出现。
+
+                            指走 user.home 之后，连绕过 sqlcli.home 的代码路径也只能解析到
+                            build 目录——**结构上够不着开发机的 ~/.sql-cli**，这才是
+                            上面那条注释说的「不可能漏」。
+                        -->
+                        <user.home>${project.build.directory}/test-user-home</user.home>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+
+            <!--
+                打包成一个可执行 jar：target/sql-cli.jar。
+
+                用 shade 而不是 assembly 的 jar-with-dependencies，是因为要按文件过滤——
+                sqlite-jdbc 把 24 个平台的原生库全带上（约 24 MB），一次只用得到一个，
+                assembly 的 descriptorRef 没法排除；顺便 ServicesResourceTransformer
+                会合并 META-INF/services 而不是让最后一个依赖覆盖前面的。
+
+                minimizeJar 不开：picocli / Jackson / JDBC 都靠反射找类，裁了会在运行时
+                才炸。真正占体积的是原生库和前端产物，裁类省不下什么。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <finalName>sql-cli</finalName>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.sqlcli.SqlCli</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                                <!--
+                                    只保留五个平台（约 5 MB）：Windows/x86_64、Mac/x86_64、
+                                    Mac/aarch64、Linux/x86_64、Linux/aarch64。
+                                    sqlite-jdbc 没有纯 Java 回退，jar 里没有对应平台的原生库就连不上
+                                    运行库；而且失败发生在建连接时、被审计层的 catch 吞掉，表现成
+                                    「执行记录永远是空的」，很难反查。所以这个名单等于支持的平台名单。
+
+                                    写成排除而不是包含：sqlite-jdbc 以后新增平台会被自动带上（包变大，
+                                    看得见），而不是被静默漏掉（跑不了，看不见）。
+                                    要跑 Alpine 容器就把 Linux-Musl/x86_64 从排除里去掉。
+                                -->
+                                <filter>
+                                    <artifact>org.xerial:sqlite-jdbc</artifact>
+                                    <excludes>
+                                        <exclude>org/sqlite/native/Linux-Android/**</exclude>
+                                        <exclude>org/sqlite/native/Linux-Musl/**</exclude>
+                                        <exclude>org/sqlite/native/FreeBSD/**</exclude>
+                                        <exclude>org/sqlite/native/Linux/x86/**</exclude>
+                                        <exclude>org/sqlite/native/Linux/arm/**</exclude>
+                                        <exclude>org/sqlite/native/Linux/armv6/**</exclude>
+                                        <exclude>org/sqlite/native/Linux/armv7/**</exclude>
+                                        <exclude>org/sqlite/native/Linux/ppc64/**</exclude>
+                                        <exclude>org/sqlite/native/Linux/riscv64/**</exclude>
+                                        <exclude>org/sqlite/native/Windows/x86/**</exclude>
+                                        <exclude>org/sqlite/native/Windows/armv7/**</exclude>
+                                        <exclude>org/sqlite/native/Windows/aarch64/**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

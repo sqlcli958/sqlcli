@@ -1,0 +1,400 @@
+/* 评审页。颜色沿用 App.css 的 :root token。 */
+
+/* 三个视图共用同一套骨架：头部 → 筛选条 → 内容 → 分页条。 */
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(1100px, 100%);
+  margin: 0 auto;
+  padding: 28px 32px 48px;
+}
+
+/* 标题一行、通栏标签一行：标签的下边框顺带把页头和内容切开。 */
+.review-head {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.review-head h1 {
+  font-size: 22px;
+  margin: 0;
+}
+
+/* ── 图谱标签：候选关系评审队列 ── */
+
+.review-rel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.review-rel-endpoint {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12.5px;
+}
+
+.review-rel-arrow {
+  color: var(--color-text-muted);
+}
+
+.review-rel-meta {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+/* 卡片操作推到右端，跟其他标签的卡片一致 */
+.review-rel-spacer {
+  flex: 1;
+}
+
+.review-hint {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.review-alert {
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.review-card {
+  border: 1px solid var(--color-border);
+  /* 左边一条状态色，比在卡片里再放一行文字省版面 */
+  border-left: 3px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  padding: 12px 14px;
+}
+
+.review-card[data-tone='ok'] { border-left-color: #22c55e; }
+.review-card[data-tone='warn'] { border-left-color: #f59e0b; }
+.review-card[data-tone='bad'] { border-left-color: #ef4444; }
+
+.review-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+
+.review-kind {
+  padding: 1px 7px;
+  border-radius: 3px;
+  background: var(--color-surface-alt, #eef2f7);
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.review-id {
+  font-family: var(--font-mono);
+}
+
+.review-alias {
+  font-family: var(--font-mono);
+  color: var(--color-text);
+}
+
+.review-card-top time {
+  margin-left: auto;
+  font-family: var(--font-mono);
+}
+
+.review-summary {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  word-break: break-all;
+  margin-bottom: 8px;
+}
+
+.review-status {
+  color: var(--color-text);
+}
+
+/* 「已批准」旁边的执行结果。红=被拒或失败，黄=还在跑，沿用全局状态色。 */
+.review-outcome {
+  font-size: 11.5px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.review-outcome[data-tone='bad'] {
+  color: var(--color-error);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.review-outcome[data-tone='warn'] {
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.review-detail {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 5px;
+  background: var(--color-surface-alt, #f6f8fa);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 320px;
+  overflow: auto;
+}
+
+/* 展开开关和裁决按钮同一行：原来分两行，卡片高度白白多一截。 */
+.review-card-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.review-decide {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  min-width: 260px;
+  flex: 1;
+}
+
+.review-decide input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  font-size: 12.5px;
+}
+
+/* 翻页中保留旧数据、压暗，比整块闪成"加载中"稳定。 */
+.review-list[data-stale] {
+  opacity: 0.55;
+}
+
+.review-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px 24px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 5px;
+  background: var(--color-surface-alt, #f6f8fa);
+}
+
+.review-panel h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.review-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.review-facts dt {
+  color: var(--color-text-muted);
+}
+
+.review-facts dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  word-break: break-all;
+}
+
+.review-timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+
+.review-timeline li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.review-timeline em {
+  font-style: normal;
+  color: var(--color-text-muted);
+}
+
+.review-timeline time {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.review-evidence {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.review-evidence li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 0;
+  color: var(--color-text-muted);
+}
+
+.review-evidence time {
+  margin-left: auto;
+  font-family: var(--font-mono);
+}
+
+.review-reason {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin: 4px 0 0;
+}
+
+/* ── 图谱变更 diff（GraphDiff.tsx）── */
+
+/* 只列真正变了的字段，所以行数少；每行是「字段名 / 旧 → 新」 */
+.review-diff {
+  display: block;
+}
+
+.review-diff-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 160px) 1fr;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.review-diff-row dt {
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.review-diff-row dd {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+/* 红删绿增：沿用状态色，红=没了，绿=现在是这样 */
+.review-diff-row del {
+  color: #b91c1c;
+  text-decoration: line-through;
+}
+
+.review-diff-row ins {
+  color: #15803d;
+  text-decoration: none;
+}
+
+.review-diff-row span {
+  color: var(--color-text-muted);
+}
+
+/* ── 批次卡：一批一张，标题是 intent（人裁决的是那件事，不是里面的 40 个对象） ── */
+
+/* 整行都是折叠开关：只做一个小三角的话，点中它需要瞄准 */
+.review-batch-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 6px 0 2px;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+.review-batch-caret {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.review-batch-count {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.review-batch-intent {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.review-batch-check {
+  margin: 0 2px 0 0;
+  flex-shrink: 0;
+}
+
+.review-batch-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 8px;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.review-batch-warn {
+  color: #b45309;
+}
+
+.review-provenance {
+  display: inline-flex;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.review-batch-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.review-batch-item {
+  border-left: 2px solid var(--color-border);
+  padding: 6px 0 6px 10px;
+}
+
+.review-batch-item[data-tone='ok'] { border-left-color: #22c55e; }
+.review-batch-item[data-tone='warn'] { border-left-color: #f59e0b; }
+.review-batch-item[data-tone='bad'] { border-left-color: #ef4444; }
+
+.review-batch-item-top {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}

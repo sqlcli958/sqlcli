@@ -1,0 +1,55 @@
+# sql-cli 数据库别名配置
+# 文档: https://github.com/your-repo/sql-cli
+#
+# 配置项说明:
+#   dbType       - 数据库类型: mysql / postgresql / oracle
+#   driverRef    - 引用 settings.yaml 中的驱动配置
+#   url          - JDBC 连接 URL
+#   username     - 用户名
+#   secretRef    - 密码引用，支持三种方式:
+#                  env:VAR_NAME       - 环境变量
+#                  keyring:service    - macOS Keychain
+#                  encrypted:name     - 加密存储（settings.yaml 中的 secrets）
+#   description  - 描述信息
+#   readonly     - 是否只读（true/false）
+#   params       - 连接参数（可选）
+#
+# 使用示例:
+#   sql-cli my-mysql "SELECT 1"
+#   sql-cli my-oracle tables
+#   sql-cli my-pg ddl my_table
+
+aliases:
+
+  # --- MySQL 示例 ---
+  # my-mysql:
+  #   dbType: mysql
+  #   driverRef: mysql8
+  #   url: jdbc:mysql://localhost:3306/mydb
+  #   username: root
+  #   secretRef: "env:MYSQL_PASSWORD"
+  #   description: "本地 MySQL"
+  #   params:
+  #     useSSL: 'false'
+  #     serverTimezone: Asia/Shanghai
+  #     maximumPoolSize: '3'
+  #     connectionTimeoutMs: '5000'
+
+  # --- PostgreSQL 示例 ---
+  # my-pg:
+  #   dbType: postgresql
+  #   driverRef: pg42
+  #   url: jdbc:postgresql://localhost:5432/mydb?currentSchema=public
+  #   username: postgres
+  #   secretRef: "env:PG_PASSWORD"
+  #   description: "本地 PostgreSQL"
+
+  # --- Oracle 示例 ---
+  # my-oracle:
+  #   dbType: oracle
+  #   driverRef: oracle6
+  #   url: jdbc:oracle:thin:@//localhost:1521/orcl
+  #   username: system
+  #   secretRef: "env:ORACLE_PASSWORD"
+  #   description: "本地 Oracle"
+  #   readonly: true

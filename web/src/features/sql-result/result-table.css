@@ -1,0 +1,104 @@
+.rt {
+  display: grid;
+  gap: 6px;
+}
+
+.rt-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+}
+
+.rt-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12.5px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.rt-table th,
+.rt-table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border);
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rt-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.rt-table th {
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.rt-col-name {
+  display: block;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* 列的业务名：来自图谱，只有能确定来源的列才有 */
+.rt-col-biz {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 400;
+  font-family: var(--font-sans, system-ui);
+}
+
+.rt-col-type {
+  display: block;
+  color: var(--color-text-dim);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.rt-num {
+  text-align: right;
+}
+
+.rt-null {
+  color: var(--color-text-dim);
+}
+
+.rt-foot {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.rt-foot .btn {
+  margin-left: 10px;
+  vertical-align: -1px;
+}
+
+/* 截断是结果不完整，不能藏在脚注里——黄色横栏放在表格上方。 */
+.rt-truncated {
+  margin: 0;
+  padding: 7px 11px;
+  border: 1px solid #fde68a;
+  border-left: 3px solid var(--color-warning);
+  border-radius: 5px;
+  background: #fffbeb;
+  color: var(--color-warning);
+  font-size: 12.5px;
+}
+
+/* ── 重执行按钮与内嵌结果 ── */
+
+.rerun-panel {
+  margin-top: 8px;
+}
+
+.rerun-error {
+  color: var(--color-error);
+  font-size: 12px;
+}
