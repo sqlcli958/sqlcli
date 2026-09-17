@@ -50,14 +50,35 @@ export function ReviewsPage() {
     refetchInterval: 2000,
   });
 
+  const pendingCount = badge.data?.pending ?? 0;
   const counts: Partial<Record<View, number>> = {
-    pending: badge.data?.pending ?? 0,
+    pending: pendingCount,
   };
 
   return (
     <div className="page review">
-      <header className="review-head">
-        <h1>评审</h1>
+      <header className="review-head review-head-v2">
+        <div className="review-title-row">
+          <div className="review-title-copy">
+            <small>REVIEW &amp; AUDIT</small>
+            <h1>评审</h1>
+            <p>把高风险 SQL、图谱变更和执行结果放在同一个控制面里：先看影响，再放行，最后保留可追溯记录。</p>
+          </div>
+          <div className="review-overview" aria-label="评审概览">
+            <div className="review-overview-item">
+              <b>{pendingCount}</b>
+              <span>待审批</span>
+            </div>
+            <div className="review-overview-item">
+              <b title={alias ?? '全部数据源'}>{alias ?? '全部'}</b>
+              <span>当前数据源</span>
+            </div>
+            <div className="review-overview-item">
+              <b>Guarded</b>
+              <span>执行模式</span>
+            </div>
+          </div>
+        </div>
         <Tabs
           label="评审视图"
           items={VIEWS.map((item) => ({ ...item, badge: counts[item.key] }))}
@@ -66,17 +87,19 @@ export function ReviewsPage() {
         />
       </header>
 
-      {view === 'executions' && <ExecutionLog alias={alias} />}
-      {view === 'graph' && <GraphReview alias={alias} />}
-      {(view === 'pending' || view === 'history') && (
-        <ApprovalList
-          key={view}
-          fixedStatus={view === 'pending' ? 'pending' : undefined}
-          // 待审批不拆类型；审批记录排掉图谱——图谱的历史在图谱标签里，还带变更流水
-          excludeKind={view === 'history' ? 'graph' : undefined}
-          alias={alias}
-        />
-      )}
+      <section className="review-stage" data-view={view} aria-label={`${VIEWS.find((item) => item.key === view)?.label ?? '评审'}内容`}>
+        {view === 'executions' && <ExecutionLog alias={alias} />}
+        {view === 'graph' && <GraphReview alias={alias} />}
+        {(view === 'pending' || view === 'history') && (
+          <ApprovalList
+            key={view}
+            fixedStatus={view === 'pending' ? 'pending' : undefined}
+            // 待审批不拆类型；审批记录排掉图谱——图谱的历史在图谱标签里，还带变更流水
+            excludeKind={view === 'history' ? 'graph' : undefined}
+            alias={alias}
+          />
+        )}
+      </section>
     </div>
   );
 }
