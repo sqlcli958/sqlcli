@@ -1,0 +1,426 @@
+/* Product polish v3 extensions: navigation grouping, settings control center,
+   guardrail/evaluation consistency, loading/empty states and responsive details. */
+
+/* ── Grouped primary navigation ── */
+.shell-nav-groups {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.shell-nav-group {
+  display: grid;
+  gap: 5px;
+}
+
+.shell-nav-group-system {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid rgba(88, 132, 166, .15);
+}
+
+.shell-nav-group-label {
+  padding: 0 10px;
+  color: #58758e;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+
+.shell-nav-group ul {
+  flex: none;
+  gap: 4px;
+}
+
+/* Replace the legacy flat-list separators from design-system-v3. */
+.shell-nav-group li,
+.shell-nav-group li:nth-child(2),
+.shell-nav-group li:nth-child(5),
+.shell-nav-group li:last-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.shell[data-nav-collapsed] .shell-nav-groups {
+  gap: 10px;
+}
+
+.shell[data-nav-collapsed] .shell-nav-group-label {
+  height: 1px;
+  margin: 3px 5px 1px;
+  padding: 0;
+  overflow: hidden;
+  background: rgba(88,132,166,.13);
+  color: transparent;
+}
+
+.shell[data-nav-collapsed] .shell-nav-group-system {
+  padding-top: 8px;
+}
+
+/* ── Reusable product states ── */
+.product-empty {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  padding: 28px;
+  border: 1px dashed #2b4b66;
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at 10% 0%, rgba(33,201,255,.07), transparent 16rem),
+    rgba(7, 20, 34, .58);
+}
+
+.product-empty::before {
+  content: '';
+  width: 38px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2f8cff, #21c9ff, #20e0c7);
+}
+
+.product-empty strong {
+  color: #edf9ff;
+  font-size: 16px;
+  font-weight: 680;
+}
+
+.product-empty p {
+  max-width: 620px;
+  margin: 0;
+  color: #8fa8bd;
+  line-height: 1.65;
+}
+
+@keyframes product-skeleton-pulse {
+  0%, 100% { opacity: .42; }
+  50% { opacity: .82; }
+}
+
+.settings-skeleton {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-skeleton span {
+  height: 56px;
+  border: 1px solid #1e3852;
+  border-radius: 9px;
+  background: linear-gradient(90deg, #0a1a2b, #10243a, #0a1a2b);
+  animation: product-skeleton-pulse 1.35s ease-in-out infinite;
+}
+
+/* ── Settings control center ── */
+.settings-block-head-v3 > div:first-child {
+  min-width: 0;
+}
+
+.settings-block-head-v3 p {
+  max-width: 720px;
+  margin: 4px 0 0;
+  color: #809bb1;
+  font-size: 12.5px;
+}
+
+.settings-overview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settings-overview-card {
+  min-height: 82px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 13px 15px;
+  border: 1px solid #213e59;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #0d2137, #091a2d);
+}
+
+.settings-overview-card b {
+  color: #7ee6ff;
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-weight: 720;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-overview-card span {
+  color: #809bb1;
+  font-size: 11.5px;
+}
+
+.settings-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+  border-radius: 10px;
+}
+
+.settings-type-badge {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid #294762;
+  border-radius: 999px;
+  background: #0a1a2c;
+  color: #9ab5ca;
+  font-size: 11px;
+}
+
+.settings-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  color: #a7becf;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-state i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #587189;
+}
+
+.settings-state.is-ok i {
+  background: #36d7a4;
+  box-shadow: 0 0 10px rgba(54,215,164,.22);
+}
+
+.settings-state.is-muted {
+  color: #6d869d;
+}
+
+.settings-switches small {
+  flex-basis: 100%;
+  padding-top: 3px;
+  color: #ff8e9b;
+}
+
+/* ── Metrics catalog polish ── */
+.metrics-page > .term-list > .term-list-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.metrics-page > .term-list > .term-list-item::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: linear-gradient(#21c9ff, #20e0c7);
+  opacity: .65;
+}
+
+.metrics-page .metric-chart-block {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top-color: #25435e;
+}
+
+.metrics-page .metric-chart-wrap {
+  min-height: 190px;
+  padding: 8px;
+  border: 1px solid #203d58;
+  border-radius: 9px;
+  background: #071725;
+}
+
+.metrics-page .metric-sql pre {
+  max-height: 260px;
+  overflow: auto;
+}
+
+.metrics-page .metric-approval {
+  border-radius: 8px;
+}
+
+/* ── Guardrail control center ── */
+.rules-page {
+  background:
+    radial-gradient(circle at 78% 0%, rgba(33,201,255,.035), transparent 28rem),
+    transparent;
+}
+
+.rules-side {
+  border-right-color: #1e3852;
+  background: rgba(8,20,34,.95);
+}
+
+.rules-side-head,
+.rules-bar {
+  border-bottom-color: #203a54;
+  background: rgba(9,24,41,.93);
+  backdrop-filter: blur(12px);
+}
+
+.rules-tree {
+  padding: 10px;
+}
+
+.rules-catalog-link,
+.rules-set-head {
+  border: 1px solid transparent;
+}
+
+.rules-catalog-link:hover,
+.rules-set-head:hover {
+  border-color: rgba(33,201,255,.09);
+  background: rgba(33,201,255,.04);
+}
+
+.rules-catalog-link.is-active,
+.rules-set-head.is-active {
+  border-color: rgba(33,201,255,.18);
+  background: linear-gradient(90deg, rgba(47,123,255,.12), rgba(32,224,199,.05));
+}
+
+.rules-form,
+.catalog {
+  max-width: 1040px;
+}
+
+.rules-pick,
+.rf-row,
+.catalog-rule,
+.rf-columns {
+  border-color: #223e59;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(14,31,52,.96), rgba(8,22,38,.96));
+}
+
+.rules-pick:hover,
+.catalog-rule:hover {
+  border-color: #315b79;
+}
+
+.rules-warn,
+.catalog-note {
+  border-color: rgba(248,185,78,.5);
+  background: rgba(248,185,78,.055);
+}
+
+/* ── Evaluation / graph health ── */
+.eval-kpi {
+  min-height: 96px;
+  border-color: #213f5a;
+  border-radius: 11px;
+  background: linear-gradient(180deg, #0e2238, #091a2d);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.02);
+}
+
+.eval-kpi:first-child {
+  border-color: rgba(33,201,255,.3);
+  background:
+    radial-gradient(circle at 92% 0%, rgba(33,201,255,.08), transparent 9rem),
+    linear-gradient(180deg, #102940, #0a1c2f);
+}
+
+.eval-kpi-value {
+  color: #eefaff;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 710;
+}
+
+.eval-block {
+  border-color: #203d58;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(13,30,50,.96), rgba(8,22,38,.96));
+  box-shadow: var(--shadow-card);
+}
+
+.eval-block h2 {
+  color: #e9f7ff;
+  font-size: 15px;
+}
+
+.eval-table tbody tr:hover td {
+  background: rgba(33,201,255,.035);
+}
+
+.eval-bar-track {
+  overflow: hidden;
+  border: 1px solid #203a54;
+  background: #071827;
+}
+
+/* ── Interaction refinement ── */
+.btn,
+.shell-nav-item,
+.settings-tabs button,
+.rules-pick,
+.metrics-page > .term-list > .term-list-item {
+  transition-property: color, background, border-color, box-shadow, transform, opacity;
+  transition-duration: 140ms;
+  transition-timing-function: ease;
+}
+
+.btn:active:not(:disabled),
+.shell-nav-item:active {
+  transform: translateY(1px);
+}
+
+:where(.btn, .shell-nav-item, .settings-tabs button):focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (max-width: 1100px) {
+  .settings-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .shell-nav-groups {
+    flex-direction: row;
+    gap: 5px;
+    overflow-x: auto;
+  }
+
+  .shell-nav-group,
+  .shell-nav-group-system {
+    display: contents;
+  }
+
+  .shell-nav-group-label {
+    display: none;
+  }
+
+  .shell-nav-group ul {
+    display: contents;
+  }
+
+  .settings-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-overview {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .settings-overview-card {
+    min-height: 72px;
+    padding: 10px 12px;
+  }
+
+  .settings-overview-card b {
+    font-size: 20px;
+  }
+
+  .product-empty {
+    padding: 20px;
+  }
+}

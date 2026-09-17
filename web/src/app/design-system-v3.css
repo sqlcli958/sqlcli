@@ -1,0 +1,852 @@
+/* SQLCLI product design system v3.
+ *
+ * This layer intentionally centralizes typography, spacing, surface depth and the
+ * remaining legacy pages. It is loaded last so older feature CSS can keep its
+ * structural rules while the product language has one source of truth.
+ */
+
+:root {
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system,
+    BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei",
+    "Noto Sans SC", "Source Han Sans SC", sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI",
+    system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei UI",
+    "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", sans-serif;
+  --font-mono: "Cascadia Code", "SFMono-Regular", "SF Mono", "JetBrains Mono",
+    "Fira Code", Consolas, "Microsoft YaHei UI", "PingFang SC", monospace;
+
+  --radius-xs: 5px;
+  --radius-sm: 8px;
+  --radius-md: 11px;
+  --radius-lg: 14px;
+  --surface-raised: #10233a;
+  --surface-panel: #0b1b2e;
+  --surface-subtle: rgba(255, 255, 255, .022);
+  --surface-hover-strong: rgba(33, 201, 255, .075);
+  --border-soft: #1c344d;
+  --border-strong: #294b68;
+  --shadow-card: 0 14px 36px rgba(0, 0, 0, .15), inset 0 1px 0 rgba(255, 255, 255, .025);
+  --shadow-float: 0 22px 56px rgba(0, 0, 0, .34);
+}
+
+html,
+body,
+#root {
+  font-family: var(--font-sans);
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  font-variant-numeric: proportional-nums;
+  text-rendering: optimizeLegibility;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-sans);
+}
+
+body {
+  font-size: 13.5px;
+  line-height: 1.55;
+  letter-spacing: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+.wb-head h1,
+.settings-head h1,
+.metrics-head h1,
+.review-head h1,
+.alias-form-header h1 {
+  font-family: var(--font-display);
+  letter-spacing: -.022em;
+  text-wrap: balance;
+}
+
+h1 { font-weight: 700; }
+h2, h3, h4 { font-weight: 640; }
+
+pre,
+code,
+kbd,
+samp,
+.wb-sql,
+.wb-autocomplete,
+.review-summary,
+.review-detail,
+.settings-mono,
+.alias-mono,
+.term-detail-mono,
+.term-list-mapped,
+.eval-cmd {
+  font-family: var(--font-mono);
+  font-variant-ligatures: contextual;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Mono is for code/identifiers only. Chinese labels and page chrome stay in the UI font. */
+.wb-head h1,
+.wb-section-title,
+.settings-head h1,
+.settings-table th,
+.shell-source::before,
+.knowledge-bar::before,
+.wb:has(.wb-editor) > .wb-head::before,
+.wb:not(:has(.wb-editor)) > .wb-head h1::before,
+.wb:has(.wb-editor) > .wb-empty::before,
+.knowledge-product-title small,
+.knowledge-center::before,
+.review-title-copy > small,
+.alias-section h2 {
+  font-family: var(--font-sans);
+}
+
+.wb-section-title,
+.alias-section h2,
+.settings-table th {
+  letter-spacing: .035em;
+  text-transform: none;
+}
+
+input,
+textarea,
+.select > select,
+.btn {
+  font-size: 13px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #607a92;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: #21c9ff;
+}
+
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid rgba(33, 201, 255, .9);
+  outline-offset: 2px;
+}
+
+.btn {
+  min-height: 34px;
+  border-radius: var(--radius-sm);
+  font-weight: 560;
+}
+
+.btn.is-sm {
+  min-height: 28px;
+  font-size: 12px;
+  border-radius: 7px;
+}
+
+.select > select {
+  min-height: 34px;
+  border-radius: var(--radius-sm);
+}
+
+.select.is-sm > select {
+  min-height: 28px;
+  font-size: 12px;
+  border-radius: 7px;
+}
+
+/* ───────────────────────── App shell / navigation ───────────────────────── */
+
+.shell-brand::after {
+  font-family: var(--font-display);
+  font-weight: 760;
+  letter-spacing: .055em;
+}
+
+.shell-source-input {
+  font-family: var(--font-sans);
+  font-weight: 520;
+}
+
+.shell-meta {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell-nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.shell-nav ul {
+  flex: 1;
+}
+
+.shell-nav li:nth-child(2),
+.shell-nav li:nth-child(5) {
+  margin-top: 8px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(80, 119, 151, .15);
+}
+
+.shell-nav li:last-child {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid rgba(80, 119, 151, .15);
+}
+
+.shell-nav-item {
+  font-size: 13px;
+  font-weight: 520;
+}
+
+.shell-nav-item.is-active {
+  font-weight: 650;
+}
+
+.shell-notice,
+.search-index-warning,
+.metric-approval,
+.wb-approval {
+  border-color: rgba(248, 185, 78, .28);
+  background: rgba(248, 185, 78, .075);
+  color: #ffd58a;
+}
+
+.search-index-warning {
+  border-bottom-color: rgba(248, 185, 78, .22);
+}
+
+/* ───────────────────────── Shared page language ───────────────────────── */
+
+.settings,
+.metrics-page,
+.eval-page {
+  width: min(1280px, 100%);
+  margin-inline: auto;
+}
+
+.settings-head,
+.metrics-head,
+.eval-head {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #213d59;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 92% 0%, rgba(32, 224, 199, .095), transparent 18rem),
+    linear-gradient(110deg, rgba(14, 32, 53, .98), rgba(9, 24, 41, .98));
+  box-shadow: var(--shadow-card);
+}
+
+.settings-head::before,
+.metrics-head::before,
+.eval-head::before {
+  display: block;
+  color: #58d7ff;
+  font-size: 10px;
+  font-weight: 720;
+  letter-spacing: .12em;
+}
+
+.settings-head::before { content: 'PRODUCT SETTINGS'; }
+.metrics-head::before { content: 'SEMANTIC METRICS'; }
+.eval-head::before { content: 'GRAPH QUALITY'; }
+
+.settings-head::after,
+.metrics-head::after,
+.eval-head::after {
+  color: #8fa9be;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.settings-head::after {
+  content: '集中管理数据源、驱动与运行时审批策略。';
+}
+
+.metrics-head::after {
+  content: '统一业务口径、时间粒度与可执行 SQL，让指标从定义直接走到趋势。';
+}
+
+.eval-head::after {
+  content: '用覆盖率、趋势、探针和工作队列持续衡量图谱质量。';
+}
+
+.settings-head {
+  gap: 10px;
+  padding: 20px 22px 0;
+}
+
+.settings-head h1,
+.metrics-head h1,
+.eval-head h1 {
+  margin: 2px 0 0;
+  color: #f3faff;
+  font-size: clamp(24px, 2.6vw, 31px);
+  font-weight: 700;
+}
+
+.metrics-head,
+.eval-head {
+  min-height: 118px;
+  padding: 20px 22px;
+  align-items: flex-start;
+}
+
+.metrics-head {
+  flex-wrap: wrap;
+}
+
+.metrics-head > .btn,
+.eval-head > .btn {
+  margin-left: auto;
+}
+
+.eval-head > .select {
+  margin-left: auto;
+}
+
+/* ───────────────────────── Settings ───────────────────────── */
+
+.settings {
+  gap: 18px;
+}
+
+.settings-tabs {
+  width: calc(100% + 44px);
+  margin: 4px -22px 0;
+  padding: 0 22px;
+  gap: 4px;
+  border-bottom-color: #203a54;
+  background: rgba(6, 19, 33, .3);
+}
+
+.settings-tabs button {
+  min-height: 42px;
+  padding-inline: 14px;
+  border-radius: 8px 8px 0 0;
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.settings-tabs button.is-active {
+  color: #c8f5ff;
+  border-bottom-color: #21c9ff;
+  background: rgba(33, 201, 255, .065);
+}
+
+.settings-block {
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #203b56;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(13, 29, 49, .96), rgba(8, 22, 38, .96));
+  box-shadow: var(--shadow-card);
+}
+
+.settings-block-head {
+  min-height: 36px;
+}
+
+.settings-block-head h2 {
+  color: #eaf7ff;
+  font-size: 16px;
+}
+
+.settings-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border-color: #24425e;
+  border-radius: 10px;
+  background: #091827;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.018);
+}
+
+.settings-table th {
+  padding: 11px 13px;
+  color: #829db5;
+  background: #0d2035;
+  font-size: 11.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.settings-table td {
+  padding: 13px;
+  border-bottom-color: #1b344d;
+  color: #a8bed0;
+}
+
+.settings-table tbody tr {
+  transition: background 120ms ease;
+}
+
+.settings-table tbody tr:hover td {
+  background: rgba(33, 201, 255, .035);
+}
+
+.settings-name {
+  font-family: var(--font-sans);
+  color: #edf8ff;
+  font-weight: 650;
+}
+
+.settings-num {
+  font-family: var(--font-sans);
+  color: #b9d1e3;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-switches {
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.settings-switches label {
+  position: relative;
+  gap: 5px;
+  min-height: 27px;
+  padding: 3px 8px;
+  border: 1px solid #27445f;
+  border-radius: 999px;
+  color: #7792aa;
+  background: #0a1a2c;
+  transition: 120ms ease;
+}
+
+.settings-switches label:hover {
+  border-color: #35617f;
+  color: #c7ddeb;
+}
+
+.settings-switches label:has(input:checked) {
+  color: #a8f1dc;
+  border-color: rgba(54, 215, 164, .34);
+  background: rgba(54, 215, 164, .075);
+  font-weight: 620;
+}
+
+.settings-switches input {
+  width: 13px;
+  height: 13px;
+}
+
+.settings-test-ok,
+.settings-test-fail {
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.02);
+}
+
+.settings-gap {
+  border-color: #28455f;
+  border-radius: 10px;
+  background: rgba(7, 20, 34, .64);
+}
+
+.driver-form-page,
+.alias-form {
+  width: min(900px, 100%);
+}
+
+.alias-form-header h1 {
+  font-family: var(--font-display);
+  font-size: 22px;
+}
+
+.alias-section {
+  border-color: #223f5b;
+  border-radius: 11px;
+  background: linear-gradient(180deg, #0d2035, #0a192a);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.02);
+}
+
+.alias-section h2 {
+  color: #8eabc2;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.alias-form-error {
+  color: #ff9aa5;
+  border: 1px solid rgba(255,107,122,.24);
+  background: rgba(255,107,122,.075);
+}
+
+/* ───────────────────────── Metrics ───────────────────────── */
+
+.metrics-page {
+  gap: 18px;
+}
+
+.metrics-page > .term-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 14px;
+  overflow: visible;
+}
+
+.metrics-page > .term-list > .term-list-item {
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid #213f5c;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(15, 34, 56, .98), rgba(8, 23, 40, .98));
+  box-shadow: var(--shadow-card);
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.metrics-page > .term-list > .term-list-item:hover {
+  transform: translateY(-1px);
+  border-color: #315b79;
+  box-shadow: 0 18px 42px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.025);
+}
+
+.metrics-page .term-list-head {
+  min-height: 30px;
+  gap: 8px;
+}
+
+.metrics-page .term-list-name {
+  color: #eefaff;
+  font-size: 15px;
+  font-weight: 680;
+}
+
+.metrics-page .term-list-status {
+  padding: 2px 7px;
+  border: 1px solid #294b67;
+  border-radius: 999px;
+  color: #89a7bd;
+  background: #0a1a2c;
+  font-size: 10.5px;
+}
+
+.metrics-page .term-list-line {
+  margin-top: 6px;
+  color: #9cb4c7;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.metrics-page .metric-item-actions {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid #1c3852;
+}
+
+.metric-chart-block {
+  margin-top: 14px;
+  padding: 13px;
+  border: 1px solid #24445f;
+  border-radius: 10px;
+  background: rgba(6, 19, 33, .62);
+}
+
+.metric-chart-wrap {
+  overflow: hidden;
+  border: 1px solid #1d3a55;
+  border-radius: 9px;
+  background: #081725;
+}
+
+.metric-sql pre {
+  border-color: #23445f;
+  border-radius: 8px;
+  background: #061421;
+  color: #d9eeff;
+}
+
+.metric-form {
+  padding: 14px;
+  border-color: #284a66;
+  border-radius: 10px;
+  background: rgba(6, 19, 33, .74);
+}
+
+.metrics-page > .term-list-hint {
+  padding: 22px;
+  border: 1px dashed #2a4b66;
+  border-radius: 12px;
+  background: rgba(8, 24, 40, .68);
+  color: #91aabd;
+  line-height: 1.7;
+}
+
+/* ───────────────────────── Rules / guardrails ───────────────────────── */
+
+.rules-page {
+  gap: 12px;
+  padding: 12px;
+  background: transparent;
+}
+
+.rules-side,
+.rules-main {
+  border: 1px solid #203c57;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(13, 30, 50, .98), rgba(8, 22, 38, .98));
+  box-shadow: var(--shadow-card);
+}
+
+.rules-side {
+  border-right: 1px solid #203c57;
+  overflow: hidden;
+}
+
+.rules-side-head,
+.rules-bar {
+  border-bottom-color: #203b55;
+  background: rgba(10, 27, 45, .82);
+  backdrop-filter: blur(10px);
+}
+
+.rules-tree {
+  padding: 10px;
+  gap: 6px;
+}
+
+.rules-catalog-link,
+.rules-set-head,
+.rules-list li {
+  border-radius: 8px;
+}
+
+.rules-catalog-link.is-active,
+.rules-set-head.is-active,
+.rules-list li:has(button.is-active) {
+  background: linear-gradient(90deg, rgba(47,123,255,.13), rgba(32,224,199,.055));
+}
+
+.rules-set {
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+}
+
+.rules-set:has(.rules-set-head.is-active) {
+  border-color: rgba(33,201,255,.12);
+  background: rgba(33,201,255,.025);
+}
+
+.rules-set-name {
+  font-family: var(--font-sans);
+}
+
+.rules-form,
+.catalog {
+  max-width: 1080px;
+  padding: 24px 28px 48px;
+}
+
+.rules-pick,
+.rf-row,
+.catalog-rule {
+  border-color: #223f5b;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #0d2035, #0a192a);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.018);
+}
+
+.rules-pick:hover,
+.catalog-rule:hover {
+  border-color: #315f7d;
+}
+
+.rules-warn {
+  border: 1px solid rgba(248,185,78,.2);
+  border-left: 3px solid #f8b94e;
+  border-radius: 8px;
+  background: rgba(248,185,78,.055);
+  color: #d7be8c;
+}
+
+.rf-field input,
+.rf-columns,
+.catalog-rule pre {
+  border-color: #23435f;
+  background: #081827;
+}
+
+.rf-block-title {
+  color: #e9f7ff;
+  font-size: 14px;
+}
+
+/* ───────────────────────── Evaluation / graph quality ───────────────────────── */
+
+.eval-page {
+  gap: 16px;
+  padding: 28px 32px 52px;
+}
+
+.eval-kpis {
+  gap: 10px;
+}
+
+.eval-kpi {
+  min-height: 108px;
+  padding: 14px;
+  border-color: #213f5b;
+  border-radius: 11px;
+  background: linear-gradient(180deg, rgba(15, 34, 56, .98), rgba(8, 23, 40, .98));
+  box-shadow: var(--shadow-card);
+}
+
+.eval-kpi-name {
+  color: #8da8bd;
+  font-size: 12px;
+}
+
+.eval-kpi-value {
+  color: #effaff;
+  font-family: var(--font-display);
+  font-size: clamp(25px, 2.8vw, 32px);
+  font-weight: 690;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.eval-block {
+  gap: 13px;
+  padding: 17px 18px 19px;
+  border-color: #213f5b;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(13, 30, 50, .97), rgba(8, 22, 38, .97));
+  box-shadow: var(--shadow-card);
+}
+
+.eval-block h2 {
+  color: #ecf9ff;
+  font-size: 15px;
+}
+
+.eval-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #102942;
+}
+
+.eval-bar-fill {
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2f7bff, #21c9ff);
+}
+
+.eval-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid #203e59;
+  border-radius: 9px;
+}
+
+.eval-table th {
+  padding: 10px;
+  border-bottom-color: #22425e;
+  background: #0d2035;
+  color: #88a5bc;
+}
+
+.eval-table td {
+  padding: 10px;
+  border-bottom-color: #1b354e;
+}
+
+.eval-table tbody tr:hover td {
+  background: rgba(33,201,255,.035);
+}
+
+.eval-empty,
+.review-hint,
+.settings-hint,
+.term-list-hint {
+  line-height: 1.65;
+}
+
+/* ───────────────────────── Responsive & interaction polish ───────────────────────── */
+
+@media (max-width: 1180px) {
+  .settings-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .metrics-page > .term-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .shell-nav li:nth-child(2),
+  .shell-nav li:nth-child(5),
+  .shell-nav li:last-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .settings-head,
+  .metrics-head,
+  .eval-head {
+    border-radius: 11px;
+  }
+
+  .settings,
+  .metrics-page,
+  .eval-page {
+    padding-inline: 16px !important;
+  }
+
+  .eval-bars li {
+    grid-template-columns: auto minmax(100px, 160px) 1fr 34px;
+  }
+}
+
+@media (max-width: 640px) {
+  body { font-size: 13px; }
+
+  .settings-head,
+  .metrics-head,
+  .eval-head {
+    padding: 16px;
+  }
+
+  .settings-tabs {
+    width: calc(100% + 32px);
+    margin-inline: -16px;
+    padding-inline: 16px;
+  }
+
+  .metrics-page > .term-list > .term-list-item,
+  .settings-block,
+  .eval-block {
+    padding: 14px;
+  }
+
+  .eval-bars li {
+    grid-template-columns: auto 1fr 28px;
+  }
+
+  .eval-bars li > :nth-child(2) {
+    grid-column: 2;
+  }
+
+  .eval-bar-track {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
