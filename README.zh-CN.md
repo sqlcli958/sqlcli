@@ -12,6 +12,12 @@
 
 ![sql-cli Web UI](docs/screenshots/eval-page.png)
 
+### Schema 图谱如何给 Agent 提供上下文
+
+![sql-cli Schema 图谱概览](docs/images/schema-graph-overview.svg)
+
+图谱把原始数据库元数据整理成可复用的 Agent 上下文：Schema、表、字段、业务术语、值域、已确认关系，以及经过评审的候选变更。
+
 ## 为什么是 sql-cli
 
 典型数据库 Agent 往往只有一个 `execute_sql` 工具，而 sql-cli 把数据库操作拆成一个可治理闭环：
