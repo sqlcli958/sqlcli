@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/sqlcli958/sqlcli/tree/main/docs
+    about: Check the getting-started guide and user documentation before opening an issue.
+  - name: Security policy
+    url: https://github.com/sqlcli958/sqlcli/security/policy
+    about: Do not publish vulnerability details or secrets in a normal issue.
