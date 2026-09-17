@@ -1,0 +1,187 @@
+/* Final visual polish for the phase-2 layout. Kept separate so the structural rules stay readable. */
+
+/* Render the public-facing wordmark without changing the accessible link text. */
+.shell-brand {
+  font-size: 0;
+}
+
+.shell-brand::after {
+  content: 'SQLCLI';
+  font-size: 15px;
+  font-weight: 820;
+  letter-spacing: .075em;
+  color: transparent;
+  background: linear-gradient(90deg, #f4fbff 0 42%, #38c5ff 64%, #20e0c7 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.shell-source::before {
+  content: 'DATA SOURCE';
+  color: #59758d;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: .11em;
+}
+
+/* The graph page did not previously have a page title; give the toolbar a compact product identity
+   without taking canvas height away from the user. */
+.knowledge-bar::before {
+  content: 'SCHEMA GRAPH';
+  flex: none;
+  padding: 6px 10px;
+  border: 1px solid rgba(33,201,255,.16);
+  border-radius: 8px;
+  color: #88e4ff;
+  background: rgba(33,201,255,.055);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+
+.knowledge-left::after,
+.knowledge-right::after {
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Make the no-graph onboarding state fit the same two-column workbench layout. */
+.wb:has(.wb-editor) > .wb-empty {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: start;
+  min-height: 180px;
+}
+
+.wb:has(.wb-editor) > .wb-empty::before {
+  content: 'SCHEMA CONTEXT';
+  color: #f8b94e;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+
+/* Richer status semantics without introducing new business state. */
+.wb-card[data-tone='ok'] h3::before,
+.wb-card[data-tone='warn'] h3::before,
+.wb-card[data-tone='bad'] h3::before,
+.wb-card[data-tone='info'] h3::before {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  border-radius: 50%;
+  vertical-align: 1px;
+  content: '';
+}
+
+.wb-card[data-tone='ok'] h3::before { background: #36d7a4; box-shadow: 0 0 10px rgba(54,215,164,.24); }
+.wb-card[data-tone='warn'] h3::before { background: #f8b94e; box-shadow: 0 0 10px rgba(248,185,78,.22); }
+.wb-card[data-tone='bad'] h3::before { background: #ff6b7a; box-shadow: 0 0 10px rgba(255,107,122,.2); }
+.wb-card[data-tone='info'] h3::before { background: #4eaaff; box-shadow: 0 0 10px rgba(78,170,255,.2); }
+
+/* Review filters become a toolbar within the control plane rather than a floating row. */
+.review-stage > .filter-bar,
+.review-stage .filter-bar {
+  margin: -3px -3px 13px;
+  padding: 9px 10px;
+  border: 1px solid #203d59;
+  border-radius: 9px;
+  background: rgba(7, 20, 34, .74);
+}
+
+.review-stage .review-kind {
+  border: 1px solid #294864;
+  background: #10263d;
+}
+
+.review-stage .review-alias {
+  padding: 2px 6px;
+  border-radius: 5px;
+  color: #80dfff;
+  background: rgba(33,201,255,.065);
+}
+
+.review-stage .review-status {
+  font-weight: 620;
+}
+
+.review-stage .review-card[data-tone='warn'] {
+  border-left-color: #f8b94e;
+  box-shadow: inset 3px 0 rgba(248,185,78,.72), 0 10px 24px rgba(0,0,0,.11);
+}
+
+.review-stage .review-card[data-tone='ok'] {
+  border-left-color: #36d7a4;
+  box-shadow: inset 3px 0 rgba(54,215,164,.65), 0 10px 24px rgba(0,0,0,.11);
+}
+
+.review-stage .review-card[data-tone='bad'] {
+  border-left-color: #ff6b7a;
+  box-shadow: inset 3px 0 rgba(255,107,122,.65), 0 10px 24px rgba(0,0,0,.11);
+}
+
+/* Dense tables read better with alternating depth and a stronger sticky header. */
+.rt-table tbody tr:nth-child(even) td,
+.executions-table tbody tr:nth-child(even) td {
+  background: rgba(255,255,255,.012);
+}
+
+.rt-table th,
+.executions-table th {
+  box-shadow: inset 0 -1px #294966;
+}
+
+/* Keep the shell usable on laptop widths: context labels disappear before useful controls do. */
+@media (max-width: 1100px) {
+  .shell-source::before {
+    display: none;
+  }
+
+  .knowledge-bar::before {
+    display: none;
+  }
+}
+
+@media (max-width: 920px) {
+  .wb:has(.wb-editor) > .wb-empty {
+    order: 2;
+  }
+
+  .wb:has(.wb-editor) > .wb-editor {
+    order: 1;
+  }
+
+  .review-head.review-head-v2 {
+    padding-inline: 16px;
+  }
+
+  .review-head-v2 .tabs {
+    margin-inline: -16px;
+    padding-inline: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .shell-brand::after {
+    display: none;
+  }
+
+  .shell-source-input {
+    min-width: 150px;
+  }
+
+  .wb:has(.wb-editor) > .wb-head {
+    min-height: 96px;
+    padding: 18px;
+  }
+
+  .wb:has(.wb-editor) > .wb-head h1 {
+    max-width: none;
+    font-size: 24px;
+  }
+}
