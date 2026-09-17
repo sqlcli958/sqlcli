@@ -35,6 +35,16 @@
   gap: 4px;
 }
 
+/* Replace the legacy flat-list separators from design-system-v3. */
+.shell-nav-group li,
+.shell-nav-group li:nth-child(2),
+.shell-nav-group li:nth-child(5),
+.shell-nav-group li:last-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
 .shell[data-nav-collapsed] .shell-nav-groups {
   gap: 10px;
 }
@@ -360,7 +370,6 @@
   transform: translateY(1px);
 }
 
-/* Preserve keyboard discoverability while keeping mouse focus quiet. */
 :where(.btn, .shell-nav-item, .settings-tabs button):focus:not(:focus-visible) {
   outline: none;
 }
