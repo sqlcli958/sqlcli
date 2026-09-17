@@ -2,6 +2,11 @@
 
 项目首页只保留定位、核心能力和快速开始。安装、配置、命令、安全约束、设计说明和开发资料统一在这里维护。
 
+## 快速开始
+
+- [Getting Started (English)](getting-started.md) — 英文快速上手入口
+- [快速开始（简体中文）](getting-started.zh-CN.md) — 从构建到第一次查询与 Schema 上下文
+
 ## 用户文档
 
 - [完整使用手册](user-manual.zh-CN.md) — 安装、配置、命令、数据库使用、Schema 图谱、规则、Web UI 与故障处理的主要入口
