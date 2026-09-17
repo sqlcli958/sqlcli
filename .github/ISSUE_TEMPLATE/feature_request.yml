@@ -1,0 +1,49 @@
+name: Feature request
+description: Propose an improvement to sql-cli
+title: "[Feature] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What workflow is difficult today? Prefer a concrete agent/database scenario.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the user-visible behavior rather than only an implementation idea.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or alternative designs have you considered?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - SQL execution and safety
+        - Schema graph and semantics
+        - Agent integration
+        - Database / driver support
+        - Web UI
+        - Approval and audit
+        - Documentation / developer experience
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I checked the documentation and existing issues for a similar request.
+          required: true
