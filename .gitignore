@@ -6,9 +6,13 @@
 /tests/reports/
 /.claude/
 /.sql-cli/
-/web/node_modules/
 /.idea/
+/.omo/
+/web/node_modules/
+/web/*.tsbuildinfo
 /dist/
 /web/dist/
+/PATH
+/web/PATH
 ui-out.log
 ui-err.log
