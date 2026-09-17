@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a reproducible problem in sql-cli
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Remove credentials, real connection strings, and sensitive production data before submitting.
+
+  - type: input
+    id: version
+    attributes:
+      label: sql-cli version / commit
+      placeholder: v0.1.0 or commit SHA
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Java version, and database type/version when relevant.
+      placeholder: Windows 11, Java 17, MySQL 8.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Include commands or steps with secrets and sensitive data removed.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output or logs
+      description: Paste only sanitized output. Do not include credentials or production data.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I removed credentials, connection strings, and sensitive data.
+          required: true
+        - label: I checked the current documentation and existing issues first.
+          required: true
