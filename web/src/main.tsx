@@ -6,6 +6,7 @@ import './app/brand-theme.css';
 import './app/product-layout.css';
 import './app/product-polish.css';
 import './app/design-system-v3.css';
+import './app/product-v3-extensions.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
