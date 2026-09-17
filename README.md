@@ -12,6 +12,12 @@
 
 ![sql-cli Web UI](docs/screenshots/eval-page.png)
 
+### Schema graph grounding
+
+![sql-cli schema graph overview](docs/images/schema-graph-overview.svg)
+
+The graph turns raw database metadata into reusable agent context: schemas, tables, columns, business terms, value domains, verified relations, and reviewed candidate changes.
+
 ## Why sql-cli?
 
 Most database tools for agents expose a query endpoint. sql-cli adds a governance loop around it:
