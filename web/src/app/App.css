@@ -142,7 +142,7 @@ html, body, #root {
 }
 
 .btn.is-dashed:hover:not(:disabled) {
-  background: #eef2ff;
+  background: var(--color-surface-hover);
   border-color: var(--color-primary);
 }
 
@@ -1134,7 +1134,7 @@ html, body, #root {
 .graph-radial-field:hover,
 .graph-radial-field.is-dragging {
   border-color: var(--color-primary);
-  background: #eef2ff;
+  background: var(--color-surface-hover);
   box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15), 0 4px 12px rgba(15, 23, 42, 0.14);
 }
 
@@ -1275,7 +1275,7 @@ html, body, #root {
 
 .graph-edge-relation-option:hover:not(:disabled) {
   border-color: var(--color-primary);
-  background: #eef2ff;
+  background: var(--color-surface-hover);
 }
 
 .graph-edge-relation-option:disabled {
@@ -1470,7 +1470,7 @@ html, body, #root {
 }
 
 .column-row-expanded {
-  background: #eef2ff;
+  background: var(--color-surface-hover);
 }
 
 .column-expand-chevron {
@@ -1519,7 +1519,7 @@ html, body, #root {
 }
 
 .column-detail-row {
-  background: #fafbff;
+  background: var(--color-surface-alt, #fafbff);
 }
 
 .column-detail-row td {

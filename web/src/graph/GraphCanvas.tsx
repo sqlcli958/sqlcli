@@ -49,6 +49,31 @@ interface RadialField {
  */
 const SMALL_GRAPH = 60;
 
+const GRAPH_THEME = {
+  dark: {
+    label: '#e8f7ff',
+    mutedEdge: '#6f8ea8',
+    edges: {
+      foreign_key: '#65d8ff',
+      join_observed: '#ffc266',
+      term_mapping: '#ff82cb',
+    },
+  },
+  light: {
+    label: '#173047',
+    mutedEdge: '#94a3b8',
+    edges: {
+      foreign_key: '#087ea4',
+      join_observed: '#b45309',
+      term_mapping: '#be185d',
+    },
+  },
+} as const;
+
+function getGraphTheme() {
+  return document.documentElement.dataset.theme === 'light' ? GRAPH_THEME.light : GRAPH_THEME.dark;
+}
+
 function getLayoutSettings(nodeCount: number) {
   const small = nodeCount <= SMALL_GRAPH;
   return {
@@ -108,7 +133,8 @@ function getLayoutDuration(nodeCount: number): number {
 }
 
 function shouldRunForceLayout(graph: Graph): boolean {
-  if (graph.order < 2 || graph.size === 0) {
+  // 小图用稳定环形布局：力导会把相连表吸成几对，关系线和标签就会互相遮挡。
+  if (graph.order <= SMALL_GRAPH || graph.order < 2 || graph.size === 0) {
     return false;
   }
   const connectedNodeCount = graph.nodes().filter((node) => graph.degree(node) > 0).length;
@@ -285,7 +311,8 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
       labelRenderedSizeThreshold: graph.order <= SMALL_GRAPH ? 1 : 5,
       labelFont: 'Inter, -apple-system, sans-serif',
       labelSize: 12,
-      labelWeight: '500',
+      labelWeight: '600',
+      labelColor: { color: getGraphTheme().label },
       minCameraRatio: 0.1,
       maxCameraRatio: 10,
       zIndex: true,
@@ -293,7 +320,7 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
         const ratio = cameraRatioRef.current;
         const emphasized = Boolean(data.emphasized);
         const relationCount = Number(data.relationCount ?? 0);
-        const hideOverviewLabel = ratio >= 0.9 && relationCount === 0 && !emphasized;
+        const hideOverviewLabel = graph.order > SMALL_GRAPH && ratio >= 0.9 && relationCount === 0 && !emphasized;
 
         return {
           ...data,
@@ -316,13 +343,21 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
           ? Math.max(1.2, raw)
           : Math.max(1.2, Math.min(raw, 1.6));
         if (ratio >= 1.8) {
-          return { ...data, hidden: false, color: '#94a3b8', size: 1, zIndex: 0 };
+          return { ...data, hidden: false, color: getGraphTheme().mutedEdge, size: 1, zIndex: 0 };
         }
-        return { ...data, hidden: false, size: normalSize, zIndex: 0 };
+        const theme = getGraphTheme();
+        const edgeColor = theme.edges[String(data.relationType ?? '') as keyof typeof theme.edges] ?? theme.mutedEdge;
+        return { ...data, hidden: false, color: edgeColor, size: normalSize, zIndex: 0 };
       },
     });
     sigmaRef.current = sigma;
     cameraRatioRef.current = sigma.getCamera().ratio;
+
+    // Sigma draws labels and edges on canvas, so CSS theme overrides cannot reach them.
+    const themeObserver = new MutationObserver(() => {
+      sigma.setSettings({ labelColor: { color: getGraphTheme().label } });
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
     // Sparse schema graphs are dominated by isolated tables. Running a global
     // force layout would push those tables far away and make Sigma shrink the
@@ -440,6 +475,7 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
     sigma.on('clickStage', onClickStage);
 
     return () => {
+      themeObserver.disconnect();
       if (stopTimer) {
         clearTimeout(stopTimer);
       }

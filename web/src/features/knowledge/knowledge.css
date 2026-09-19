@@ -510,11 +510,11 @@
 }
 
 .lineage-table-node-row:hover {
-  background: var(--color-surface-alt, #eef2f7);
+  background: var(--color-surface-alt);
 }
 
 .lineage-table-node-row.is-selected {
-  background: #eff6ff;
+  background: var(--color-surface-hover);
   color: var(--color-primary);
   font-weight: 600;
 }
