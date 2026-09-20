@@ -387,7 +387,7 @@ test('workbench renders the SQL-first workspace and product navigation', async (
   await expect(page.getByRole('button', { name: '执行' })).toBeVisible();
 
   for (const item of ['工作台', '数据模型', '指标', '治理', '设置']) {
-    await expect(page.getByRole('link', { name: item, exact: true })).toBeVisible();
+    await expect(page.getByLabel('一级导航').getByRole('link', { name: item, exact: true })).toBeVisible();
   }
 
   await expect(page.getByLabel('数据源')).toHaveValue('demo');
@@ -418,7 +418,7 @@ test('data model supports catalog, relation, lineage and term views', async ({ p
 
   await page.getByRole('button', { name: '血缘', exact: true }).click();
   await expect(page).toHaveURL(/mode=lineage/);
-  await expect(page.getByText(/还没有血缘/)).toBeVisible();
+  await expect(page.locator('.model-sidebar').getByText(/还没有血缘/)).toBeVisible();
 
   await page.getByRole('button', { name: '术语', exact: true }).click();
   await expect(page).toHaveURL(/mode=terms/);
@@ -446,7 +446,7 @@ test('governance renders health summary and opens review control plane', async (
 
   await capture(page, testInfo, 'governance');
 
-  await page.getByRole('button', { name: '审批与审计' }).click();
+  await page.getByRole('button', { name: '审批与审计', exact: true }).click();
   await expect(page).toHaveURL(/section=reviews/);
   await expect(page.getByText('待审批', { exact: true })).toBeVisible();
 });
@@ -457,7 +457,7 @@ test('settings renders data source management in the same product shell', async 
   await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
   await expect(page.getByText('数据源控制台')).toBeVisible();
   await expect(page.getByRole('table').getByText('demo', { exact: true })).toBeVisible();
-  await expect(page.getByText(/postgresql/i)).toBeVisible();
+  await expect(page.getByRole('table').getByText(/postgresql/i)).toBeVisible();
   await expect(page.getByLabel('新建数据源')).toBeVisible();
 
   await capture(page, testInfo, 'settings');
