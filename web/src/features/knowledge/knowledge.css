@@ -589,3 +589,390 @@
   align-items: center;
   gap: 3px;
 }
+
+
+/* ───────────────── Product redesign: data model workspace ───────────────── */
+
+.knowledge.knowledge-redesign {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.model-header {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 20px 24px 0;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.model-title {
+  padding-bottom: 16px;
+}
+
+.model-eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.model-title h1 {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+
+.model-title p {
+  margin: 5px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.model-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.model-tabs button {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.model-tabs button:hover:not(:disabled) {
+  color: var(--color-text);
+}
+
+.model-tabs button.is-active {
+  border-bottom-color: var(--color-primary);
+  color: var(--color-text);
+  font-weight: 650;
+}
+
+.model-tabs button:disabled {
+  color: var(--color-text-dim);
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.model-toolbar {
+  min-height: 48px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.model-search {
+  flex: 1;
+  min-width: 220px;
+  max-width: 560px;
+}
+
+.model-toolbar-hint,
+.model-toolbar-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.model-toolbar-stats {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.model-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.model-catalog,
+.model-relations,
+.model-lineage {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.model-sidebar {
+  width: 288px;
+  min-width: 288px;
+  max-width: 288px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.model-pane-title {
+  flex: none;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .03em;
+}
+
+.model-sidebar > .schema-explorer,
+.model-sidebar > .term-list,
+.model-sidebar > .lineage-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.model-detail {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: color-mix(in srgb, var(--color-bg) 62%, var(--color-surface));
+}
+
+.model-detail > .table-inspector {
+  min-height: 100%;
+}
+
+.model-empty {
+  min-height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 7px;
+  padding: 28px;
+  text-align: center;
+}
+
+.model-empty::before {
+  content: '';
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, transparent 47%, var(--color-border) 47% 53%, transparent 53%),
+    linear-gradient(transparent 47%, var(--color-border) 47% 53%, transparent 53%);
+  opacity: .75;
+}
+
+.model-empty strong {
+  margin-top: 4px;
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.model-empty p {
+  max-width: 430px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.model-graph {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.model-inspector-drawer {
+  position: absolute;
+  z-index: 15;
+  top: 10px;
+  right: 10px;
+  bottom: 10px;
+  width: clamp(340px, 31vw, 520px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .28);
+}
+
+.model-drawer-head {
+  min-height: 44px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 10px 0 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.model-drawer-head strong {
+  color: var(--color-text);
+  font-size: 12.5px;
+}
+
+.model-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.model-lineage-canvas {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.model-terms {
+  width: min(980px, calc(100% - 48px));
+  height: calc(100% - 32px);
+  margin: 16px auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.model-terms > .term-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.model-loading {
+  margin: auto;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* 关系模式隐藏目录后画布直接吃满，不留下旧三栏的空白。 */
+.model-relations.is-sidebar-hidden .model-graph {
+  width: 100%;
+}
+
+@media (max-width: 980px) {
+  .model-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0;
+    padding-top: 16px;
+  }
+
+  .model-title {
+    padding-bottom: 10px;
+  }
+
+  .model-tabs {
+    overflow-x: auto;
+  }
+
+  .model-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .model-toolbar-stats {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .model-sidebar {
+    width: 250px;
+    min-width: 250px;
+    max-width: 250px;
+  }
+
+  .model-inspector-drawer {
+    width: min(460px, calc(100% - 20px));
+  }
+}
+
+@media (max-width: 720px) {
+  .model-header {
+    padding-inline: 16px;
+  }
+
+  .model-toolbar {
+    padding-inline: 8px;
+  }
+
+  .model-search {
+    min-width: 0;
+    max-width: none;
+  }
+
+  .model-catalog,
+  .model-lineage {
+    overflow: auto;
+    flex-direction: column;
+  }
+
+  .model-sidebar {
+    width: 100%;
+    min-width: 100%;
+    max-width: 100%;
+    min-height: 280px;
+    max-height: 42vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .model-detail,
+  .model-lineage-canvas {
+    min-height: 52vh;
+  }
+
+  .model-relations .model-sidebar {
+    display: none;
+  }
+
+  .model-terms {
+    width: calc(100% - 24px);
+    height: calc(100% - 24px);
+    margin: 12px;
+  }
+
+  .model-inspector-drawer {
+    inset: 8px;
+    width: auto;
+  }
+}
