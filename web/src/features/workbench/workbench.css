@@ -457,3 +457,279 @@
 
 /* 规则提示：advisory 级违规不改变结果，用警告色的左边线和执行失败的红区分开。 */
 .wb-notices { margin: 8px 0 0; padding: 6px 12px; list-style: none; border-left: 2px solid var(--color-warning); background: var(--color-surface); color: var(--color-text-muted); font-size: 12px; line-height: 1.7; white-space: pre-wrap; }
+
+
+/* ───────────────── Product redesign: SQL workspace ───────────────── */
+
+.shell-main > .page.wb-workspace-redesign,
+.shell-main > .page.wb-source-directory {
+  width: min(1320px, 100%);
+  max-width: none;
+  margin: 0 auto;
+  padding: 24px 28px 40px;
+}
+
+.wb.wb-workspace-redesign,
+.wb.wb-source-directory {
+  gap: 16px;
+}
+
+.wb-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--color-text-dim);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.wb-directory-head,
+.wb-workspace-head {
+  min-height: 0;
+  padding: 0 0 18px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.wb-directory-head h1,
+.wb-workspace-head h1 {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+
+.wb-directory-head p,
+.wb-workspace-head p {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.wb-workspace-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.wb-title-line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.wb-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.wb-context-notice {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 10px 12px 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, var(--color-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-warning) 6%, var(--color-surface));
+}
+
+.wb-context-notice > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wb-context-notice strong {
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.wb-context-notice span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.wb.wb-workspace-redesign > .wb-editor {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: visible;
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.wb.wb-workspace-redesign > .wb-editor > .wb-section-head {
+  min-height: 44px;
+  padding: 0 14px;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.wb.wb-workspace-redesign > .wb-editor .wb-section-title {
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.wb.wb-workspace-redesign > .wb-editor .wb-sql-wrap {
+  margin: 0;
+}
+
+.wb.wb-workspace-redesign > .wb-editor .wb-sql {
+  min-height: 300px;
+  padding: 18px 20px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--color-bg) 38%, var(--color-surface));
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.wb.wb-workspace-redesign > .wb-editor .wb-sql:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+.wb.wb-workspace-redesign > .wb-editor > .wb-editor-bar {
+  min-height: 52px;
+  padding: 8px 12px;
+  gap: 8px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.wb.wb-workspace-redesign > .wb-editor > :is(.wb-approval, .wb-confirm, .wb-alert, .wb-hint, .wb-notices, .rt) {
+  margin-left: 12px;
+  margin-right: 12px;
+}
+
+.wb.wb-workspace-redesign > .wb-editor > .rt {
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+.wb-workspace-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--color-text-dim);
+  font-size: 11.5px;
+}
+
+.wb-workspace-foot kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--color-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: 10px;
+}
+
+.wb-workspace-foot a {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.wb-workspace-foot a:hover {
+  color: var(--color-primary);
+}
+
+.wb-source-grid {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+
+.wb-source-card {
+  min-height: 156px;
+  padding: 15px 16px;
+  gap: 9px;
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+.wb-source-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wb-source-title h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-source-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-text-dim);
+}
+
+.wb-source-dot[data-ready] {
+  background: var(--color-success);
+}
+
+.wb-source-card .wb-source-actions {
+  margin-top: auto;
+}
+
+@media (max-width: 760px) {
+  .shell-main > .page.wb-workspace-redesign,
+  .shell-main > .page.wb-source-directory {
+    padding: 18px 16px 32px;
+  }
+
+  .wb-workspace-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .wb-head-actions {
+    overflow-x: auto;
+  }
+
+  .wb-context-notice {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .wb.wb-workspace-redesign > .wb-editor .wb-sql {
+    min-height: 240px;
+  }
+
+  .wb-workspace-foot {
+    flex-wrap: wrap;
+  }
+
+  .wb-workspace-foot a {
+    width: 100%;
+    margin-left: 0;
+  }
+}
