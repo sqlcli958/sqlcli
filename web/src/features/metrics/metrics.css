@@ -57,3 +57,151 @@
   align-items: center;
   gap: 10px;
 }
+
+
+/* ───────────────── Product redesign: metrics catalog ───────────────── */
+
+.shell-main > .page.metrics-redesign {
+  width: min(1120px, 100%);
+  max-width: none;
+  margin: 0 auto;
+  padding: 24px 28px 44px;
+}
+
+.metrics-redesign {
+  gap: 16px;
+}
+
+.metrics-redesign .metrics-head {
+  min-height: 0;
+  padding: 0 0 18px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.metrics-redesign .metrics-head::before,
+.metrics-redesign .metrics-head::after {
+  content: none;
+}
+
+.metrics-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--color-text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.metrics-redesign .metrics-head h1 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.metrics-redesign .metrics-head p {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.metrics-redesign > .term-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.metrics-redesign > .term-list > .term-list-item {
+  min-width: 0;
+  margin: 0;
+  padding: 15px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.metrics-redesign > .term-list > .term-list-item:last-child {
+  border-bottom: 0;
+}
+
+.metrics-redesign > .term-list > .term-list-item:hover {
+  transform: none;
+  border-color: var(--color-border);
+  background: color-mix(in srgb, var(--color-primary) 3%, var(--color-surface));
+  box-shadow: none;
+}
+
+.metrics-redesign .term-list-head {
+  min-height: 28px;
+}
+
+.metrics-redesign .term-list-name {
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.metrics-redesign .term-list-status {
+  padding: 2px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-text-dim);
+  font-size: 10px;
+}
+
+.metrics-redesign .term-list-line {
+  margin-top: 4px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.metrics-redesign .metric-item-actions {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.metrics-redesign .metric-chart-block {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-bg) 50%, var(--color-surface));
+}
+
+.metrics-redesign .metric-chart-wrap {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.metrics-redesign .metric-sql pre {
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-bg);
+}
+
+@media (max-width: 720px) {
+  .shell-main > .page.metrics-redesign {
+    padding: 18px 16px 32px;
+  }
+
+  .metrics-redesign .metrics-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
