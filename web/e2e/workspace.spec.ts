@@ -387,7 +387,7 @@ test('workbench renders the SQL-first workspace and product navigation', async (
   await expect(page.getByRole('button', { name: '执行' })).toBeVisible();
 
   for (const item of ['工作台', '数据模型', '指标', '治理', '设置']) {
-    await expect(page.getByRole('link', { name: item })).toBeVisible();
+    await expect(page.getByRole('link', { name: item, exact: true })).toBeVisible();
   }
 
   await expect(page.getByLabel('数据源')).toHaveValue('demo');
@@ -406,8 +406,8 @@ test('data model supports catalog, relation, lineage and term views', async ({ p
   await page.locator('.table-item').filter({ hasText: 'orders' }).click();
 
   await expect(page.locator('.inspector-title')).toHaveText('app.orders');
-  await expect(page.getByRole('cell', { name: 'id', exact: true })).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'amount', exact: true })).toBeVisible();
+  await expect(page.locator('.columns-table tbody tr').filter({ hasText: 'id' }).first()).toBeVisible();
+  await expect(page.locator('.columns-table tbody tr').filter({ hasText: 'amount' }).first()).toBeVisible();
   await capture(page, testInfo, 'data-model-tables');
 
   await page.getByRole('button', { name: '关系', exact: true }).click();
@@ -442,7 +442,7 @@ test('governance renders health summary and opens review control plane', async (
   await expect(page.getByRole('heading', { name: '治理' })).toBeVisible();
   await expect(page.getByText('需要处理')).toBeVisible();
   await expect(page.getByText('搜索索引')).toBeVisible();
-  await expect(page.getByText('模型质量')).toBeVisible();
+  await expect(page.getByText('模型质量', { exact: true })).toBeVisible();
 
   await capture(page, testInfo, 'governance');
 
@@ -456,7 +456,7 @@ test('settings renders data source management in the same product shell', async 
 
   await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
   await expect(page.getByText('数据源控制台')).toBeVisible();
-  await expect(page.getByText('demo', { exact: true })).toBeVisible();
+  await expect(page.getByRole('table').getByText('demo', { exact: true })).toBeVisible();
   await expect(page.getByText(/postgresql/i)).toBeVisible();
   await expect(page.getByLabel('新建数据源')).toBeVisible();
 
