@@ -1,0 +1,260 @@
+.governance-page {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+}
+
+.governance-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 26px 30px 18px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.governance-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--color-text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.governance-header h1 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.governance-header p {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.governance-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 30px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.governance-tabs button {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.governance-tabs button:hover {
+  color: var(--color-text);
+}
+
+.governance-tabs button.is-active {
+  border-bottom-color: var(--color-primary);
+  color: var(--color-text);
+  font-weight: 650;
+}
+
+.governance-content {
+  flex: 1;
+  min-height: 0;
+}
+
+.governance-overview {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 26px 30px 48px;
+  display: grid;
+  gap: 18px;
+}
+
+.governance-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.governance-metric {
+  min-height: 92px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  border-right: 1px solid var(--color-border);
+}
+
+.governance-metric:last-child {
+  border-right: 0;
+}
+
+.governance-metric strong {
+  color: var(--color-text);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.governance-metric span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.governance-metric[data-tone='warn'] strong { color: var(--color-warning); }
+.governance-metric[data-tone='bad'] strong { color: var(--color-error); }
+.governance-metric[data-tone='ok'] strong { color: var(--color-success); }
+
+.governance-panel {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.governance-panel-head {
+  padding: 17px 18px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.governance-panel-head h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 15px;
+}
+
+.governance-panel-head p {
+  margin: 5px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.governance-actions {
+  display: flex;
+  flex-direction: column;
+}
+
+.governance-action {
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.governance-action:last-child {
+  border-bottom: 0;
+}
+
+.governance-action-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-dim);
+}
+
+.governance-action[data-tone='ok'] .governance-action-dot { background: var(--color-success); }
+.governance-action[data-tone='warn'] .governance-action-dot { background: var(--color-warning); }
+.governance-action[data-tone='bad'] .governance-action-dot { background: var(--color-error); }
+.governance-action[data-tone='info'] .governance-action-dot { background: var(--color-primary); }
+
+.governance-action-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.governance-action-copy strong {
+  color: var(--color-text);
+  font-size: 13.5px;
+}
+
+.governance-action-copy span {
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.governance-empty {
+  width: min(720px, calc(100% - 60px));
+  margin: 30px auto;
+  padding: 28px;
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.governance-empty strong {
+  color: var(--color-text);
+  font-size: 16px;
+}
+
+.governance-empty p {
+  margin: 0 0 6px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* 子页面进入治理后不再自己制造一层大外框。 */
+.governance-content > .eval-page,
+.governance-content > .rules-page,
+.governance-content > .page.review {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+@media (max-width: 780px) {
+  .governance-header,
+  .governance-overview {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .governance-tabs {
+    padding: 0 12px;
+    overflow-x: auto;
+  }
+
+  .governance-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .governance-metric:nth-child(2) {
+    border-right: 0;
+  }
+
+  .governance-metric:nth-child(-n+2) {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .governance-action {
+    grid-template-columns: 10px minmax(0, 1fr);
+  }
+
+  .governance-action .btn {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
