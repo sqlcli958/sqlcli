@@ -11,9 +11,15 @@ import { NAV_GROUP_LABELS, NAV_ITEMS, type NavGroup, navPath } from './navigatio
 import './app-shell.css';
 import { Button } from '../ui/Button';
 
-const NAV_GROUPS: NavGroup[] = ['work', 'knowledge', 'governance', 'system'];
+const NAV_GROUPS: NavGroup[] = ['primary', 'system'];
 
-/** 应用壳层：顶部数据源上下文 + 左侧一级导航 + 主内容区。 */
+/**
+ * 产品壳层。
+ *
+ * 顶部只承担“当前数据源 + 当前工作区健康度”，左侧只放产品级任务。
+ * 具体功能（关系/血缘、质量/规则/审批）进入页面后再用二级导航展开，
+ * 避免一级导航变成功能清单。
+ */
 export function AppShell() {
   const [searchParams] = useSearchParams();
   const alias = searchParams.get('alias');
@@ -22,7 +28,6 @@ export function AppShell() {
 
   const setSession = useSessionStore((s) => s.setSession);
   const clearSession = useSessionStore((s) => s.clearSession);
-  const readOnly = useSessionStore((s) => s.readOnly);
   const setWorkspaceRevision = useGraphStore((s) => s.setWorkspaceRevision);
   const switchGraphAlias = useGraphStore((s) => s.switchAlias);
   const revision = useGraphStore((s) => s.workspaceRevision);
@@ -33,20 +38,20 @@ export function AppShell() {
     staleTime: 30_000,
   });
 
-  const current = aliases.data?.aliases.find((a) => a.name === alias);
+  const current = aliases.data?.aliases.find((item) => item.name === alias);
   const graphAvailable = current?.graphAvailable ?? false;
-  const names = aliases.data?.aliases.map((a) => a.name) ?? [];
 
   const switchAlias = (next: string, replace = false) => {
-    const page = location.pathname.split('/').pop() || 'sql';
-    navigate(navPath(page, next), { replace });
+    const params = new URLSearchParams(location.search);
+    if (next) params.set('alias', next);
+    else params.delete('alias');
+    const suffix = params.toString();
+    navigate(`${location.pathname}${suffix ? `?${suffix}` : ''}`, { replace });
   };
 
-  const [draft, setDraft] = useState(alias ?? '');
-  useEffect(() => setDraft(alias ?? ''), [alias]);
-
+  // 新用户默认展开；只有明确收起过才恢复折叠状态。
   const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem('shell-nav-collapsed') !== '0',
+    () => localStorage.getItem('shell-nav-collapsed') === '1',
   );
   useEffect(() => {
     localStorage.setItem('shell-nav-collapsed', collapsed ? '1' : '0');
@@ -54,7 +59,7 @@ export function AppShell() {
 
   useEffect(() => {
     if (alias || !aliases.data?.aliases.length) return;
-    const first = aliases.data.aliases.find((a) => a.graphAvailable) ?? aliases.data.aliases[0];
+    const first = aliases.data.aliases.find((item) => item.graphAvailable) ?? aliases.data.aliases[0];
     switchAlias(first.name, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alias, aliases.data]);
@@ -69,7 +74,7 @@ export function AppShell() {
   useEffect(() => switchGraphAlias(alias), [alias, switchGraphAlias]);
 
   useEffect(() => {
-    if (!alias) {
+    if (!alias || !graphAvailable) {
       clearSession();
       return;
     }
@@ -83,7 +88,7 @@ export function AppShell() {
       );
       setWorkspaceRevision(session.data.revision);
     }
-  }, [alias, session.data, setSession, clearSession, setWorkspaceRevision]);
+  }, [alias, graphAvailable, session.data, setSession, clearSession, setWorkspaceRevision]);
 
   const connection = useQuery({
     queryKey: ['alias', 'test', alias],
@@ -100,6 +105,7 @@ export function AppShell() {
     enabled: Boolean(alias) && graphAvailable,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
+    retry: false,
   });
 
   const approvals = useQuery({
@@ -110,106 +116,123 @@ export function AppShell() {
   });
   const pendingCount = approvals.data?.pending ?? 0;
 
-  const graphTone: Tone = graphAvailable ? 'ok' : 'bad';
-  const graphDetail = graphAvailable ? '图谱已导入' : '图谱未导入，到工作台导入';
-
-  const connectionTone: Tone = connection.isPending
-    ? 'warn'
+  const connectionTone = connection.isPending
+    ? 'pending'
     : connection.data?.success
       ? 'ok'
       : 'bad';
-  const connectionDetail = connection.isPending
-    ? '正在测试连接'
+  const connectionLabel = connection.isPending
+    ? '连接中'
     : connection.data?.success
-      ? `连接正常${connection.data.serverVersion ? ` · ${connection.data.serverVersion}` : ''}`
-      : `连接失败${connection.data?.message ? `：${connection.data.message}` : ''}`;
+      ? '已连接'
+      : '连接异常';
+  const connectionTitle = connection.data?.success
+    ? `连接正常${connection.data.serverVersion ? ` · ${connection.data.serverVersion}` : ''}`
+    : connection.data?.message || '正在检查数据库连接';
 
   const indexState = index.data?.status ?? 'unknown';
-  const indexTone: Tone = !graphAvailable || indexState === 'unknown'
-    ? 'warn'
-    : indexState === 'ready'
-      ? 'ok'
-      : indexState === 'stale'
-        ? 'warn'
-        : 'bad';
-  const indexDetail = !graphAvailable
-    ? '图谱未导入，索引不可用'
-    : indexState === 'ready'
-      ? '搜索索引已就绪'
-      : indexState === 'stale'
-        ? '图谱已变更，索引待重建（图谱页可重建）'
-        : indexState === 'missing'
-          ? '索引缺失，搜索不可用'
-          : '索引状态未知';
+  const indexNeedsAttention = graphAvailable && indexState !== 'ready' && indexState !== 'unknown';
 
   return (
-    <div className="shell" data-nav-collapsed={collapsed || undefined}>
+    <div
+      className="shell"
+      data-product-shell="true"
+      data-nav-collapsed={collapsed || undefined}
+    >
       <header className="shell-header">
-        <Link className="shell-brand" to={navPath('sql', alias)}>
-          sql-cli
+        <Link className="shell-brand" to={navPath('sql', alias)} aria-label="SQLCLI 工作台">
+          SQLCLI
         </Link>
 
-        <label className="shell-source">
-          <input
-            className="shell-source-input"
-            list="shell-alias-list"
-            value={draft}
-            placeholder="搜索数据源…"
-            autoComplete="off"
+        <div className="shell-context">
+          <span className="shell-context-label">数据源</span>
+          <select
+            className="shell-source-select"
+            value={alias ?? ''}
             aria-label="数据源"
-            onChange={(e) => {
-              const next = e.target.value;
-              setDraft(next);
-              if (next && next !== alias && names.includes(next)) switchAlias(next);
-            }}
-            onFocus={(e) => e.target.select()}
-            onBlur={() => setDraft(alias ?? '')}
-          />
-          <datalist id="shell-alias-list">
-            {names.map((name) => <option key={name} value={name} />)}
-          </datalist>
-        </label>
+            disabled={aliases.isLoading || !aliases.data?.aliases.length}
+            onChange={(event) => switchAlias(event.target.value)}
+          >
+            {!alias && <option value="">选择数据源</option>}
+            {aliases.data?.aliases.map((item) => (
+              <option key={item.name} value={item.name}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+          {current?.dbType && <span className="shell-context-type">{current.dbType}</span>}
+        </div>
 
-        {alias && (
-          <div className="shell-status" role="status">
-            <StatusDot label="图谱" tone={graphTone} detail={graphDetail} />
-            <StatusDot label="连接" tone={connectionTone} detail={connectionDetail} />
-            <StatusDot label="索引" tone={indexTone} detail={indexDetail} />
-            {readOnly && (
-              <span className="shell-lock" title="只读数据源，不能执行写操作" aria-label="只读">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z" />
-                </svg>
-              </span>
-            )}
-            {graphAvailable && <span className="shell-meta">rev {revision}</span>}
-          </div>
-        )}
+        <div className="shell-health" aria-label="工作区状态">
+          {alias && (
+            <span className="shell-health-chip" data-tone={connectionTone} title={connectionTitle}>
+              <span className="shell-health-dot" aria-hidden="true" />
+              {connectionLabel}
+            </span>
+          )}
+
+          {alias && !graphAvailable && (
+            <Link
+              className="shell-health-chip"
+              data-tone="warn"
+              to={navPath('knowledge', alias)}
+              title="数据模型尚未导入"
+            >
+              模型未导入
+            </Link>
+          )}
+
+          {alias && indexNeedsAttention && (
+            <Link
+              className="shell-health-chip"
+              data-tone="warn"
+              to={navPath('knowledge', alias, { mode: 'relations' })}
+              title={indexState === 'stale' ? '搜索索引落后于当前 revision' : '搜索索引不可用'}
+            >
+              索引{indexState === 'stale' ? '待更新' : '异常'}
+            </Link>
+          )}
+
+          {current?.readOnly && (
+            <span className="shell-health-chip" data-tone="muted" title="只读数据源，不能执行写操作">
+              只读
+            </span>
+          )}
+
+          {graphAvailable && <span className="shell-revision">rev {revision}</span>}
+        </div>
       </header>
 
       <PendingApprovalNotice alias={alias} />
 
       <nav className="shell-nav" aria-label="一级导航">
-        <Button
-          title={collapsed ? '展开导航' : '收起导航'}
-          aria-label={collapsed ? '展开导航' : '收起导航'}
-          aria-expanded={!collapsed}
-          onClick={() => setCollapsed(!collapsed)}
-          size="sm"
-          icon
-          className="shell-nav-toggle"
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M15.4 7.4L14 6l-6 6 6 6 1.4-1.4-4.6-4.6 4.6-4.6z" />
-          </svg>
-        </Button>
+        <div className="shell-nav-head">
+          <span className="shell-nav-product">Workspace</span>
+          <Button
+            title={collapsed ? '展开导航' : '收起导航'}
+            aria-label={collapsed ? '展开导航' : '收起导航'}
+            aria-expanded={!collapsed}
+            onClick={() => setCollapsed(!collapsed)}
+            size="sm"
+            icon
+            className="shell-nav-toggle"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M15.4 7.4L14 6l-6 6 6 6 1.4-1.4-4.6-4.6 4.6-4.6z" />
+            </svg>
+          </Button>
+        </div>
 
         <div className="shell-nav-groups">
           {NAV_GROUPS.map((group) => {
             const items = NAV_ITEMS.filter((item) => item.group === group);
             if (items.length === 0) return null;
             return (
-              <section className={`shell-nav-group shell-nav-group-${group}`} key={group} aria-label={NAV_GROUP_LABELS[group]}>
+              <section
+                className={`shell-nav-group shell-nav-group-${group}`}
+                key={group}
+                aria-label={NAV_GROUP_LABELS[group]}
+              >
                 <div className="shell-nav-group-label" aria-hidden="true">{NAV_GROUP_LABELS[group]}</div>
                 <ul>
                   {items.map((item) => {
@@ -220,8 +243,8 @@ export function AppShell() {
                       <>
                         <svg
                           className="shell-nav-icon"
-                          width="17"
-                          height="17"
+                          width="18"
+                          height="18"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
@@ -233,8 +256,8 @@ export function AppShell() {
                           <path d={item.icon} />
                         </svg>
                         <span className="shell-nav-label">{item.label}</span>
-                        {item.key === 'reviews' && pendingCount > 0 && (
-                          <span className="shell-nav-badge" title={`${pendingCount} 件等着裁决`}>
+                        {item.key === 'governance' && pendingCount > 0 && (
+                          <span className="shell-nav-badge" title={`${pendingCount} 件等待处理`}>
                             {pendingCount > 99 ? '99+' : pendingCount}
                           </span>
                         )}
@@ -272,28 +295,20 @@ export function AppShell() {
   );
 }
 
-type Tone = 'ok' | 'warn' | 'bad';
-
 function PendingApprovalNotice({ alias }: { alias: string | null }) {
   const pending = useSessionStore((state) => state.pendingApproval);
   const dismiss = useSessionStore((state) => state.dismissPendingApproval);
   if (pending == null) return null;
   return (
     <div className="shell-notice" role="status">
-      <span>本次修改已提交审批 #{pending}，批准后才会写入图谱。</span>
-      <Link to={`${navPath('reviews', alias)}${alias ? '&' : '?'}tab=graph`} onClick={dismiss}>
-        去评审
+      <span>本次修改已提交审批 #{pending}，批准后才会写入数据模型。</span>
+      <Link
+        to={navPath('governance', alias, { section: 'reviews', tab: 'graph' })}
+        onClick={dismiss}
+      >
+        去处理
       </Link>
       <button type="button" onClick={dismiss} title="知道了" aria-label="关闭提示">×</button>
     </div>
-  );
-}
-
-function StatusDot({ label, tone, detail }: { label: string; tone: Tone; detail: string }) {
-  return (
-    <span className="shell-dot" data-tone={tone} data-tip={`${label}：${detail}`} tabIndex={0}>
-      <span className="shell-dot-mark" aria-hidden="true" />
-      <span className="sr-only">{`${label}：${detail}`}</span>
-    </span>
   );
 }
