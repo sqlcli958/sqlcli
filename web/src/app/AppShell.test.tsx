@@ -40,12 +40,12 @@ function renderShell() {
  * 待审批角标：没有它，队列里的东西只有主动点进评审页才知道。
  * 实测 6 条待审批从提交那天挂了一整天，而同期图谱一个字节没长。
  */
-test('评审导航项带出待审批条数', async () => {
+test('治理导航项带出待审批条数', async () => {
   vi.mocked(getApprovals).mockResolvedValue({ approvals: [], total: 6, pending: 6 } as never);
 
   renderShell();
 
-  await waitFor(() => expect(screen.getByTitle('6 件等着裁决')).toHaveTextContent('6'));
+  await waitFor(() => expect(screen.getByTitle('6 件等待处理')).toHaveTextContent('6'));
 });
 
 /** 队列空时不留一个 0：常驻的「0」和没有角标传递的信息一样，只多占一块地方。 */
@@ -54,8 +54,8 @@ test('没有待审批时不显示角标', async () => {
 
   renderShell();
 
-  await waitFor(() => expect(screen.getByText('评审')).toBeInTheDocument());
-  expect(screen.queryByTitle(/件等着裁决/)).toBeNull();
+  await waitFor(() => expect(screen.getByText('治理')).toBeInTheDocument());
+  expect(screen.queryByTitle(/件等待处理/)).toBeNull();
 });
 
 /**
@@ -67,6 +67,6 @@ test('角标不按当前别名过滤', async () => {
 
   renderShell();
 
-  await waitFor(() => expect(screen.getByTitle('3 件等着裁决')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByTitle('3 件等待处理')).toBeInTheDocument());
   expect(vi.mocked(getApprovals).mock.calls[0][0]).not.toHaveProperty('alias');
 });
