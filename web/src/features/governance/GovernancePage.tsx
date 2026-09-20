@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getAliases } from '../../api/aliases';
 import { getApprovals } from '../../api/approvals';
 import { getIndexStatus } from '../../api/indexApi';
@@ -9,6 +9,7 @@ import { EvalPage } from '../eval/EvalPage';
 import { RulesPage } from '../policy/RulesPage';
 import { ReviewsPage } from '../review/ReviewsPage';
 import { Button } from '../../ui/Button';
+import { navPath } from '../../app/navigation';
 import './governance.css';
 
 const SECTIONS = [
@@ -81,6 +82,8 @@ function GovernanceOverview({
   alias: string | null;
   onOpen: (section: Section) => void;
 }) {
+  const navigate = useNavigate();
+
   const aliases = useQuery({
     queryKey: ['aliases'],
     queryFn: ({ signal }) => getAliases(signal),
@@ -163,9 +166,9 @@ function GovernanceOverview({
                     : '索引缺失或不可用'
             }
             actionLabel={graphAvailable && indexState !== 'ready' ? '去数据模型处理' : undefined}
-            onAction={graphAvailable && indexState !== 'ready' ? () => window.location.assign(
-              `/workspaces/local/knowledge?alias=${encodeURIComponent(alias)}&mode=relations`,
-            ) : undefined}
+            onAction={graphAvailable && indexState !== 'ready'
+              ? () => navigate(navPath('knowledge', alias, { mode: 'relations' }))
+              : undefined}
           />
 
           <GovernanceAction
