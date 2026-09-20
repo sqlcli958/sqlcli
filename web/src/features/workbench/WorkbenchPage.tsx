@@ -2,9 +2,6 @@ import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getAliases } from '../../api/aliases';
-import { getWorkspaceStats, getWorkspaceCompleteness } from '../../api/workspace';
-import { getValidationIssues } from '../../api/validation';
-import { getIndexStatus } from '../../api/indexApi';
 import { navPath } from '../../app/navigation';
 import { SqlEditor } from './SqlEditor';
 import { takeWorkbenchSql } from './workbenchSql';
@@ -14,28 +11,16 @@ import { StatusDot, type Tone } from '../../ui/StatusDot';
 import type { WorkspaceCompletenessDto } from '../../types/api';
 
 /**
- * 工作台。原「概览」并入此页，导航因此从六项收敛为五项。
+ * SQL 工作台。
  *
- * 没有选中数据源时它就是数据源目录；选中之后是这个数据源的健康视图加 SQL 编辑器。
- * 一个页面两种状态，而不是两个页面——没有上下文时本来要回答的问题就是"我该看哪个库"。
- *
- * **执行记录不在这里**，在评审页——审批看「要不要放行」，执行记录看「放行之后
- * 发生了什么」，它们是同一件事的两半，同一个功能只留一个入口。
- *
- * **这里没有导入图谱的入口**，只有跳到图谱页的链接。导入的粒度是「一个 schema」，
- * 而挑哪个 schema 要看表目录，那是图谱页的东西；在这里再放一个整库导入按钮，
- * 就成了同一件事的第二个入口，还是更粗的那个。
- *
- * SQL 编辑器在「图谱规模」之前，**不要求图谱已导入**——跑 SQL 只需要连接，
- * 把它护在图谱后面等于新数据源连一条 SELECT 都跑不了。
+ * 新版不再承担“工作区健康 Dashboard”：索引、校验、审批和完整性都归治理。
+ * 这个页面只围绕一个主任务——写 SQL、执行、看结果。
  */
 export function WorkbenchPage() {
   const [searchParams] = useSearchParams();
   const alias = searchParams.get('alias');
   return alias ? <WorkspaceBoard alias={alias} /> : <SourceDirectory />;
 }
-
-/* ────────────────── 未选数据源：目录 ────────────────── */
 
 function SourceDirectory() {
   const { data, isLoading, isError } = useQuery({
@@ -45,47 +30,56 @@ function SourceDirectory() {
   });
 
   return (
-    <div className="page wb">
-      <header className="wb-head">
-        <h1>数据源</h1>
+    <div className="page wb wb-source-directory">
+      <header className="wb-head wb-directory-head">
+        <span className="wb-eyebrow">SQL Workspace</span>
+        <h1>选择数据源</h1>
+        <p>打开一个连接后直接开始查询；数据模型和治理能力都围绕当前数据源工作。</p>
       </header>
 
-      {isLoading && <p className="wb-hint">加载中…</p>}
+      {isLoading && <p className="wb-hint">正在读取数据源…</p>}
       {isError && (
         <p className="wb-alert" role="alert">
           无法读取数据源列表。确认 <code>sql-cli ui</code> 仍在运行。
         </p>
       )}
       {data?.aliases.length === 0 && (
-        <p className="wb-hint">
-          尚未配置数据源。用 <code>sql-cli alias add</code> 添加，或到设置页新建。
-        </p>
+        <div className="wb-empty">
+          <strong>还没有数据源</strong>
+          <p className="wb-hint">
+            用 <code>sql-cli alias add</code> 添加，或到设置页新建一个连接。
+          </p>
+          <Link className={buttonClass('primary')} to={navPath('settings', null)}>
+            打开设置
+          </Link>
+        </div>
       )}
 
-      <div className="wb-sources">
-        {data?.aliases.map((a) => (
-          <article className="wb-source" key={a.name}>
+      <div className="wb-sources wb-source-grid">
+        {data?.aliases.map((item) => (
+          <article className="wb-source wb-source-card" key={item.name}>
             <div className="wb-source-top">
-              <h2>{a.name}</h2>
-              <span className="wb-tag">{a.dbType || 'unknown'}</span>
-              {a.readOnly && <span className="wb-tag is-lock">只读</span>}
+              <div className="wb-source-title">
+                <span className="wb-source-dot" data-ready={item.graphAvailable || undefined} aria-hidden="true" />
+                <h2>{item.name}</h2>
+              </div>
+              <span className="wb-tag">{item.dbType || 'unknown'}</span>
+              {item.readOnly && <span className="wb-tag is-lock">只读</span>}
             </div>
-            {a.description && <p className="wb-source-desc">{a.description}</p>}
+            <p className="wb-source-desc">{item.description || '未填写说明'}</p>
             <p className="wb-source-stat">
-              {a.graphAvailable ? (
-                <>
-                  <b>{a.tables ?? 0}</b> 张表 · <b>{a.relations ?? 0}</b> 条关系
-                </>
+              {item.graphAvailable ? (
+                <>{item.tables ?? 0} 张表 · {item.relations ?? 0} 条关系</>
               ) : (
-                <span className="wb-muted">图谱未导入</span>
+                <span className="wb-muted">数据模型未导入</span>
               )}
             </p>
             <div className="wb-source-actions">
-              <Link className={buttonClass('primary')} to={navPath('sql', a.name)}>
-                打开
+              <Link className={buttonClass('primary')} to={navPath('sql', item.name)}>
+                打开工作台
               </Link>
-              <Link className={buttonClass()} to={navPath('knowledge', a.name)}>
-                {a.graphAvailable ? '图谱' : '去导入'}
+              <Link className={buttonClass('ghost')} to={navPath('knowledge', item.name)}>
+                数据模型
               </Link>
             </div>
           </article>
@@ -95,10 +89,7 @@ function SourceDirectory() {
   );
 }
 
-/* ────────────────── 已选数据源：健康视图 ────────────────── */
-
 function WorkspaceBoard({ alias }: { alias: string }) {
-  // 跨页送进来的 SQL（表详情的「在工作台查询」）只在首次渲染时取一次，取完就清。
   const [sql, setSql] = useState(() => takeWorkbenchSql() ?? '');
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
@@ -107,80 +98,48 @@ function WorkspaceBoard({ alias }: { alias: string }) {
     queryFn: ({ signal }) => getAliases(signal),
     staleTime: 30_000,
   });
-  const current = aliases.data?.aliases.find((a) => a.name === alias);
-  const graphAvailable = current?.graphAvailable ?? false;
-
-  const stats = useQuery({
-    queryKey: ['workspace', 'stats', alias],
-    queryFn: ({ signal }) => getWorkspaceStats(signal),
-    enabled: graphAvailable,
-  });
-
-  // 只问 error 级别：warning 的量级对"是否需要现在处理"没有决定作用。
-  const issues = useQuery({
-    queryKey: ['validation', 'issues', alias, 'error'],
-    queryFn: ({ signal }) => getValidationIssues(undefined, 'error', signal),
-    enabled: graphAvailable,
-  });
-
-  const index = useQuery({
-    queryKey: ['index', 'status', alias],
-    queryFn: ({ signal }) => getIndexStatus(signal),
-    enabled: graphAvailable,
-  });
-
-  const completeness = useQuery({
-    queryKey: ['workspace', 'completeness', alias],
-    queryFn: ({ signal }) => getWorkspaceCompleteness(signal),
-    enabled: graphAvailable,
-  });
-
-  if (!graphAvailable) {
-    return (
-      <div className="page wb">
-        <header className="wb-head">
-          <h1>{alias}</h1>
-          <p>还没有图谱，导入后才能搜索表和维护关系。</p>
-        </header>
-        <div className="wb-empty">
-          <Link className={buttonClass('primary')} to={navPath('knowledge', alias)}>
-            去图谱页导入
-          </Link>
-          <p className="wb-hint">
-            图谱页的表目录会列出这个数据源的全部 schema，按需要逐个导入。
-            命令行等价写法：
-            <code>sql-cli {alias} schema import --from-db --schema &lt;schema&gt;</code>
-          </p>
-        </div>
-
-        {/* 没图谱也能跑 SQL：执行只靠连接，和图谱无关 */}
-        <SqlEditor
-          alias={alias}
-          aliasInfo={current}
-          sql={sql}
-          onSqlChange={setSql}
-          textareaRef={editorRef}
-        />
-      </div>
-    );
-  }
-
-  const s = stats.data;
-  const errorCount = issues.data?.total ?? 0;
-  const indexStatus = index.data?.status ?? 'unknown';
-  const approvalOn = Boolean(
-    current?.approveQuery || current?.approveUpdate || current?.approveGraph,
-  );
+  const current = aliases.data?.aliases.find((item) => item.name === alias);
 
   return (
-    <div className="page wb">
-      <header className="wb-head">
-        <h1>{alias}</h1>
-        <p>
-          {current?.description || '数据源概览'}
-          {current?.readOnly && <span className="wb-tag is-lock">只读</span>}
-        </p>
+    <div className="page wb wb-workspace-redesign">
+      <header className="wb-head wb-workspace-head">
+        <div className="wb-workspace-title">
+          <span className="wb-eyebrow">SQL Workspace</span>
+          <div className="wb-title-line">
+            <h1>{alias}</h1>
+            {current?.readOnly && <span className="wb-tag is-lock">只读</span>}
+          </div>
+          <p>{current?.description || '编写 SQL、执行并查看结果。'}</p>
+        </div>
+
+        <div className="wb-head-actions">
+          <Link className={buttonClass('ghost')} to={navPath('knowledge', alias)}>
+            数据模型
+          </Link>
+          <Link
+            className={buttonClass('ghost')}
+            to={navPath('governance', alias, { section: 'reviews' })}
+          >
+            审批与审计
+          </Link>
+        </div>
       </header>
+
+      {aliases.isError && (
+        <p className="wb-alert" role="alert">无法读取数据源信息。</p>
+      )}
+
+      {current && !current.graphAvailable && (
+        <div className="wb-context-notice">
+          <div>
+            <strong>SQL 可以直接使用</strong>
+            <span>当前还没有数据模型，因此表/字段补全和语义上下文会比较有限。</span>
+          </div>
+          <Link className={buttonClass()} to={navPath('knowledge', alias)}>
+            导入数据模型
+          </Link>
+        </div>
+      )}
 
       <SqlEditor
         alias={alias}
@@ -190,83 +149,11 @@ function WorkspaceBoard({ alias }: { alias: string }) {
         textareaRef={editorRef}
       />
 
-      {/* 图谱规模 */}
-      <section className="wb-section">
-        <h2 className="wb-section-title">图谱规模</h2>
-        <div className="wb-metrics">
-          <Metric label="Schema" value={s?.schemas} />
-          <Metric label="表" value={s?.tables} />
-          <Metric label="字段" value={s?.columns} />
-          <Metric label="关系" value={s?.relations} />
-          <Metric label="业务术语" value={s?.terms} />
-        </div>
-      </section>
-
-      {/* 需要关注 */}
-      <section className="wb-section">
-        <h2 className="wb-section-title">需要关注</h2>
-        <div className="wb-cards">
-          <Attention
-            tone={indexStatus === 'ready' ? 'ok' : indexStatus === 'stale' ? 'warn' : 'bad'}
-            title="搜索索引"
-            body={
-              indexStatus === 'ready'
-                ? `已就绪，覆盖 ${index.data?.tableCount ?? 0} 张表`
-                : indexStatus === 'stale'
-                  ? '图谱已变更，索引落后于当前 revision，搜索结果可能不完整'
-                  : '索引缺失，schema search 无法使用'
-            }
-            action={
-              indexStatus !== 'ready' && (
-                <Link className={buttonClass()} to={navPath('knowledge', alias)}>
-                  去重建
-                </Link>
-              )
-            }
-          />
-
-          <Attention
-            tone={errorCount > 0 ? 'bad' : (s?.validationIssues ?? 0) > 0 ? 'warn' : 'ok'}
-            title="图谱校验"
-            body={
-              (s?.validationIssues ?? 0) === 0
-                ? '没有未处理的校验问题'
-                : `${s?.validationIssues} 个问题${errorCount > 0 ? `，其中 ${errorCount} 个为错误` : ''}`
-            }
-            action={
-              (s?.validationIssues ?? 0) > 0 && (
-                <Link className={buttonClass()} to={navPath('knowledge', alias)}>
-                  去处理
-                </Link>
-              )
-            }
-          />
-
-          <Attention
-            tone={approvalOn ? 'warn' : 'info'}
-            title="审批"
-            body={
-              approvalOn
-                ? `已开启：${[
-                    current?.approveQuery && '查询',
-                    current?.approveUpdate && '增删改',
-                    current?.approveGraph && '图谱变更',
-                  ]
-                    .filter(Boolean)
-                    .join(' / ')}，执行前会停在评审页等放行。`
-                : '未开启，操作直接执行。到设置页可以按数据源打开；执行记录在评审页。'
-            }
-            action={
-              <Link className={buttonClass()} to={navPath(approvalOn ? 'reviews' : 'settings', alias)}>
-                {approvalOn ? '去评审' : '去设置'}
-              </Link>
-            }
-          />
-        </div>
-      </section>
-
-      {/* 图谱完整性：数的是图谱自己的健康度，不是业务数据 */}
-      <CompletenessSection alias={alias} data={completeness.data} />
+      <footer className="wb-workspace-foot">
+        <span><kbd>Ctrl</kbd> + <kbd>Enter</kbd> 执行</span>
+        <span><kbd>Ctrl</kbd> + <kbd>Space</kbd> 补全</span>
+        <Link to={navPath('governance', alias)}>查看工作区健康度</Link>
+      </footer>
     </div>
   );
 }
