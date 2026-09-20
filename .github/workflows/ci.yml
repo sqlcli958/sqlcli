@@ -10,7 +10,79 @@ permissions:
   contents: read
 
 jobs:
+  frontend:
+    name: Frontend quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Lint
+        working-directory: web
+        run: npm run lint
+
+      - name: Unit tests
+        working-directory: web
+        run: npm test
+
+      - name: TypeScript and Vite build
+        working-directory: web
+        run: npm run build
+
+  ui-e2e:
+    name: UI / Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run UI tests
+        working-directory: web
+        run: npm run test:e2e
+
+      - name: Upload UI report and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-ui-report
+          path: |
+            web/playwright-report/
+            web/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
   build:
+    name: Backend / package
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
