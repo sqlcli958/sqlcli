@@ -53,7 +53,7 @@ export function MetricsPage() {
 
   if (!alias) {
     return (
-      <div className="page metrics-page">
+      <div className="page metrics-page metrics-redesign">
         <p className="term-list-hint">请先在顶栏选择数据源。</p>
       </div>
     );
@@ -67,7 +67,7 @@ export function MetricsPage() {
         </header>
         <p className="term-list-hint">
           还没有图谱，指标的口径引用图谱里的列——先去
-          <Link className="metric-link" to={navPath('knowledge', alias)}>图谱页导入</Link>。
+          <Link className="metric-link" to={navPath('knowledge', alias)}>数据模型中导入</Link>。
         </p>
       </div>
     );
@@ -95,8 +95,12 @@ export function MetricsPage() {
   return (
     <div className="page metrics-page">
       <header className="metrics-head">
-        <h1>指标</h1>
-        <Button size="sm" onClick={() => setEditing(editing === 'new' ? null : 'new')}>
+        <div>
+          <span className="metrics-eyebrow">Semantic metrics</span>
+          <h1>指标</h1>
+          <p>统一业务口径、可用粒度和维度，并从同一条 SQL 执行链路验证趋势。</p>
+        </div>
+        <Button variant="primary" size="sm" onClick={() => setEditing(editing === 'new' ? null : 'new')}>
           {editing === 'new' ? '收起' : '新建指标'}
         </Button>
       </header>
@@ -350,7 +354,7 @@ function MetricChartSection({
       {chart.isPending && aliasInfo?.approveQuery && (
         <p className="metric-approval" role="status">
           等待审批中，请到评审页放行。
-          <Link className="metric-link" to={navPath('reviews', alias)}>去评审</Link>
+          <Link className="metric-link" to={navPath('governance', alias, { section: 'reviews' })}>去评审</Link>
         </p>
       )}
       {chart.isError && (
