@@ -337,7 +337,7 @@ export function SqlEditor({
       {run.isPending && needsApproval && (
         <p className="wb-approval" role="status">
           等待审批中，请到评审页放行。
-          <Link className="wb-link" to={navPath('reviews', alias)}>去评审</Link>
+          <Link className="wb-link" to={navPath('governance', alias, { section: 'reviews' })}>去评审</Link>
         </p>
       )}
 
