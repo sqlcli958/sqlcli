@@ -258,3 +258,50 @@
     justify-self: start;
   }
 }
+
+
+/* Embedded governance tools use the governance header as their page chrome. */
+.governance-content .eval-page,
+.governance-content .page.review {
+  padding: 20px 24px 40px;
+}
+
+.governance-content .eval-head,
+.governance-content .review-head.review-head-v2 {
+  min-height: 0;
+  margin: 0 0 16px;
+  padding: 0 0 14px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.governance-content .eval-head::before,
+.governance-content .eval-head::after {
+  content: none;
+}
+
+.governance-content .review-title-copy > small {
+  display: none;
+}
+
+.governance-content .review-title-copy h1 {
+  font-size: 18px;
+}
+
+.governance-content .review-title-copy p {
+  max-width: 760px;
+  font-size: 12.5px;
+}
+
+.governance-content .review-overview {
+  min-width: 360px;
+}
+
+.governance-content .rules-page {
+  min-height: 100%;
+  padding: 12px;
+  background: transparent;
+}
