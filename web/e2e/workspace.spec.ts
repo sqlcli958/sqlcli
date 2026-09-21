@@ -458,7 +458,7 @@ test('settings renders data source management in the same product shell', async 
   await expect(page.getByText('数据源控制台')).toBeVisible();
   await expect(page.getByRole('table').getByText('demo', { exact: true })).toBeVisible();
   await expect(page.getByRole('table').getByText(/postgresql/i)).toBeVisible();
-  await expect(page.getByLabel('新建数据源')).toBeVisible();
+  await expect(page.getByRole('button', { name: '新建数据源', exact: true })).toBeVisible();
 
   await capture(page, testInfo, 'settings');
 });
