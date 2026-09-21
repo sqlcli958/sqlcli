@@ -122,7 +122,15 @@ function fitToNodes(sigma: Sigma, graph: Graph): void {
   // **必须在动画回调里 refresh。** 相机动画期间 Sigma 不画标签，动画结束时也不会自己
   // 补一帧——结果是一屏没有名字的圆点，而节点数据里标签、尺寸、可见性全都是对的
   // （实测：refresh 之前标签 0 像素，调一次就有 1712）。
-  sigma.getCamera().animate({ x: 0.5, y: 0.5, ratio: 1 }, { duration: 320 }, () => sigma.refresh());
+  // Sigma 会把当前 bbox 归一化到整个画布。两三个节点时 ratio=1 会把它们顶到画布边缘，
+  // 看起来像“有一条线贯穿整屏”。节点越少越留出更多呼吸空间；十几张以后逐步回到 1。
+  const ratio =
+    graph.order <= 2 ? 2.4 :
+    graph.order <= 4 ? 1.9 :
+    graph.order <= 8 ? 1.55 :
+    graph.order <= 16 ? 1.25 :
+    1;
+  sigma.getCamera().animate({ x: 0.5, y: 0.5, ratio }, { duration: 320 }, () => sigma.refresh());
 }
 
 function getLayoutDuration(nodeCount: number): number {
