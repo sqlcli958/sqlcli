@@ -1,13 +1,11 @@
 import { Navigate, createBrowserRouter, useLocation, useSearchParams } from 'react-router-dom';
 import { AppShell } from './AppShell';
-import { WORKSPACE_BASE } from './navigation';
+import { WORKSPACE_BASE, navPath } from './navigation';
 import { WorkbenchPage } from '../features/workbench/WorkbenchPage';
 import { KnowledgePage } from '../features/knowledge/KnowledgePage';
 import { MetricsPage } from '../features/metrics/MetricsPage';
-import { RulesPage } from '../features/policy/RulesPage';
-import { EvalPage } from '../features/eval/EvalPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
-import { ReviewsPage } from '../features/review/ReviewsPage';
+import { GovernancePage } from '../features/governance/GovernancePage';
 
 /** 保留当前 query（数据源上下文）跳转到同一 workspace 下的另一页。 */
 function KeepQuery({ to }: { to: string }) {
@@ -15,28 +13,37 @@ function KeepQuery({ to }: { to: string }) {
   return <Navigate to={`${WORKSPACE_BASE}/${to}${search}`} replace />;
 }
 
+/** 旧的一层功能路由收口到治理页，同时保留 alias 和评审子标签。 */
+function GovernanceRedirect({ section }: { section: 'quality' | 'rules' | 'reviews' }) {
+  const [params] = useSearchParams();
+  const copy = new URLSearchParams(params);
+  copy.set('section', section);
+  const suffix = copy.toString();
+  return <Navigate to={`${WORKSPACE_BASE}/governance${suffix ? `?${suffix}` : ''}`} replace />;
+}
+
 /**
- * 旧链接兼容。
- *
- * 老 UI 用 `?alias=` + `?view=` 在一个路径上分派页面。这里只做一次性跳转，
- * 不保留两套状态——P0 清单 3.3 明确要求不长期并存。
+ * 更早版本的 query 驱动入口兼容。
+ * 新版只把“产品级任务”放一级路由，旧 view 会一次性落到新结构。
  */
 function LegacyRedirect() {
   const [params] = useSearchParams();
   const alias = params.get('alias');
   const view = params.get('view');
 
-  const page =
-    view === 'rules'
-      ? 'rules'
-      : view === 'add-alias'
-        ? 'settings'
-        : alias && view !== 'executions'
-          ? 'knowledge'
-          : 'sql';
-
-  const search = alias ? `?alias=${encodeURIComponent(alias)}` : '';
-  return <Navigate to={`${WORKSPACE_BASE}/${page}${search}`} replace />;
+  if (view === 'rules') {
+    return <Navigate to={navPath('governance', alias, { section: 'rules' })} replace />;
+  }
+  if (view === 'executions') {
+    return <Navigate to={navPath('governance', alias, { section: 'reviews', tab: 'executions' })} replace />;
+  }
+  if (view === 'add-alias') {
+    return <Navigate to={navPath('settings', alias)} replace />;
+  }
+  if (alias) {
+    return <Navigate to={navPath('knowledge', alias)} replace />;
+  }
+  return <Navigate to={navPath('sql', null)} replace />;
 }
 
 function NotFound() {
@@ -60,13 +67,17 @@ export const router = createBrowserRouter([
       { path: 'sql', element: <WorkbenchPage /> },
       { path: 'knowledge', element: <KnowledgePage /> },
       { path: 'metrics', element: <MetricsPage /> },
-      { path: 'rules', element: <RulesPage /> },
-      { path: 'eval', element: <EvalPage /> },
-      { path: 'reviews', element: <ReviewsPage /> },
-      // 并入工作台前的两个页面，旧书签一次性跳转
+      { path: 'governance', element: <GovernancePage /> },
+      { path: 'settings', element: <SettingsPage /> },
+
+      // 旧书签兼容：功能仍然存在，只是归到治理的二级导航。
+      { path: 'rules', element: <GovernanceRedirect section="rules" /> },
+      { path: 'eval', element: <GovernanceRedirect section="quality" /> },
+      { path: 'reviews', element: <GovernanceRedirect section="reviews" /> },
+
+      // 并入工作台前的两个页面。
       { path: 'overview', element: <KeepQuery to="sql" /> },
       { path: 'operations', element: <KeepQuery to="sql" /> },
-      { path: 'settings', element: <SettingsPage /> },
       { path: '*', element: <NotFound /> },
     ],
   },

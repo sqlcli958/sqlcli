@@ -18,9 +18,13 @@ export function SettingsPage() {
   const [editing, setEditing] = useState<string | null>(null);
 
   return (
-    <div className="page settings">
+    <div className="page settings settings-redesign">
       <header className="settings-head">
-        <h1>设置</h1>
+        <div className="settings-title">
+          <span className="settings-eyebrow">Workspace settings</span>
+          <h1>设置</h1>
+          <p>管理数据源、驱动和执行保护策略。</p>
+        </div>
         <div className="settings-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'sources'} className={tab === 'sources' ? 'is-active' : ''} onClick={() => setTab('sources')}>数据源</button>
           <button type="button" role="tab" aria-selected={tab === 'drivers'} className={tab === 'drivers' ? 'is-active' : ''} onClick={() => setTab('drivers')}>驱动</button>
@@ -79,7 +83,7 @@ function SourceSettings({ onAdd, onEdit }: { onAdd: () => void; onEdit: (name: s
           <h2>数据源控制台</h2>
           <p>连接、图谱状态和审批策略集中管理；高频策略可以直接在列表中切换。</p>
         </div>
-        <ActionIcon action="add" label="新建数据源" primary size="md" onClick={onAdd} />
+        <Button variant="primary" size="sm" onClick={onAdd}>新建数据源</Button>
       </div>
 
       {!isLoading && !isError && (

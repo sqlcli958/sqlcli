@@ -166,7 +166,8 @@ test('没有声明时间列的指标不给出图入口，只给补时间列的 C
   renderPage();
   await screen.findByText('已支付GMV');
 
-  expect(screen.getByText(/没有声明时间列/)).toBeTruthy();
+  expect(screen.getByText('未配置趋势粒度')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '趋势' })).toBeNull();
   expect(screen.queryByRole('button', { name: '出图' })).toBeNull();
 });
 
@@ -192,6 +193,7 @@ test('出图：展开 SQL 走 executeWorkbenchSql，不另写执行路径，画�
   renderPage();
   await screen.findByText('已支付GMV');
 
+  await userEvent.click(screen.getByRole('button', { name: '趋势' }));
   await userEvent.click(screen.getByRole('button', { name: '出图' }));
 
   await waitFor(() => expect(executeWorkbenchSql).toHaveBeenCalledWith('SELECT grain_day, gmv_paid FROM x'));
@@ -219,6 +221,7 @@ test('出图查询为空结果时不画空网格，说明没有数据', async ()
   renderPage();
   await screen.findByText('已支付GMV');
 
+  await userEvent.click(screen.getByRole('button', { name: '趋势' }));
   await userEvent.click(screen.getByRole('button', { name: '出图' }));
 
   expect(await screen.findByText('这个时间范围内没有数据。')).toBeTruthy();

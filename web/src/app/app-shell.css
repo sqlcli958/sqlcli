@@ -400,3 +400,350 @@
   line-height: 1;
   padding: 0 2px;
 }
+
+
+/* ───────────────── Product redesign shell ───────────────── */
+
+.shell[data-product-shell='true'] {
+  --shell-header-h: 56px;
+  --shell-nav-w: 216px;
+  --shell-radius: 7px;
+  background: var(--color-bg);
+}
+
+.shell[data-product-shell='true'][data-nav-collapsed] {
+  --shell-nav-w: 64px;
+}
+
+.shell[data-product-shell='true'] .shell-header {
+  gap: 18px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface) 96%, transparent);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.shell[data-product-shell='true'] .shell-brand {
+  min-width: 118px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--color-text);
+  background: none;
+  -webkit-background-clip: initial;
+  background-clip: initial;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.shell[data-product-shell='true'] .shell-brand::before {
+  width: 26px;
+  height: 26px;
+  filter: none;
+}
+
+.shell[data-product-shell='true'] .shell-brand::after {
+  display: none;
+}
+
+.shell-context {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.shell-context-label {
+  color: var(--color-text-dim);
+  font-size: 11px;
+}
+
+.shell-source-select {
+  min-width: 190px;
+  max-width: 300px;
+  height: 32px;
+  padding: 0 30px 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.shell-source-select:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 70%, transparent);
+  outline-offset: 1px;
+}
+
+.shell-context-type {
+  padding: 2px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.shell[data-product-shell='true'] .shell-health {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.shell-health-chip {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.shell-health-chip[data-tone='ok'] {
+  color: color-mix(in srgb, var(--color-success) 80%, var(--color-text));
+  border-color: color-mix(in srgb, var(--color-success) 25%, var(--color-border));
+}
+
+.shell-health-chip[data-tone='warn'] {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 28%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning) 5%, transparent);
+}
+
+.shell-health-chip[data-tone='bad'] {
+  color: var(--color-error);
+  border-color: color-mix(in srgb, var(--color-error) 28%, var(--color-border));
+}
+
+.shell-health-chip[data-tone='pending'],
+.shell-health-chip[data-tone='muted'] {
+  color: var(--color-text-dim);
+}
+
+.shell-health-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.shell-revision {
+  color: var(--color-text-dim);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.shell[data-product-shell='true'] .shell-nav {
+  padding: 10px 8px 12px;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.shell-nav-head {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 5px 6px 9px;
+}
+
+.shell-nav-product {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.shell[data-product-shell='true'] .btn.shell-nav-toggle {
+  margin: 0;
+}
+
+.shell[data-product-shell='true'] .shell-nav-groups {
+  gap: 14px;
+}
+
+.shell[data-product-shell='true'] .shell-nav-group {
+  display: grid;
+  gap: 4px;
+}
+
+.shell[data-product-shell='true'] .shell-nav-group-system {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.shell[data-product-shell='true'] .shell-nav-group-label {
+  padding: 0 10px 3px;
+  color: var(--color-text-dim);
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: .09em;
+}
+
+.shell[data-product-shell='true'] .shell-nav-group ul {
+  gap: 2px;
+}
+
+.shell[data-product-shell='true'] .shell-nav-group li,
+.shell[data-product-shell='true'] .shell-nav-group li:nth-child(2),
+.shell[data-product-shell='true'] .shell-nav-group li:nth-child(5),
+.shell[data-product-shell='true'] .shell-nav-group li:last-child {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.shell[data-product-shell='true'] .shell-nav-item {
+  min-height: 38px;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 520;
+}
+
+.shell[data-product-shell='true'] .shell-nav-item:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.shell[data-product-shell='true'] .shell-nav-item.is-active {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  box-shadow: inset 2px 0 0 var(--color-primary);
+  font-weight: 650;
+}
+
+.shell[data-product-shell='true'] .shell-nav-item.is-active .shell-nav-icon {
+  color: var(--color-primary);
+  filter: none;
+}
+
+.shell[data-product-shell='true'][data-nav-collapsed] .shell-nav-head {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.shell[data-product-shell='true'][data-nav-collapsed] .shell-nav-product,
+.shell[data-product-shell='true'][data-nav-collapsed] .shell-nav-group-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.shell[data-product-shell='true'][data-nav-collapsed] .shell-nav-group-system {
+  padding-top: 8px;
+}
+
+.shell[data-product-shell='true'][data-nav-collapsed] .shell-nav-item.is-active {
+  box-shadow: inset 2px 0 0 var(--color-primary);
+}
+
+.shell[data-product-shell='true'] .shell-main {
+  background: var(--color-bg);
+}
+
+.shell[data-product-shell='true'] .shell-notice {
+  box-shadow: none;
+}
+
+@media (max-width: 900px) {
+  .shell[data-product-shell='true'] .shell-header {
+    gap: 10px;
+  }
+
+  .shell[data-product-shell='true'] .shell-brand {
+    min-width: 0;
+  }
+
+  .shell-context-label,
+  .shell-context-type,
+  .shell-revision {
+    display: none;
+  }
+
+  .shell-source-select {
+    min-width: 150px;
+  }
+}
+
+@media (max-width: 720px) {
+  .shell[data-product-shell='true'] {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'header'
+      'nav'
+      'main';
+  }
+
+  .shell[data-product-shell='true'] .shell-header {
+    min-height: 54px;
+    flex-wrap: wrap;
+    padding-block: 8px;
+  }
+
+  .shell[data-product-shell='true'] .shell-health {
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+  }
+
+  .shell[data-product-shell='true'] .shell-nav {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 5px 8px;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .shell[data-product-shell='true'] .shell-nav-head,
+  .shell[data-product-shell='true'] .shell-nav-group-label,
+  .shell[data-product-shell='true'] .shell-nav-group-system {
+    display: none;
+  }
+
+  .shell[data-product-shell='true'] .shell-nav-groups,
+  .shell[data-product-shell='true'] .shell-nav-group,
+  .shell[data-product-shell='true'] .shell-nav-group ul {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+  }
+
+  .shell[data-product-shell='true'] .shell-nav-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+
+  .shell[data-product-shell='true'] .shell-nav-item {
+    min-width: max-content;
+  }
+}
