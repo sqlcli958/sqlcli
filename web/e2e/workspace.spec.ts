@@ -348,7 +348,7 @@ async function capture(page: Page, testInfo: TestInfo, name: string) {
   await page.evaluate(async () => {
     await document.fonts.ready;
   });
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(450);
   const path = testInfo.outputPath(`${name}.png`);
   await page.screenshot({
     path,
