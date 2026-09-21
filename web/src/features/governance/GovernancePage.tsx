@@ -137,13 +137,6 @@ function GovernanceOverview({
 
   return (
     <div className="governance-overview">
-      <section className="governance-summary" aria-label="治理概览">
-        <SummaryMetric label="表" value={graphAvailable ? s?.tables : undefined} />
-        <SummaryMetric label="关系" value={graphAvailable ? s?.relations : undefined} />
-        <SummaryMetric label="校验错误" value={graphAvailable ? errorCount : undefined} tone={errorCount > 0 ? 'bad' : 'ok'} />
-        <SummaryMetric label="待审批" value={pendingCount} tone={pendingCount > 0 ? 'warn' : 'ok'} />
-      </section>
-
       <section className="governance-panel">
         <div className="governance-panel-head">
           <div>
@@ -207,6 +200,13 @@ function GovernanceOverview({
             }
           />
         </div>
+      </section>
+
+      <section className="governance-summary" aria-label="治理概览">
+        <SummaryMetric label="表" value={graphAvailable ? s?.tables : undefined} />
+        <SummaryMetric label="关系" value={graphAvailable ? s?.relations : undefined} />
+        <SummaryMetric label="校验错误" value={graphAvailable ? errorCount : undefined} tone={errorCount > 0 ? 'bad' : 'ok'} />
+        <SummaryMetric label="待审批" value={pendingCount} tone={pendingCount > 0 ? 'warn' : 'ok'} />
       </section>
     </div>
   );
