@@ -62,19 +62,19 @@
 /* ───────────────── Product redesign: metrics catalog ───────────────── */
 
 .shell-main > .page.metrics-redesign {
-  width: min(1120px, 100%);
+  width: min(1040px, 100%);
   max-width: none;
   margin: 0 auto;
   padding: 24px 28px 44px;
 }
 
 .metrics-redesign {
-  gap: 16px;
+  gap: 14px;
 }
 
 .metrics-redesign .metrics-head {
   min-height: 0;
-  padding: 0 0 18px;
+  padding: 0 0 14px;
   border: 0;
   border-bottom: 1px solid var(--color-border);
   border-radius: 0;
@@ -123,7 +123,7 @@
 .metrics-redesign > .term-list > .term-list-item {
   min-width: 0;
   margin: 0;
-  padding: 15px 16px;
+  padding: 13px 15px;
   border: 0;
   border-bottom: 1px solid var(--color-border);
   border-radius: 0;
@@ -169,14 +169,24 @@
 }
 
 .metrics-redesign .metric-item-actions {
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.metrics-redesign .metric-trend-unavailable {
+  color: var(--color-text-dim);
+  font-size: 11px;
+  margin-left: 2px;
 }
 
 .metrics-redesign .metric-chart-block {
-  margin-top: 12px;
-  padding: 12px;
+  margin-top: 10px;
+  padding: 10px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: color-mix(in srgb, var(--color-bg) 50%, var(--color-surface));
