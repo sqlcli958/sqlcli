@@ -61,7 +61,7 @@ export function MetricsPage() {
 
   if (!graphAvailable) {
     return (
-      <div className="page metrics-page">
+      <div className="page metrics-page metrics-redesign">
         <header className="metrics-head">
           <h1>指标</h1>
         </header>
@@ -75,14 +75,14 @@ export function MetricsPage() {
 
   if (list.isLoading) {
     return (
-      <div className="page metrics-page">
+      <div className="page metrics-page metrics-redesign">
         <p className="term-list-hint">加载中…</p>
       </div>
     );
   }
   if (list.isError) {
     return (
-      <div className="page metrics-page">
+      <div className="page metrics-page metrics-redesign">
         <p className="term-list-hint">指标加载失败</p>
       </div>
     );
@@ -93,7 +93,7 @@ export function MetricsPage() {
   const metrics = (list.data?.metrics ?? []) as RatioMetricDto[];
 
   return (
-    <div className="page metrics-page">
+    <div className="page metrics-page metrics-redesign">
       <header className="metrics-head">
         <div>
           <span className="metrics-eyebrow">Semantic metrics</span>
@@ -170,10 +170,12 @@ function MetricItem({
   onDone: () => void;
 }) {
   const [grain, setGrain] = useState('');
+  const [showTrend, setShowTrend] = useState(false);
   const expand = useMutation({
     mutationFn: () => expandMetricSql(metric.name, { grain: grain || undefined }),
   });
   const grains = metric.grain?.grains ?? [];
+  const canTrend = Boolean(metric.grain?.timeColumn && grains.length > 0);
   const isRatio = !!(metric.numerator && metric.denominator);
   // 比率结构由展开器强制推定成 non_additive，不看 metric.additivity 填的是什么；
   // 跟 MetricSqlExpander#effectiveAdditivity 保持同一个判断规则。
@@ -237,6 +239,13 @@ function MetricItem({
         <Button size="sm" onClick={() => expand.mutate()} disabled={expand.isPending}>
           {expand.isPending ? '展开中…' : '展开 SQL'}
         </Button>
+        {canTrend ? (
+          <Button size="sm" onClick={() => setShowTrend((open) => !open)}>
+            {showTrend ? '收起趋势' : '趋势'}
+          </Button>
+        ) : (
+          <span className="metric-trend-unavailable">未配置趋势粒度</span>
+        )}
         <Button size="sm" onClick={onToggleEdit}>
           {editing ? '收起' : '编辑'}
         </Button>
@@ -260,7 +269,9 @@ function MetricItem({
         </div>
       )}
 
-      <MetricChartSection metric={metric} alias={alias} aliasInfo={aliasInfo} />
+      {showTrend && canTrend && (
+        <MetricChartSection metric={metric} alias={alias} aliasInfo={aliasInfo} />
+      )}
 
       {editing && <MetricForm metric={metric} revision={revision} onDone={onDone} />}
     </li>
