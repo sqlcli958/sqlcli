@@ -110,7 +110,7 @@
   font-size: 12.5px;
 }
 
-.metrics-redesign > .term-list {
+.metrics-page.metrics-redesign > .term-list {
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -120,7 +120,7 @@
   background: var(--color-surface);
 }
 
-.metrics-redesign > .term-list > .term-list-item {
+.metrics-page.metrics-redesign > .term-list > .term-list-item {
   min-width: 0;
   margin: 0;
   padding: 13px 15px;
@@ -132,11 +132,11 @@
   transform: none;
 }
 
-.metrics-redesign > .term-list > .term-list-item:last-child {
+.metrics-page.metrics-redesign > .term-list > .term-list-item:last-child {
   border-bottom: 0;
 }
 
-.metrics-redesign > .term-list > .term-list-item:hover {
+.metrics-page.metrics-redesign > .term-list > .term-list-item:hover {
   transform: none;
   border-color: var(--color-border);
   background: color-mix(in srgb, var(--color-primary) 3%, var(--color-surface));
