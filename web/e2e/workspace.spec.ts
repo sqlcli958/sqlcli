@@ -448,7 +448,7 @@ test('governance renders health summary and opens review control plane', async (
 
   await page.getByRole('button', { name: '审批与审计', exact: true }).click();
   await expect(page).toHaveURL(/section=reviews/);
-  await expect(page.getByText('待审批', { exact: true })).toBeVisible();
+  await expect(page.getByRole('tab', { name: '待审批', exact: true })).toBeVisible();
 });
 
 test('settings renders data source management in the same product shell', async ({ page }, testInfo) => {
