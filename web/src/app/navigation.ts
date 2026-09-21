@@ -21,10 +21,10 @@ export interface NavItem {
 export const WORKSPACE_BASE = '/workspaces/local';
 
 export const NAV_GROUP_LABELS: Record<NavGroup, string> = {
-  work: 'WORK',
-  knowledge: 'KNOWLEDGE',
-  governance: 'GOVERNANCE',
-  system: 'SYSTEM',
+  work: '工作',
+  knowledge: '知识',
+  governance: '治理',
+  system: '系统',
 };
 
 /**
