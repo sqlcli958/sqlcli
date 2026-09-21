@@ -15,13 +15,21 @@ function initializeNodePositions(graph: Graph): void {
     .filter((node) => graph.degree(node) === 0)
     .sort();
 
-  const connectedRadius = Math.max(420, connected.length * 46);
+  const tiny = connected.length > 0 && connected.length <= 6;
+  const connectedRadius = tiny
+    ? 110 + Math.max(0, connected.length - 2) * 16
+    : Math.max(420, connected.length * 46);
   const half = Math.ceil(connected.length / 2);
   connected.forEach((node, index) => {
-    const slot = index % 2 === 0
-      ? index / 2
-      : half + (index - 1) / 2;
-    const angle = -Math.PI / 2 + (Math.PI * 2 * slot) / Math.max(connected.length, 1);
+    // 两三张表是最常见的“查一条关系”场景，不应该被摊到画布四角。
+    // 2 节点横排；3~6 节点用紧凑规则多边形。大图仍保留原来的高权重交错排布。
+    const slot = tiny
+      ? index
+      : index % 2 === 0
+        ? index / 2
+        : half + (index - 1) / 2;
+    const startAngle = connected.length === 2 ? 0 : -Math.PI / 2;
+    const angle = startAngle + (Math.PI * 2 * slot) / Math.max(connected.length, 1);
     graph.mergeNodeAttributes(node, {
       x: Math.cos(angle) * connectedRadius,
       y: Math.sin(angle) * connectedRadius,
