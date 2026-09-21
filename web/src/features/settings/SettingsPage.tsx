@@ -83,7 +83,7 @@ function SourceSettings({ onAdd, onEdit }: { onAdd: () => void; onEdit: (name: s
           <h2>数据源控制台</h2>
           <p>连接、图谱状态和审批策略集中管理；高频策略可以直接在列表中切换。</p>
         </div>
-        <ActionIcon action="add" label="新建数据源" primary size="md" onClick={onAdd} />
+        <Button variant="primary" size="sm" onClick={onAdd}>新建数据源</Button>
       </div>
 
       {!isLoading && !isError && (
