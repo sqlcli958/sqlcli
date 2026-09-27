@@ -267,7 +267,7 @@ test('light theme keeps Workbench Graph Review Rules Metrics Eval Settings surfa
       <div class="wb"><header class="wb-head">Workbench</header><section class="wb-editor"></section></div>
       <section class="knowledge-center">Graph</section>
       <section class="review-stage"><article class="review-card">Review</article></section>
-      <section class="rules-page"><article class="rule-card">Rules</article></section>
+      <section class="rules-page"><article class="rules-main">Rules</article></section>
       <section class="metrics-page"><article class="metric-form">Metrics</article></section>
       <section class="eval-page"><article class="eval-kpi">Eval</article></section>
       <section class="settings"><header class="settings-head">Settings</header></section>
@@ -278,7 +278,7 @@ test('light theme keeps Workbench Graph Review Rules Metrics Eval Settings surfa
       Workbench: '.wb > .wb-head',
       Graph: '.knowledge-center',
       Review: '.review-stage .review-card',
-      Rules: '.rules-page .rule-card',
+      Rules: '.rules-page .rules-main',
       Metrics: '.metrics-page .metric-form',
       Eval: '.eval-page .eval-kpi',
       Settings: '.settings .settings-head',
