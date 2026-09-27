@@ -267,7 +267,10 @@ function RollbackButton({ record }: { record: SqlExecutionRecordDto }) {
                 <p className="review-hint" role="status">
                   已提交审批 #{run.data.approvalId}，共 {run.data.statements} 条语句；
                   批准后才执行。
-                  <Link className="exec-link" to={navPath('reviews', record.alias)}>
+                  <Link
+                    className="exec-link"
+                    to={`${navPath('reviews', record.alias)}${record.alias ? '&' : '?'}tab=pending`}
+                  >
                     去待审批裁决
                   </Link>
                 </p>
