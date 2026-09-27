@@ -400,6 +400,14 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
+                    <!--
+                        多个基线用例会临时覆盖 sqlcli.configRoot/user.home，而 SettingsConfig 又是
+                        进程级单例。Surefire 默认复用 fork 会把这类全局状态带到下一个测试类，
+                        造成单跑通过、全量失败。测试类之间使用独立 JVM，隔离 System Property
+                        和静态单例；CI 本来就是手动触发，优先保证基线确定性。
+                    -->
+                    <forkCount>1</forkCount>
+                    <reuseForks>false</reuseForks>
                     <argLine>
                         -javaagent:${settings.localRepository}/net/bytebuddy/byte-buddy-agent/1.17.5/byte-buddy-agent-1.17.5.jar
                         --add-opens java.base/java.lang=ALL-UNNAMED
