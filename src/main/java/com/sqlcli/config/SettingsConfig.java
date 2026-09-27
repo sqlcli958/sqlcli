@@ -86,12 +86,20 @@ public class SettingsConfig {
                 : Path.of(System.getProperty("user.home"), ".sql-cli");
     }
 
-    private void load() {
+    /**
+     * 每次加载都从干净默认值开始。
+     *
+     * <p>SettingsConfig 是进程级单例；测试和设置页都会调用 reload()。旧实现只覆盖标量、
+     * 却往 driverDefaults/drivers/secrets 里继续追加，配置根目录切换或某次加载失败后，
+     * 下一次解析仍可能看到上一份配置。这也是 AliasResolver 这类消费者出现顺序相关基线
+     * 失败的根因之一。先清空再加载，让 reload 真正幂等。
+     */
+    private synchronized void load() {
+        resetToDefaults();
+
         Path settingsFile = configRoot().resolve(SETTINGS_PATH);
         if (!Files.exists(settingsFile)) {
             log.info("settings.yaml not found, using defaults");
-            aliasesPath = DEFAULT_ALIASES_PATH;
-            masterPasswordEnv = "SQLCLI_MASTER_PASSWORD";
             return;
         }
 
@@ -102,25 +110,29 @@ public class SettingsConfig {
                 data = new HashMap<>();
             }
 
-            // 加载 aliasesPath
             aliasesPath = stringValue(data.get("aliasesPath"), DEFAULT_ALIASES_PATH);
             masterPasswordEnv = stringValue(data.get("masterPasswordEnv"), "SQLCLI_MASTER_PASSWORD");
-            schemaGraphPath = stringValue(data.get("schemaGraphPath"), "config/schema-graphs");
+            schemaGraphPath = stringValue(data.get("schemaGraphPath"), DEFAULT_SCHEMA_GRAPH_PATH);
 
-            // 加载驱动默认配置
             loadDriverDefaults(data);
-
-            // 加载驱动配置
             loadDrivers(data);
-
-            // 加载密码存储
             loadSecrets(data);
 
             log.info("Loaded settings from: {}", settingsFile);
         } catch (Exception e) {
             log.warn("Failed to load settings.yaml", e);
-            aliasesPath = DEFAULT_ALIASES_PATH;
+            // 不保留半加载状态；失败后和“没有配置文件”一样回到确定的默认值。
+            resetToDefaults();
         }
+    }
+
+    private void resetToDefaults() {
+        aliasesPath = DEFAULT_ALIASES_PATH;
+        masterPasswordEnv = "SQLCLI_MASTER_PASSWORD";
+        schemaGraphPath = DEFAULT_SCHEMA_GRAPH_PATH;
+        driverDefaults.clear();
+        drivers.clear();
+        secrets.clear();
     }
 
     @SuppressWarnings("unchecked")
