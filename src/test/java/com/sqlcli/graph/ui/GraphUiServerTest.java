@@ -342,6 +342,12 @@ class GraphUiServerTest {
         assertEquals(1, json.getIntParam(Map.of(), "depth", 1));
     }
 
+    @Test
+    void jsonHttpSupportRecognizesWindowsClientAbort() {
+        assertTrue(JsonHttpSupport.isClientDisconnect(
+                new IOException("你的主机中的软件中止了一个已建立的连接")));
+    }
+
     // --- Helper methods ---
 
     private static String httpGet(String path) throws IOException {

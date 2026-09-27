@@ -92,14 +92,7 @@ samp,
 .wb-section-title,
 .settings-head h1,
 .settings-table th,
-.shell-source::before,
-.knowledge-bar::before,
-.wb:has(.wb-editor) > .wb-head::before,
-.wb:not(:has(.wb-editor)) > .wb-head h1::before,
-.wb:has(.wb-editor) > .wb-empty::before,
 .knowledge-product-title small,
-.knowledge-center::before,
-.review-title-copy > small,
 .alias-section h2 {
   font-family: var(--font-sans);
 }
@@ -238,40 +231,6 @@ input[type='radio'] {
     radial-gradient(circle at 92% 0%, rgba(32, 224, 199, .095), transparent 18rem),
     linear-gradient(110deg, rgba(14, 32, 53, .98), rgba(9, 24, 41, .98));
   box-shadow: var(--shadow-card);
-}
-
-.settings-head::before,
-.metrics-head::before,
-.eval-head::before {
-  display: block;
-  color: #58d7ff;
-  font-size: 10px;
-  font-weight: 720;
-  letter-spacing: .12em;
-}
-
-.settings-head::before { content: 'PRODUCT SETTINGS'; }
-.metrics-head::before { content: 'SEMANTIC METRICS'; }
-.eval-head::before { content: 'GRAPH QUALITY'; }
-
-.settings-head::after,
-.metrics-head::after,
-.eval-head::after {
-  color: #8fa9be;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.settings-head::after {
-  content: '集中管理数据源、驱动与运行时审批策略。';
-}
-
-.metrics-head::after {
-  content: '统一业务口径、时间粒度与可执行 SQL，让指标从定义直接走到趋势。';
-}
-
-.eval-head::after {
-  content: '用覆盖率、趋势、探针和工作队列持续衡量图谱质量。';
 }
 
 .settings-head {

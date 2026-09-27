@@ -9,6 +9,7 @@ import java.util.List;
 public class ParsedSql {
     private final String sqlType;           // UPDATE / DELETE
     private final String tableName;         // 表名
+    private final String queryTable;        // 预读时保留目标表别名
     private final String whereClause;       // WHERE条件（可能为null）
     private final List<String> columns;     // UPDATE的列名列表
     private final List<String> values;      // UPDATE的新值表达式列表
@@ -16,11 +17,12 @@ public class ParsedSql {
     private final String complexityReason;  // 复杂SQL的原因
     private final String originalSql;       // 原始SQL
 
-    public ParsedSql(String sqlType, String tableName, String whereClause,
+    public ParsedSql(String sqlType, String tableName, String queryTable, String whereClause,
                       List<String> columns, List<String> values,
                       boolean isComplex, String complexityReason, String originalSql) {
         this.sqlType = sqlType;
         this.tableName = tableName;
+        this.queryTable = queryTable;
         this.whereClause = whereClause;
         this.columns = columns != null ? new ArrayList<>(columns) : new ArrayList<>();
         this.values = values != null ? new ArrayList<>(values) : new ArrayList<>();
@@ -70,7 +72,7 @@ public class ParsedSql {
      */
     public String buildQuerySql() {
         StringBuilder sb = new StringBuilder();
-        sb.append("SELECT * FROM ").append(tableName);
+        sb.append("SELECT * FROM ").append(queryTable);
         if (hasWhereClause()) {
             sb.append(" WHERE ").append(whereClause);
         }

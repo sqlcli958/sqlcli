@@ -60,7 +60,6 @@ export function ReviewsPage() {
       <header className="review-head review-head-v2">
         <div className="review-title-row">
           <div className="review-title-copy">
-            <small>REVIEW &amp; AUDIT</small>
             <h1>评审</h1>
             <p>把高风险 SQL、图谱变更和执行结果放在同一个控制面里：先看影响，再放行，最后保留可追溯记录。</p>
           </div>
@@ -72,10 +71,6 @@ export function ReviewsPage() {
             <div className="review-overview-item">
               <b title={alias ?? '全部数据源'}>{alias ?? '全部'}</b>
               <span>当前数据源</span>
-            </div>
-            <div className="review-overview-item">
-              <b>Guarded</b>
-              <span>执行模式</span>
             </div>
           </div>
         </div>

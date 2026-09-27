@@ -93,7 +93,8 @@ public class JsonHttpSupport {
             if (msg != null && (msg.contains("Broken pipe")
                     || msg.contains("Connection reset by peer")
                     || msg.contains("An existing connection was forcibly closed")
-                    || msg.contains("远程主机强迫关闭了一个现有的连接"))) {
+                    || msg.contains("远程主机强迫关闭了一个现有的连接")
+                    || msg.contains("中止了一个已建立的连接"))) {
                 return true;
             }
             cause = cause.getCause();

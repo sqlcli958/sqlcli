@@ -7,7 +7,7 @@ import { getIndexStatus } from '../api/indexApi';
 import { getApprovals } from '../api/approvals';
 import { useSessionStore } from '../state/sessionStore';
 import { useGraphStore } from '../state/graphStore';
-import { NAV_GROUP_LABELS, NAV_ITEMS, type NavGroup, navPath } from './navigation';
+import { NAV_ITEMS, type NavGroup, navPath } from './navigation';
 import './app-shell.css';
 import { Button } from '../ui/Button';
 
@@ -209,8 +209,7 @@ export function AppShell() {
             const items = NAV_ITEMS.filter((item) => item.group === group);
             if (items.length === 0) return null;
             return (
-              <section className={`shell-nav-group shell-nav-group-${group}`} key={group} aria-label={NAV_GROUP_LABELS[group]}>
-                <div className="shell-nav-group-label" aria-hidden="true">{NAV_GROUP_LABELS[group]}</div>
+              <section className={`shell-nav-group shell-nav-group-${group}`} key={group}>
                 <ul>
                   {items.map((item) => {
                     const disabled = item.needsAlias && !alias;

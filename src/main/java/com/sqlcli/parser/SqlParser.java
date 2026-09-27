@@ -3,8 +3,8 @@ package com.sqlcli.parser;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.delete.Delete;
 import net.sf.jsqlparser.statement.update.Update;
+import net.sf.jsqlparser.statement.update.UpdateSet;
 import net.sf.jsqlparser.expression.Expression;
-import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 
 import java.util.ArrayList;
@@ -66,28 +66,22 @@ public class SqlParser {
         String whereClause = whereExpression != null ? whereExpression.toString() : null;
 
         // 检查复杂性
-        ComplexityCheckResult complexity = checkComplexity(update, whereExpression);
+        ComplexityCheckResult complexity = checkComplexity(update);
 
         // 提取列名和新值
         List<String> columns = new ArrayList<>();
         List<String> values = new ArrayList<>();
-        List<Column> columnList = update.getColumns();
-        List<Expression> valueList = update.getExpressions();
-
-        if (columnList != null) {
-            for (Column col : columnList) {
-                columns.add(col.getColumnName());
-            }
-        }
-        if (valueList != null) {
-            for (Expression val : valueList) {
-                values.add(val.toString());
+        for (UpdateSet set : update.getUpdateSets()) {
+            for (int i = 0; i < set.getColumns().size(); i++) {
+                columns.add(set.getColumn(i).getColumnName());
+                values.add(set.getValue(i).toString());
             }
         }
 
         return new ParsedSql(
                 "UPDATE",
                 tableName,
+                table.toString(),
                 whereClause,
                 columns,
                 values,
@@ -114,6 +108,7 @@ public class SqlParser {
         return new ParsedSql(
                 "DELETE",
                 tableName,
+                table.toString(),
                 whereClause,
                 null,
                 null,
@@ -126,7 +121,7 @@ public class SqlParser {
     /**
      * 检查SQL是否复杂
      */
-    private ComplexityCheckResult checkComplexity(Update update, Expression where) {
+    private ComplexityCheckResult checkComplexity(Update update) {
         // 检查多表UPDATE
         if (update.getJoins() != null && !update.getJoins().isEmpty()) {
             return new ComplexityCheckResult(true, "UPDATE with JOIN is not supported");
@@ -147,11 +142,7 @@ public class SqlParser {
             return new ComplexityCheckResult(true, "UPDATE with LIMIT is not supported");
         }
 
-        // 检查WHERE中的子查询（简化检测）
-        if (statementAnalyzer.containsSubSelect(where)) {
-            return new ComplexityCheckResult(true, "UPDATE with subquery in WHERE is not supported");
-        }
-
+        // ponytail: WHERE 子查询沿用现有预读恢复流程；若需防外部表并发变化，须按预读主键限定实际写入。
         return new ComplexityCheckResult(false, null);
     }
 

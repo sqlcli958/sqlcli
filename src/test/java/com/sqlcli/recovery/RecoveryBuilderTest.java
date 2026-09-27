@@ -13,11 +13,39 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class RecoveryBuilderTest {
+
+    @Test
+    void aliasedUpdateWithExistsCanPreReadRowsForRecovery() throws Exception {
+        ParsedSql sql = new SqlParser().parse("""
+                UPDATE qm_pct.pct_contract_case c
+                SET c.process_id = 'new', c.process_status = 6
+                WHERE c.deleted = b'0' AND c.id = 7083
+                  AND EXISTS (SELECT 1 FROM qm_pct.ACT_RU_EXECUTION r
+                              JOIN qm_pct.ACT_RU_TASK t ON t.PROC_INST_ID_ = r.ID_
+                              WHERE r.BUSINESS_KEY_ = '7083')
+                  AND EXISTS (SELECT 1 FROM qm_pct.ACT_RU_EXECUTION r
+                              WHERE r.BUSINESS_STATUS_ = '0')
+                """);
+
+        assertFalse(sql.isComplex());
+        assertEquals("qm_pct.pct_contract_case", sql.getTableName());
+        assertTrue(sql.buildQuerySql()
+                .startsWith("SELECT * FROM qm_pct.pct_contract_case c WHERE c.deleted"));
+        assertTrue(sql.buildQuerySql().contains("AND EXISTS (SELECT 1"));
+        RecoveryResult recovery = new RecoveryBuilder().build(sql,
+                rows(new String[]{"id", "process_id", "process_status"},
+                        new Object[][]{{7083, "old", 0}}),
+                "test", List.of("id"));
+        assertEquals(List.of("UPDATE qm_pct.pct_contract_case SET process_id='old', "
+                + "process_status=0 WHERE id=7083;"), recovery.getRecoverySqls());
+    }
 
     @Test
     void multiRowUpdateRecoveryUsesEveryCompositePrimaryKeyValue() throws Exception {

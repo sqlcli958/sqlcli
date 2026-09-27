@@ -7,32 +7,23 @@
   flex: 1;
   min-height: 0;
   flex-direction: column;
-  gap: 14px;
+  gap: 8px;
 }
 
 .shell-nav-group {
-  display: grid;
-  gap: 5px;
+  display: contents;
 }
 
 .shell-nav-group-system {
+  display: flex;
+  flex-direction: column;
   margin-top: auto;
   padding-top: 12px;
   border-top: 1px solid rgba(88, 132, 166, .15);
 }
 
-.shell-nav-group-label {
-  padding: 0 10px;
-  color: #58758e;
-  font-family: var(--font-sans);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .12em;
-}
-
 .shell-nav-group ul {
-  flex: none;
-  gap: 4px;
+  display: contents;
 }
 
 /* Replace the legacy flat-list separators from design-system-v3. */
@@ -46,16 +37,7 @@
 }
 
 .shell[data-nav-collapsed] .shell-nav-groups {
-  gap: 10px;
-}
-
-.shell[data-nav-collapsed] .shell-nav-group-label {
-  height: 1px;
-  margin: 3px 5px 1px;
-  padding: 0;
-  overflow: hidden;
-  background: rgba(88,132,166,.13);
-  color: transparent;
+  gap: 8px;
 }
 
 .shell[data-nav-collapsed] .shell-nav-group-system {
@@ -73,14 +55,6 @@
   background:
     radial-gradient(circle at 10% 0%, rgba(33,201,255,.07), transparent 16rem),
     rgba(7, 20, 34, .58);
-}
-
-.product-empty::before {
-  content: '';
-  width: 38px;
-  height: 4px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #2f8cff, #21c9ff, #20e0c7);
 }
 
 .product-empty strong {
@@ -210,15 +184,6 @@
 .metrics-page > .term-list > .term-list-item {
   position: relative;
   overflow: hidden;
-}
-
-.metrics-page > .term-list > .term-list-item::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 2px;
-  background: linear-gradient(#21c9ff, #20e0c7);
-  opacity: .65;
 }
 
 .metrics-page .metric-chart-block {
@@ -390,10 +355,6 @@
   .shell-nav-group,
   .shell-nav-group-system {
     display: contents;
-  }
-
-  .shell-nav-group-label {
-    display: none;
   }
 
   .shell-nav-group ul {

@@ -96,6 +96,28 @@ class SqlBatchExecutorTest {
     }
 
     @Test
+    void aliasedUpdateWithExistsKeepsItsRecoveryScript() throws Exception {
+        try (Connection conn = DriverManager.getConnection(dbUrl());
+             Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE gate (id INTEGER PRIMARY KEY, enabled INTEGER)");
+            st.execute("INSERT INTO gate VALUES (1, 1)");
+        }
+        long batchId = runState.createBatch("demo", ApprovalBatchRow.KIND_SQL, "EXISTS UPDATE");
+        List<ApprovalRow> items = stage(batchId, """
+                UPDATE t AS target SET name = 'x'
+                WHERE target.id = 1
+                  AND EXISTS (SELECT 1 FROM gate g WHERE g.id = target.id AND g.enabled = 1)
+                  AND EXISTS (SELECT 1 FROM gate g WHERE g.id = 1)
+                """);
+
+        SqlBatchExecutor.BatchResult result = executor.execute(config(), batchId, items);
+
+        assertEquals("x", nameOf(1));
+        assertTrue(runState.findRecovery(result.items().get(0).executionId())
+                .rollbackSql().contains("UPDATE t SET name='a' WHERE id=1;"));
+    }
+
+    @Test
     void aLaterFailureRollsBackTheEarlierStatements() throws Exception {
         long batchId = runState.createBatch("demo", ApprovalBatchRow.KIND_SQL, "第二条会炸");
         List<ApprovalRow> items = stage(batchId,

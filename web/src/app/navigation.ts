@@ -1,8 +1,7 @@
 /**
  * 一级导航配置。
  *
- * 页面按用户任务分成三个视觉分组：Work / Knowledge / Governance；
- * 设置固定在底部。分组只影响信息架构和视觉层级，不改现有路由。
+ * 页面按用户任务分组；设置固定在底部。分组只影响布局，不改现有路由。
  */
 export type NavGroup = 'work' | 'knowledge' | 'governance' | 'system';
 
@@ -19,13 +18,6 @@ export interface NavItem {
 }
 
 export const WORKSPACE_BASE = '/workspaces/local';
-
-export const NAV_GROUP_LABELS: Record<NavGroup, string> = {
-  work: 'WORK',
-  knowledge: 'KNOWLEDGE',
-  governance: 'GOVERNANCE',
-  system: 'SYSTEM',
-};
 
 /**
  * 24×24 图标，描边而非填充。
