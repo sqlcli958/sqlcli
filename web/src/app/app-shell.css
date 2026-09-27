@@ -198,7 +198,7 @@
 }
 
 .shell[data-nav-collapsed] {
-  --shell-nav-w: 56px;
+  --shell-nav-w: 48px;
 }
 
 .shell[data-nav-collapsed] .shell-nav {
