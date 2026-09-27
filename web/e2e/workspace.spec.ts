@@ -172,3 +172,85 @@ test('rule manager opens for the selected alias', async ({ page }) => {
   await page.getByRole('button', { name: 'MySQL 8' }).click();
   await expect(page.getByRole('textbox', { name: /JSON（支持 dbTypeAny/ })).toHaveValue(/productVersionRegex/);
 });
+
+
+test('light theme keeps SQL and code text readable', async ({ page }) => {
+  await page.goto('/');
+
+  const checks = await page.evaluate(() => {
+    document.documentElement.dataset.theme = 'light';
+
+    const fixture = document.createElement('div');
+    fixture.setAttribute('data-readability-fixture', 'true');
+    fixture.innerHTML = `
+      <section class="review-stage" style="padding:16px">
+        <article class="review-card">
+          <code class="review-summary">UPDATE users SET status = 'active' WHERE id = 1</code>
+          <button class="exec-sql" type="button"><code>SELECT * FROM users</code></button>
+          <pre class="review-detail">DELETE FROM users WHERE id = 1</pre>
+          <div class="exec-detail"><pre>UPDATE users SET name = 'demo'</pre></div>
+        </article>
+      </section>
+    `;
+    document.body.appendChild(fixture);
+
+    const parseColor = (value: string) => {
+      const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+      if (!match) throw new Error(`Unsupported color: ${value}`);
+      return {
+        r: Number(match[1]),
+        g: Number(match[2]),
+        b: Number(match[3]),
+        a: match[4] === undefined ? 1 : Number(match[4]),
+      };
+    };
+
+    const luminance = ({ r, g, b }: { r: number; g: number; b: number }) => {
+      const convert = (channel: number) => {
+        const value = channel / 255;
+        return value <= 0.04045
+          ? value / 12.92
+          : Math.pow((value + 0.055) / 1.055, 2.4);
+      };
+      return 0.2126 * convert(r) + 0.7152 * convert(g) + 0.0722 * convert(b);
+    };
+
+    const effectiveBackground = (element: Element) => {
+      let current: Element | null = element;
+      while (current) {
+        const color = parseColor(getComputedStyle(current).backgroundColor);
+        if (color.a > 0) return color;
+        current = current.parentElement;
+      }
+      return { r: 255, g: 255, b: 255, a: 1 };
+    };
+
+    const contrast = (foreground: ReturnType<typeof parseColor>, background: ReturnType<typeof parseColor>) => {
+      const front = luminance(foreground);
+      const back = luminance(background);
+      return (Math.max(front, back) + 0.05) / (Math.min(front, back) + 0.05);
+    };
+
+    return [
+      '.review-summary',
+      '.exec-sql code',
+      '.review-detail',
+      '.exec-detail pre',
+    ].map((selector) => {
+      const element = fixture.querySelector(selector);
+      if (!element) throw new Error(`Missing readability fixture: ${selector}`);
+      const foreground = parseColor(getComputedStyle(element).color);
+      const background = effectiveBackground(element);
+      return {
+        selector,
+        foreground: getComputedStyle(element).color,
+        background: `rgb(${background.r}, ${background.g}, ${background.b})`,
+        ratio: contrast(foreground, background),
+      };
+    });
+  });
+
+  for (const check of checks) {
+    expect(check.ratio, `${check.selector}: ${check.foreground} on ${check.background}`).toBeGreaterThanOrEqual(4.5);
+  }
+});
