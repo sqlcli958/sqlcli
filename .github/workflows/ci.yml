@@ -1,18 +1,108 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Checks to run
+        required: true
+        default: frontend
+        type: choice
+        options:
+          - frontend
+          - backend
+          - e2e
+          - full
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  frontend:
+    if: ${{ inputs.scope == 'frontend' || inputs.scope == 'full' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+  backend:
+    if: ${{ inputs.scope == 'backend' || inputs.scope == 'full' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Backend tests
+        run: mvn -B -ntp test -P '!web'
+
+  e2e:
+    if: ${{ inputs.scope == 'e2e' || inputs.scope == 'full' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: npm run test:e2e
+
+  package:
+    if: ${{ inputs.scope == 'full' }}
+    needs: [frontend, backend, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -32,8 +122,8 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Build and test
-        run: mvn -B -ntp clean package
+      - name: Package executable JAR
+        run: mvn -B -ntp -DskipTests package
 
       - name: Smoke test executable JAR
         run: java -jar target/sql-cli.jar --help > /dev/null
