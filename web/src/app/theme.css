@@ -9,7 +9,7 @@ html[data-theme='light'] {
   --color-border: #dfe2e5;
   --color-text: #1c1e21;
   --color-text-muted: #626870;
-  --color-text-dim: #7a8189;
+  --color-text-dim: #6b727a;
   --color-error: #c62828;
   --color-warning: #626870;
   --color-success: #626870;
@@ -1029,6 +1029,81 @@ html[data-theme='light'] ::-webkit-scrollbar-thumb {
 
 html[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
   background: #aeb4ba;
+}
+
+/* ── Light readability guard: code/SQL must never inherit dark-theme pale text ── */
+html[data-theme='light'] :where(pre, code, kbd, samp) {
+  color: var(--color-text);
+}
+
+html[data-theme='light'] :is(
+  .review-stage .review-summary,
+  .review-stage .review-detail,
+  .review-stage .exec-sql code,
+  .review-stage .exec-detail pre,
+  .review-stage .exec-recovery pre,
+  .wb code,
+  .settings-mono,
+  .alias-mono,
+  .term-detail-mono,
+  .term-list-mapped,
+  .term-list-hint code,
+  .col-hints-enum code,
+  .col-hints-empty code,
+  .relation-editor-endpoint-code
+) {
+  color: var(--color-text) !important;
+}
+
+html[data-theme='light'] .review-stage .review-summary {
+  opacity: 1;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+html[data-theme='light'] :is(
+  .review-stage .review-detail,
+  .review-stage .exec-detail pre,
+  .review-stage .exec-recovery pre,
+  .wb-sql,
+  .metric-sql,
+  .metric-sql pre,
+  .eval-cmd,
+  .rules-page pre,
+  .rules-page code,
+  .catalog-rule pre
+) {
+  color: var(--color-text) !important;
+  border-color: var(--border-soft) !important;
+  background-color: #f7f7f8 !important;
+  background-image: none !important;
+}
+
+html[data-theme='light'] .review-stage .exec-sql code {
+  color: var(--color-text) !important;
+  text-decoration-color: #8a9096;
+}
+
+html[data-theme='light'] :is(
+  .review-stage .review-card-top,
+  .review-stage .review-card-top time,
+  .review-stage .review-facts dt,
+  .review-stage .review-reason,
+  .review-stage .review-evidence,
+  .review-stage .review-provenance,
+  .review-stage .exec-row time,
+  .review-stage .exec-type,
+  .review-stage .exec-rows,
+  .review-stage .exec-ms,
+  .settings-state.is-muted
+) {
+  color: var(--color-text-muted) !important;
+}
+
+html[data-theme='light'] .shell-source-input::placeholder,
+html[data-theme='light'] input::placeholder,
+html[data-theme='light'] textarea::placeholder {
+  color: #747b83;
 }
 
 html, body { overflow-x: hidden; }
