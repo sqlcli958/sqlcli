@@ -60,7 +60,7 @@ html[data-theme='light'] textarea {
 
 html[data-theme='light'] .shell-source-input::placeholder,
 html[data-theme='light'] input::placeholder,
-html[data-theme='light'] textarea::placeholder { color: #747b83; }
+html[data-theme='light'] textarea::placeholder { color: #6f767e; }
 
 html[data-theme='light'] .shell-status { border-color: #d5e0e8; background: #f4f8fa; }
 html[data-theme='light'] .shell-nav-item { color: #33485d; }
@@ -1103,7 +1103,7 @@ html[data-theme='light'] :is(
 html[data-theme='light'] .shell-source-input::placeholder,
 html[data-theme='light'] input::placeholder,
 html[data-theme='light'] textarea::placeholder {
-  color: #747b83;
+  color: #6f767e;
 }
 
 html, body { overflow-x: hidden; }
