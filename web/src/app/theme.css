@@ -1113,40 +1113,40 @@ html, body { overflow-x: hidden; }
 
 /* Sigma 的字段属性是 HTML 覆盖层，深色主题不能沿用浅色白底。 */
 html[data-theme='dark'] .graph-radial-field {
-  border-color: #4b5158;
-  background: #2f3338;
+  border-color: #2f6b86;
+  background: #102a3d;
   color: #e8f7ff;
   box-shadow: 0 4px 14px rgba(0, 0, 0, .32), inset 0 1px 0 rgba(255, 255, 255, .04);
 }
 
 html[data-theme='dark'] .graph-radial-field:hover,
 html[data-theme='dark'] .graph-radial-field.is-dragging {
-  border-color: #7d838a;
-  background: #454b52;
-  box-shadow: 0 0 0 2px rgba(28, 30, 33, .12), 0 5px 16px rgba(0, 0, 0, .36);
+  border-color: #65d8ff;
+  background: #163e55;
+  box-shadow: 0 0 0 2px rgba(101, 216, 255, .18), 0 5px 16px rgba(0, 0, 0, .36);
 }
 
 html[data-theme='dark'] .graph-radial-field-target {
-  border-color: #656b72;
-  background: #3d4248;
-  color: #f7f7f8;
+  border-color: #35b9c8;
+  background: #103942;
+  color: #e8ffff;
 }
 
 html[data-theme='dark'] .graph-radial-field-target:hover {
-  border-color: #8a9096;
-  background: #454b52;
+  border-color: #73f0f4;
+  background: #164a50;
 }
 
 html[data-theme='dark'] .graph-radial-field-caption {
-  border: 1px solid #555b62;
-  background: rgba(35, 38, 42, .94);
+  border: 1px solid #2f6079;
+  background: rgba(8, 20, 33, .94);
   color: #e8f7ff;
 }
 
 html[data-theme='dark'] .graph-field-overlay-status,
 html[data-theme='dark'] .graph-relation-composer {
-  border-color: #555b62;
-  background: #2f3338;
+  border-color: #2f526c;
+  background: #0e2235;
   color: #e8f7ff;
   box-shadow: 0 14px 32px rgba(0, 0, 0, .36);
 }
