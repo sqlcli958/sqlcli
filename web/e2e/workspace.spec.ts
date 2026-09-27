@@ -254,3 +254,59 @@ test('light theme keeps SQL and code text readable', async ({ page }) => {
     expect(check.ratio, `${check.selector}: ${check.foreground} on ${check.background}`).toBeGreaterThanOrEqual(4.5);
   }
 });
+
+test('light theme keeps Workbench Graph Review Rules Metrics Eval Settings surfaces neutral', async ({ page }) => {
+  await page.goto('/');
+
+  const surfaces = await page.evaluate(() => {
+    document.documentElement.dataset.theme = 'light';
+
+    const fixture = document.createElement('div');
+    fixture.setAttribute('data-neutral-theme-fixture', 'true');
+    fixture.innerHTML = `
+      <div class="wb"><header class="wb-head">Workbench</header><section class="wb-editor"></section></div>
+      <section class="knowledge-center">Graph</section>
+      <section class="review-stage"><article class="review-card">Review</article></section>
+      <section class="rules-page"><article class="rules-main">Rules</article></section>
+      <section class="metrics-page"><article class="metric-form">Metrics</article></section>
+      <section class="eval-page"><article class="eval-kpi">Eval</article></section>
+      <section class="settings"><header class="settings-head">Settings</header></section>
+    `;
+    document.body.appendChild(fixture);
+
+    const selectors = {
+      Workbench: '.wb > .wb-head',
+      Graph: '.knowledge-center',
+      Review: '.review-stage .review-card',
+      Rules: '.rules-page .rules-main',
+      Metrics: '.metrics-page .metric-form',
+      Eval: '.eval-page .eval-kpi',
+      Settings: '.settings .settings-head',
+    };
+
+    return Object.entries(selectors).map(([module, selector]) => {
+      const element = fixture.querySelector(selector);
+      if (!element) throw new Error(`Missing theme fixture: ${selector}`);
+      const style = getComputedStyle(element);
+      return {
+        module,
+        color: style.color,
+        background: style.backgroundColor,
+        border: style.borderTopColor,
+      };
+    });
+  });
+
+  const chroma = (value: string) => {
+    const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (!match) throw new Error(`Unsupported color: ${value}`);
+    const channels = [Number(match[1]), Number(match[2]), Number(match[3])];
+    return Math.max(...channels) - Math.min(...channels);
+  };
+
+  for (const surface of surfaces) {
+    expect(chroma(surface.color), `${surface.module} text: ${surface.color}`).toBeLessThanOrEqual(28);
+    expect(chroma(surface.background), `${surface.module} background: ${surface.background}`).toBeLessThanOrEqual(28);
+    expect(chroma(surface.border), `${surface.module} border: ${surface.border}`).toBeLessThanOrEqual(28);
+  }
+});

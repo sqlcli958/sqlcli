@@ -526,10 +526,18 @@ function ApprovalCard({ item }: { item: ApprovalDto }) {
 
   const decide = useMutation({
     mutationFn: (decision: 'approved' | 'rejected') => decideApproval(item.id, decision, reason),
-    // 批准一条图谱变更会真的写图谱，所有图谱读缓存都过期了；SQL 审批只动审批表。
-    onSuccess: () => (graph
-      ? queryClient.invalidateQueries()
-      : queryClient.invalidateQueries({ queryKey: ['approvals'] })),
+    // 图谱审批会改图谱；recovery 审批会真正执行回滚，因此还要刷新执行记录。
+    // 普通 SQL 审批只需要刷新审批列表。
+    onSuccess: async () => {
+      if (graph) {
+        await queryClient.invalidateQueries();
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      if (item.kind === 'recovery') {
+        await queryClient.invalidateQueries({ queryKey: ['executions'] });
+      }
+    },
   });
 
   return (

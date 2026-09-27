@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { getApprovals } from '../../api/approvals';
@@ -36,11 +35,19 @@ function isView(value: string | null): value is View {
  * 拆到两个页面就得来回跳。工作台不再重复展示它。
  */
 export function ReviewsPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const alias = searchParams.get('alias');
-  // 图谱页的「去评审」链接带 ?tab=graph 过来，直接落在对的标签上
-  const initial = searchParams.get('tab');
-  const [view, setView] = useState<View>(isView(initial) ? initial : 'pending');
+  // tab 是评审链路的可导航状态：同一路由内从执行记录跳回待审批、或从图谱跳来时，
+  // 不能只在首次 mount 读一次，否则 URL 已变而页面仍停在旧标签。
+  const requestedView = searchParams.get('tab');
+  const view: View = isView(requestedView) ? requestedView : 'pending';
+
+  const setView = (next: View) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'pending') params.delete('tab');
+    else params.set('tab', next);
+    setSearchParams(params, { replace: true });
+  };
 
   // 角标独立于当前视图：在别的标签上也要看得见「还有几件事等着我」。
   // 只取一条，要的是响应里的 pending 计数而不是列表本身。
@@ -78,7 +85,7 @@ export function ReviewsPage() {
           label="评审视图"
           items={VIEWS.map((item) => ({ ...item, badge: counts[item.key] }))}
           value={view}
-          onChange={setView}
+          onChange={(next) => setView(next as View)}
         />
       </header>
 

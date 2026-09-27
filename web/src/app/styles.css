@@ -1,14 +1,12 @@
 /*
  * Global stylesheet entry point.
  *
- * Order matters: legacy product layers establish the current component/layout
- * surfaces, and theme.css is the final theme-specific override layer.
- * Keep new global CSS out of main.tsx; consolidate or remove layers here.
+ * Order matters: base styles establish components, product-layout owns layout,
+ * design-system-v3 owns shared visual polish, and theme.css owns theme overrides.
+ * Keep new global CSS out of main.tsx; do not re-introduce one-off global layers.
  */
 @import './App.css';
 @import './brand-theme.css';
 @import './product-layout.css';
-@import './product-polish.css';
 @import './design-system-v3.css';
-@import './product-v3-extensions.css';
 @import './theme.css';

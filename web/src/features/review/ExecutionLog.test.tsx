@@ -13,7 +13,7 @@ vi.mock('../../api/executions', () => ({
   executeRollback: vi.fn(),
 }));
 
-const { getExecutionHistory } = await import('../../api/executions');
+const { getExecutionHistory, getRecoveryPreview, executeRollback } = await import('../../api/executions');
 
 const failed: SqlExecutionRecordDto = {
   id: 1,
@@ -88,5 +88,31 @@ test('增删改才给回滚按钮', () => {
 test('格式化不切开字符串字面量里的关键字', () => {
   expect(formatSql("SELECT * FROM t WHERE name = 'from a join b' AND id = 1")).toBe(
     ["SELECT *", "FROM t", "WHERE name = 'from a join b'", '  AND id = 1'].join('\n'),
+  );
+});
+
+test('Execution → Recovery 提交后链接明确回到待审批标签', async () => {
+  vi.mocked(getRecoveryPreview).mockResolvedValue({
+    rollback: "UPDATE sys_menu SET visible=0 WHERE id='9527'",
+    backup: '[{"id":"9527","visible":0}]',
+  } as never);
+  vi.mocked(executeRollback).mockResolvedValue({
+    executionId: 1,
+    statements: 1,
+    approvalId: 77,
+    status: 'pending',
+  });
+
+  renderLog();
+  await userEvent.click(await screen.findByRole('button', { name: '回滚' }));
+  expect(await screen.findByText(/visible=0/)).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: '提交回滚' }));
+  await userEvent.click(screen.getByRole('button', { name: '确认提交' }));
+
+  await waitFor(() => expect(executeRollback).toHaveBeenCalledWith(1));
+  expect(await screen.findByRole('link', { name: '去待审批裁决' })).toHaveAttribute(
+    'href',
+    '/workspaces/local/reviews?alias=demo&tab=pending',
   );
 });
