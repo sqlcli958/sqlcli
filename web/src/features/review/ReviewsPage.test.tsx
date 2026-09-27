@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { Link, MemoryRouter } from 'react-router-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
@@ -45,6 +45,7 @@ function renderPage() {
     <MemoryRouter initialEntries={['/workspaces/local/reviews?alias=demo']}>
       <QueryClientProvider client={client}>
         <ReviewsPage />
+        <Link to="/workspaces/local/reviews?alias=demo&tab=graph">测试跳转图谱</Link>
       </QueryClientProvider>
     </MemoryRouter>,
   );
@@ -241,4 +242,21 @@ test('卡片露出审批号与任务号', async () => {
 
   await screen.findByText('#7');
   expect(await screen.findByText('任务 #34')).toBeInTheDocument();
+});
+
+test('同一路由更新 tab 参数时视图跟着 URL 切换', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <MemoryRouter initialEntries={['/workspaces/local/reviews?alias=demo&tab=executions']}>
+      <QueryClientProvider client={client}>
+        <ReviewsPage />
+        <Link to="/workspaces/local/reviews?alias=demo&tab=graph">测试跳转图谱</Link>
+      </QueryClientProvider>
+    </MemoryRouter>,
+  );
+
+  expect(screen.getByRole('tab', { name: '执行记录' })).toHaveAttribute('aria-selected', 'true');
+  await userEvent.click(screen.getByRole('link', { name: '测试跳转图谱' }));
+  await waitFor(() =>
+    expect(screen.getByRole('tab', { name: /图谱/ })).toHaveAttribute('aria-selected', 'true'));
 });
