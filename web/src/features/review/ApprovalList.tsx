@@ -140,7 +140,7 @@ export function ApprovalList({
   excludeStatus?: ApprovalStatus;
   /** 只看这个类型，锁死不给筛。 */
   fixedKind?: ApprovalKind;
-  /** 塞进工具条最左边的额外筛选项。图谱标签用它放视图切换，免得再叠一条工具条 */
+  /** 塞进工具条最左边的额外筛选项，避免调用方为了一个局部切换再叠一条工具条。 */
   leading?: React.ReactNode;
 }) {
   const [page, setPage] = useState(0);
