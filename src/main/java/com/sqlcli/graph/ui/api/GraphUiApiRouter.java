@@ -252,10 +252,14 @@ public class GraphUiApiRouter implements HttpHandler {
         String alias = json.getParam(params, "alias", null);
         if (alias != null && ("all".equalsIgnoreCase(alias) || alias.isBlank())) alias = null;
         String targetId = json.getParam(params, "targetId", null);
+        Long after = longParam(params, "createdAfter");
+        Long before = longParam(params, "createdBefore");
+        String schema = json.getParam(params, "schema", null);
         int limit = json.getIntParam(params, "limit", 20);
         int offset = json.getIntParam(params, "offset", 0);
         List<Map<String, Object>> items = new ArrayList<>();
-        for (GraphChangeRow row : runState.listGraphChanges(alias, targetId, limit, offset)) {
+        for (GraphChangeRow row : runState.listGraphChanges(
+                alias, targetId, after, before, schema, limit, offset)) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", row.id());
             item.put("alias", row.alias());
@@ -272,7 +276,7 @@ public class GraphUiApiRouter implements HttpHandler {
         }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("changes", items);
-        body.put("total", runState.countGraphChanges(alias, targetId));
+        body.put("total", runState.countGraphChanges(alias, targetId, after, before, schema));
         json.writeOk(exchange, body);
     }
 

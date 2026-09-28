@@ -70,6 +70,44 @@
   text-decoration: underline;
 }
 
+.exec-graph-summary {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.exec-graph-summary strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.exec-graph-summary small {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.exec-row-graph .exec-type {
+  font-weight: 650;
+  letter-spacing: 0.05em;
+}
+
+.exec-graph-detail .review-panel {
+  margin-top: 10px;
+}
+
+.exec-graph-detail > .review-hint {
+  margin: 10px 0 0;
+}
+
 .exec-rows,
 .exec-ms {
   font-family: var(--font-mono);
