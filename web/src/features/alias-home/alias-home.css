@@ -258,6 +258,13 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  padding: 2px 12px 10px;
+  margin-top: -2px;
+}
+
+.alias-form-actions .btn {
+  min-width: 58px;
+  border-radius: 8px;
 }
 
 .alias-form-actions .btn:disabled { cursor: wait; }
