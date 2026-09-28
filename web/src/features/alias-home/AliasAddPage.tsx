@@ -363,8 +363,8 @@ export function AliasAddPage({ onDone, editName }: { onDone: () => void; editNam
         </section>
 
         <div className="alias-form-actions">
-          <Button onClick={onDone}>取消</Button>
-          <Button type="submit" disabled={pending} variant="primary">
+          <Button className="alias-cancel-action" onClick={onDone}>取消</Button>
+          <Button className="alias-save-action" type="submit" disabled={pending} variant="primary">
             {pending ? '保存中…' : '保存'}
           </Button>
         </div>
