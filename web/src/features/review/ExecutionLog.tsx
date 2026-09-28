@@ -7,15 +7,17 @@ import {
   getRecoveryPreview,
   type ExecutionFilters,
 } from '../../api/executions';
+import { listGraphChanges, type GraphChangeFilters } from '../../api/graphChanges';
 import { navPath } from '../../app/navigation';
 import { Button } from '../../ui/Button';
 import { FilterBar } from '../../ui/FilterBar';
 import { Pagination } from '../../ui/Pagination';
 import { Select } from '../../ui/Select';
 import { StatusDot } from '../../ui/StatusDot';
-import type { SqlExecutionRecordDto } from '../../types/api';
+import type { GraphChangeDto, SqlExecutionRecordDto } from '../../types/api';
 import { RerunButton } from '../sql-result/RerunButton';
 import { formatSql } from './formatSql';
+import { GraphDiff, objectLabel } from './GraphDiff';
 import { TIME_RANGES, rangeMs, since } from './timeRange';
 import './executions.css';
 
@@ -32,13 +34,62 @@ const STATUS_LABEL: Record<string, string> = {
   failed: '失败',
 };
 
-/** 语句类型筛选项。写全没有意义——历史里出现的就这些。 */
-const TYPES = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'MERGE', 'ROLLBACK', 'CREATE', 'ALTER', 'DROP'];
+/** 执行记录里的内容类型。GRAPH 不是 SQL，但和 SQL 一起组成真正的执行流水。 */
+const TYPES = [
+  { value: 'GRAPH', label: '图谱变更' },
+  ...['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'MERGE', 'ROLLBACK', 'CREATE', 'ALTER', 'DROP']
+    .map((value) => ({ value, label: value })),
+];
 
 /** 增删改才有回滚脚本；其余语句给重放按钮。 */
 export function isWrite(sqlType?: string): boolean {
   return ['INSERT', 'UPDATE', 'DELETE', 'MERGE'].includes((sqlType ?? '').toUpperCase());
 }
+
+const HISTORY_CHUNK = 500;
+
+async function loadExecutionWindow(
+  alias: string,
+  limit: number,
+  filters: ExecutionFilters,
+  signal?: AbortSignal,
+) {
+  if (limit <= HISTORY_CHUNK) {
+    return getExecutionHistory(alias, 0, Math.max(1, limit), filters, signal);
+  }
+
+  const first = await getExecutionHistory(alias, 0, HISTORY_CHUNK, filters, signal);
+  const records = [...first.records];
+  for (let page = 1; records.length < Math.min(limit, first.total); page += 1) {
+    const next = await getExecutionHistory(alias, page, HISTORY_CHUNK, filters, signal);
+    records.push(...next.records);
+    if (next.records.length === 0) break;
+  }
+  return { ...first, records: records.slice(0, limit) };
+}
+
+async function loadGraphWindow(
+  filters: GraphChangeFilters,
+  limit: number,
+  signal?: AbortSignal,
+) {
+  if (limit <= HISTORY_CHUNK) {
+    return listGraphChanges(filters, 0, Math.max(1, limit), signal);
+  }
+
+  const first = await listGraphChanges(filters, 0, HISTORY_CHUNK, signal);
+  const changes = [...first.changes];
+  for (let page = 1; changes.length < Math.min(limit, first.total); page += 1) {
+    const next = await listGraphChanges(filters, page, HISTORY_CHUNK, signal);
+    changes.push(...next.changes);
+    if (next.changes.length === 0) break;
+  }
+  return { ...first, changes: changes.slice(0, limit) };
+}
+
+type ExecutionActivity =
+  | { kind: 'sql'; at: number; id: number; record: SqlExecutionRecordDto }
+  | { kind: 'graph'; at: number; id: number; change: GraphChangeDto };
 
 /**
  * 执行记录。原先在工作台，挪到评审页——它和审批是同一件事的两半：
@@ -55,22 +106,65 @@ export function ExecutionLog({ alias }: { alias: string | null }) {
   const [status, setStatus] = useState('');
   const [range, setRange] = useState('all');
 
-  const log = useQuery({
-    queryKey: ['executions', alias, page, pageSize, schema, type, status, range],
+  const historyWindow = (page + 1) * pageSize;
+  const includeSql = type !== 'GRAPH';
+  // graph_change_log 只记录已经落地的变更，所以它在统一流水里天然是 success。
+  const includeGraph = (type === '' || type === 'GRAPH') && (status === '' || status === 'success');
+
+  const sqlLog = useQuery({
+    queryKey: ['executions', 'sql', alias, page, pageSize, schema, type, status, range],
     queryFn: ({ signal }) => {
       const filters: ExecutionFilters = {
         schema: schema || undefined,
-        type: type || undefined,
+        type: type && type !== 'GRAPH' ? type : undefined,
         status: status || undefined,
         startedAfter: since(range),
       };
-      return getExecutionHistory(alias ?? '', page, pageSize, filters, signal);
+      return loadExecutionWindow(alias ?? '', historyWindow, filters, signal);
     },
+    enabled: Boolean(alias) && includeSql,
     placeholderData: (prev) => prev,
   });
 
-  const records = log.data?.records ?? [];
-  const schemas = log.data?.schemas ?? [];
+  const graphLog = useQuery({
+    queryKey: ['executions', 'graph', alias, page, pageSize, schema, status, range],
+    queryFn: ({ signal }) => loadGraphWindow({
+      alias,
+      schema: schema || undefined,
+      createdAfter: since(range),
+    }, historyWindow, signal),
+    enabled: Boolean(alias) && includeGraph,
+    placeholderData: (prev) => prev,
+  });
+
+  // 只看 GRAPH 时 SQL 列表不会请求，但 schema 下拉仍要有历史选项；只取 1 条换目录即可。
+  const schemaCatalog = useQuery({
+    queryKey: ['executions', 'schemas', alias],
+    queryFn: ({ signal }) => getExecutionHistory(alias ?? '', 0, 1, {}, signal),
+    enabled: Boolean(alias) && !includeSql,
+    staleTime: 30_000,
+  });
+
+  const sqlRecords = includeSql ? sqlLog.data?.records ?? [] : [];
+  const graphChanges = includeGraph ? graphLog.data?.changes ?? [] : [];
+  const activities: ExecutionActivity[] = [
+    ...sqlRecords.map((record) => ({ kind: 'sql' as const, at: record.startedAt, id: record.id, record })),
+    ...graphChanges.map((change) => ({ kind: 'graph' as const, at: change.createdAt, id: change.id, change })),
+  ].sort((a, b) => b.at - a.at || b.id - a.id);
+
+  const offset = page * pageSize;
+  const visible = activities.slice(offset, offset + pageSize);
+  const total = (includeSql ? sqlLog.data?.total ?? 0 : 0)
+    + (includeGraph ? graphLog.data?.total ?? 0 : 0);
+  const schemas = sqlLog.data?.schemas ?? schemaCatalog.data?.schemas ?? [];
+  const loading = (includeSql && sqlLog.isPending) || (includeGraph && graphLog.isPending);
+  const loadError = includeSql && sqlLog.isError
+    ? sqlLog.error
+    : includeGraph && graphLog.isError
+      ? graphLog.error
+      : null;
+  const loaded = (!includeSql || sqlLog.isSuccess) && (!includeGraph || graphLog.isSuccess);
+  const stale = (includeSql && sqlLog.isPlaceholderData) || (includeGraph && graphLog.isPlaceholderData);
   const filtered = Boolean(schema || type || status || rangeMs(range));
 
   /** 改筛选条件要回到第一页，否则会停在一个新结果集里不存在的页码上。 */
@@ -90,10 +184,20 @@ export function ExecutionLog({ alias }: { alias: string | null }) {
             <option key={item} value={item}>{item}</option>
           ))}
         </Select>
-        <Select size="sm" value={type} onChange={change(setType)} label="按语句类型筛选" title="按语句类型筛选">
-          <option value="">全部语句类型</option>
+        <Select
+          size="sm"
+          value={type}
+          onChange={(event) => {
+            setType(event.target.value);
+            if (event.target.value === 'GRAPH') setStatus('');
+            setPage(0);
+          }}
+          label="按记录类型筛选"
+          title="按记录类型筛选"
+        >
+          <option value="">全部类型</option>
           {TYPES.map((item) => (
-            <option key={item} value={item}>{item}</option>
+            <option key={item.value} value={item.value}>{item.label}</option>
           ))}
         </Select>
         <Select size="sm" value={status} onChange={change(setStatus)} label="按执行状态筛选" title="按执行状态筛选">
@@ -125,7 +229,7 @@ export function ExecutionLog({ alias }: { alias: string | null }) {
         <Pagination
           page={page}
           pageSize={pageSize}
-          total={log.data?.total ?? 0}
+          total={total}
           onPage={setPage}
           onPageSize={(size) => {
             setPageSize(size);
@@ -134,22 +238,85 @@ export function ExecutionLog({ alias }: { alias: string | null }) {
         />
       </FilterBar>
 
-      {log.isPending && <p className="review-hint">加载中…</p>}
-      {log.isError && (
-        <p className="review-alert" role="alert">加载失败：{log.error.message}</p>
+      {loading && <p className="review-hint">加载中…</p>}
+      {loadError && (
+        <p className="review-alert" role="alert">加载失败：{loadError.message}</p>
       )}
-      {log.isSuccess && records.length === 0 && (
+      {loaded && visible.length === 0 && (
         <p className="review-hint">{filtered ? '没有符合条件的记录。' : '暂无执行记录。'}</p>
       )}
 
-      {records.length > 0 && (
-        <ul className="exec-list" data-stale={log.isPlaceholderData || undefined}>
-          {records.map((record) => (
-            <ExecutionRow key={record.id} record={record} />
+      {visible.length > 0 && (
+        <ul className="exec-list" data-stale={stale || undefined}>
+          {visible.map((item) => item.kind === 'sql' ? (
+            <ExecutionRow key={`sql-${item.id}`} record={item.record} />
+          ) : (
+            <GraphExecutionRow key={`graph-${item.id}`} change={item.change} />
           ))}
         </ul>
       )}
     </>
+  );
+}
+
+function GraphExecutionRow({ change }: { change: GraphChangeDto }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <li className="exec-row exec-row-graph" data-open={open || undefined}>
+      <StatusDot tone="ok" />
+      <time dateTime={new Date(change.createdAt).toISOString()}>
+        {new Date(change.createdAt).toLocaleString()}
+      </time>
+      <span className="exec-type">GRAPH</span>
+      <span className="exec-graph-summary" title={change.targetId ?? undefined}>
+        <strong>{objectLabel(change.targetId)}</strong>
+        <small>{change.operation}</small>
+      </span>
+      <span className="exec-rows">r{change.revisionBefore} → r{change.revisionAfter}</span>
+      <span className="exec-ms">—</span>
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        {open ? '收起' : '详情'}
+      </Button>
+
+      {open && (
+        <div className="exec-detail exec-graph-detail">
+          <h4>图谱变更</h4>
+          <dl className="exec-facts">
+            <dt>对象</dt>
+            <dd>{objectLabel(change.targetId)}</dd>
+            <dt>操作</dt>
+            <dd>{change.operation}</dd>
+            <dt>数据源</dt>
+            <dd>{change.alias}</dd>
+            <dt>执行者</dt>
+            <dd>{change.actor ?? '未标注'}</dd>
+            <dt>图谱版本</dt>
+            <dd>r{change.revisionBefore} → r{change.revisionAfter}</dd>
+            <dt>审批</dt>
+            <dd>{change.approvalId == null ? '直接生效' : `#${change.approvalId}`}</dd>
+          </dl>
+
+          {change.reason && (
+            <>
+              <h4>变更原因</h4>
+              <pre>{change.reason}</pre>
+            </>
+          )}
+
+          {change.payload ? (
+            <GraphDiff payload={change.payload} />
+          ) : (
+            <p className="review-hint">这条历史记录没有保存字段级 before / after。</p>
+          )}
+        </div>
+      )}
+    </li>
   );
 }
 
