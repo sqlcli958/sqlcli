@@ -22,10 +22,16 @@ vi.mock('../../api/relations', () => ({
 }));
 
 vi.mock('../../api/graphChanges', () => ({ listGraphChanges: vi.fn() }));
+vi.mock('../../api/executions', () => ({
+  getExecutionHistory: vi.fn(),
+  getRecoveryPreview: vi.fn(),
+  executeRollback: vi.fn(),
+}));
 
 const { getApprovals, getApprovalDetail } = await import('../../api/approvals');
 const { listRelations } = await import('../../api/relations');
 const { listGraphChanges } = await import('../../api/graphChanges');
+const { getExecutionHistory } = await import('../../api/executions');
 
 function approval(id: number, kind: ApprovalDto['kind']): ApprovalDto {
   return {
@@ -45,7 +51,7 @@ function renderPage() {
     <MemoryRouter initialEntries={['/workspaces/local/reviews?alias=demo']}>
       <QueryClientProvider client={client}>
         <ReviewsPage />
-        <Link to="/workspaces/local/reviews?alias=demo&tab=graph">测试跳转图谱</Link>
+        <Link to="/workspaces/local/reviews?alias=demo&tab=executions">测试跳转执行记录</Link>
       </QueryClientProvider>
     </MemoryRouter>,
   );
@@ -59,6 +65,12 @@ beforeEach(() => {
   });
   vi.mocked(listRelations).mockResolvedValue({ relations: [], revision: 5 });
   vi.mocked(listGraphChanges).mockResolvedValue({ changes: [], total: 0 });
+  vi.mocked(getExecutionHistory).mockResolvedValue({ records: [], schemas: [], total: 0 });
+  vi.mocked(getApprovalDetail).mockResolvedValue({
+    ...approval(2, 'graph'),
+    taskRun: null,
+    events: [],
+  });
 });
 
 test('没有 precheck 事件时取不到预检', () => {
@@ -162,9 +174,9 @@ test('没有关联任务时说明没采集预检', async () => {
   await waitFor(() => expect(screen.getByText(/未采集预检/)).toBeTruthy());
 });
 
-// 一件等着我决定的事只有一个入口：待审批不按类型拆，图谱卡片多摊开一份 diff 而已。
-// 历史侧才拆——图谱的审批记录连着变更流水，混进通用记录里看不出来。
-test('待审批不拆类型，审批记录才把图谱排掉', async () => {
+// 图谱不再单开顶层历史标签：待审批和审批记录都保留图谱类型，
+// 已经真正落地的图谱变更则进入「执行记录」。
+test('待审批和审批记录都保留图谱类型', async () => {
   renderPage();
   await screen.findByText('SELECT 1');
 
@@ -176,14 +188,16 @@ test('待审批不拆类型，审批记录才把图谱排掉', async () => {
   expect(screen.getByRole('option', { name: '图谱' })).toBeTruthy();
 
   await userEvent.click(screen.getByRole('tab', { name: '审批记录' }));
-  await waitFor(() => expect(lastList()?.[0]?.excludeKind).toBe('graph'));
+  await waitFor(() => expect(lastList()?.[0]?.alias).toBe('demo'));
+  expect(lastList()?.[0]?.excludeKind).toBeUndefined();
 });
 
-// 图谱审批批的是一次内容变更，不看 before/after 批不下去，所以卡片上直接摊开
-test('待审批里的图谱变更摊开 before/after，按钮说明批准才写入', async () => {
+test('图谱默认只显示摘要，点击详情后才展示具体参数和 before/after', async () => {
   vi.mocked(getApprovals).mockResolvedValue({
     approvals: [{
       ...approval(7, 'graph'),
+      summary: 'schema add-lineage --from orders.user_id --to users.id',
+      targetId: 'column:demo:APP.ORDERS.USER_ID',
       payload: {
         targetId: 'column:demo:APP.ORDERS.USER_ID',
         operation: 'upsert_column',
@@ -196,28 +210,35 @@ test('待审批里的图谱变更摊开 before/after，按钮说明批准才写�
     total: 1,
     pending: 1,
   });
+  vi.mocked(getApprovalDetail).mockResolvedValue({
+    ...approval(7, 'graph'),
+    taskRun: null,
+    events: [],
+  });
 
   renderPage();
   expect(await screen.findByText('APP.ORDERS.USER_ID')).toBeTruthy();
+  expect(screen.queryByText(/schema add-lineage/)).toBeNull();
+  expect(screen.queryByText('旧描述')).toBeNull();
+  expect(screen.queryByText('下单用户 ID')).toBeNull();
+  expect(screen.getByRole('button', { name: '批准并写入' })).toBeTruthy();
+
+  await userEvent.click(screen.getByRole('button', { name: '详情' }));
+
+  expect(await screen.findByText(/schema add-lineage/)).toBeTruthy();
   expect(screen.getByText('旧描述')).toBeTruthy();
   expect(screen.getByText('下单用户 ID')).toBeTruthy();
-  expect(screen.getByRole('button', { name: '批准并写入' })).toBeTruthy();
 });
 
-// 图谱标签是历史：还没裁决的在待审批里，这里要把 pending 排掉，否则一件事两个入口。
-test('图谱标签只列裁决过的图谱审批', async () => {
+test('顶部不再保留独立图谱标签', async () => {
   renderPage();
-  await userEvent.click(screen.getByRole('tab', { name: '图谱' }));
+  await screen.findByText('SELECT 1');
 
-  await waitFor(() => {
-    const calls = vi.mocked(getApprovals).mock.calls.filter((one) => one[2] !== 1);
-    const call = calls[calls.length - 1];
-    expect(call?.[0]?.kind).toBe('graph');
-    expect(call?.[0]?.excludeStatus).toBe('pending');
-  });
+  expect(screen.queryByRole('tab', { name: '图谱' })).toBeNull();
+  expect(screen.getByRole('tab', { name: '执行记录' })).toBeTruthy();
 });
 
-test('?tab=graph 直接落在图谱标签上', async () => {
+test('旧的 ?tab=graph 链接兼容到执行记录', async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <MemoryRouter initialEntries={['/workspaces/local/reviews?alias=demo&tab=graph']}>
@@ -227,7 +248,7 @@ test('?tab=graph 直接落在图谱标签上', async () => {
     </MemoryRouter>,
   );
   await waitFor(() =>
-    expect(screen.getByRole('tab', { name: /图谱/ })).toHaveAttribute('aria-selected', 'true'));
+    expect(screen.getByRole('tab', { name: '执行记录' })).toHaveAttribute('aria-selected', 'true'));
 });
 
 // CLI 提交写操作时打印的是「审批 #12 / 任务 #34」。这两个号在页面上必须找得到，
@@ -247,16 +268,16 @@ test('卡片露出审批号与任务号', async () => {
 test('同一路由更新 tab 参数时视图跟着 URL 切换', async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <MemoryRouter initialEntries={['/workspaces/local/reviews?alias=demo&tab=executions']}>
+    <MemoryRouter initialEntries={['/workspaces/local/reviews?alias=demo&tab=history']}>
       <QueryClientProvider client={client}>
         <ReviewsPage />
-        <Link to="/workspaces/local/reviews?alias=demo&tab=graph">测试跳转图谱</Link>
+        <Link to="/workspaces/local/reviews?alias=demo&tab=executions">测试跳转执行记录</Link>
       </QueryClientProvider>
     </MemoryRouter>,
   );
 
-  expect(screen.getByRole('tab', { name: '执行记录' })).toHaveAttribute('aria-selected', 'true');
-  await userEvent.click(screen.getByRole('link', { name: '测试跳转图谱' }));
+  expect(screen.getByRole('tab', { name: '审批记录' })).toHaveAttribute('aria-selected', 'true');
+  await userEvent.click(screen.getByRole('link', { name: '测试跳转执行记录' }));
   await waitFor(() =>
-    expect(screen.getByRole('tab', { name: /图谱/ })).toHaveAttribute('aria-selected', 'true'));
+    expect(screen.getByRole('tab', { name: '执行记录' })).toHaveAttribute('aria-selected', 'true'));
 });

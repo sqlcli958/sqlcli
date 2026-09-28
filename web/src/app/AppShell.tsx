@@ -280,7 +280,7 @@ function PendingApprovalNotice({ alias }: { alias: string | null }) {
   return (
     <div className="shell-notice" role="status">
       <span>本次修改已提交审批 #{pending}，批准后才会写入图谱。</span>
-      <Link to={`${navPath('reviews', alias)}${alias ? '&' : '?'}tab=graph`} onClick={dismiss}>
+      <Link to={navPath('reviews', alias)} onClick={dismiss}>
         去评审
       </Link>
       <button type="button" onClick={dismiss} title="知道了" aria-label="关闭提示">×</button>

@@ -18,7 +18,7 @@ import type {
   BatchStatus,
   PrecheckDto,
 } from '../../types/api';
-import { GraphDiff } from './GraphDiff';
+import { GraphDiff, objectLabel } from './GraphDiff';
 import { TIME_RANGES, since } from './timeRange';
 
 const KIND_LABEL: Record<ApprovalKind, string> = {
@@ -134,13 +134,13 @@ export function ApprovalList({
 }: {
   fixedStatus?: ApprovalStatus;
   alias?: string | null;
-  /** 排除这个类型。「审批记录」传 'graph'：图谱的历史在图谱标签里 */
+  /** 排除指定类型；保留给调用方做窄化筛选。 */
   excludeKind?: ApprovalKind;
   /** 排除这个状态。「图谱」传 'pending'：还没裁决的在待审批标签里 */
   excludeStatus?: ApprovalStatus;
-  /** 只看这个类型，锁死不给筛。「图谱」标签传 'graph' */
+  /** 只看这个类型，锁死不给筛。 */
   fixedKind?: ApprovalKind;
-  /** 塞进工具条最左边的额外筛选项。图谱标签用它放视图切换，免得再叠一条工具条 */
+  /** 塞进工具条最左边的额外筛选项，避免调用方为了一个局部切换再叠一条工具条。 */
   leading?: React.ReactNode;
 }) {
   const [page, setPage] = useState(0);
@@ -448,7 +448,9 @@ function BatchItem({
   onToggle: () => void;
 }) {
   const [reason, setReason] = useState('');
+  const [detailOpen, setDetailOpen] = useState(false);
   const pending = item.status === 'pending';
+  const graphTarget = item.targetId ?? item.payload?.targetId;
 
   const reject = useMutation({
     mutationFn: () => decideApproval(item.id, 'rejected', reason),
@@ -469,13 +471,30 @@ function BatchItem({
           />
         )}
         <span className="review-id">#{item.id}</span>
-        <code className="review-summary">{item.summary}</code>
+        <code className="review-summary">
+          {kind === 'graph' ? (graphTarget ? objectLabel(graphTarget) : '图谱变更') : item.summary}
+        </code>
         {!pending && (
           <span className="review-status">{STATUS_LABEL[item.status] ?? item.status}</span>
         )}
         <TaskOutcome item={item} />
       </div>
-      {kind === 'graph' && item.payload && <GraphDiff payload={item.payload} />}
+      {kind === 'graph' && (
+        <div className="review-card-actions">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={detailOpen}
+            onClick={() => setDetailOpen(!detailOpen)}
+          >
+            {detailOpen ? '收起详情' : '详情'}
+          </Button>
+        </div>
+      )}
+      {detailOpen && kind === 'graph' && item.summary && (
+        <pre className="review-detail">{item.summary}</pre>
+      )}
+      {detailOpen && kind === 'graph' && item.payload && <GraphDiff payload={item.payload} />}
       {kind === 'sql' && item.detail && <pre className="review-detail">{item.detail}</pre>}
       {pending && (
         <div className="review-decide">
@@ -521,6 +540,7 @@ function ApprovalCard({ item }: { item: ApprovalDto }) {
   const pending = item.status === 'pending';
 
   const graph = item.kind === 'graph';
+  const graphTarget = item.targetId ?? item.payload?.targetId;
   /** 候选边的发布审批：对象已经在图谱里，批准 = 发布，拒绝 = 转 ignored。 */
   const publishReview = graph && item.payload?.action === 'publish';
 
@@ -565,14 +585,9 @@ function ApprovalCard({ item }: { item: ApprovalDto }) {
         </time>
       </div>
 
-      <code className="review-summary">{item.summary}</code>
-
-      {/*
-        图谱审批批的是一次内容变更，不看 before/after 批不下去，所以直接摊开而不是藏进「详情」。
-        候选边的发布审批（action=publish）例外：对象已经在图谱里，没有 before/after 可比，
-        该看的是端点、置信度、证据——摘要那行已经带了前三样，其余在「详情」里。
-      */}
-      {item.payload && item.payload.action !== 'publish' && <GraphDiff payload={item.payload} />}
+      <code className="review-summary">
+        {graph ? (graphTarget ? objectLabel(graphTarget) : '图谱变更') : item.summary}
+      </code>
       {graph && !item.payload && pending && (
         <p className="review-hint">
           这条审批没有记下变更内容（升级前提交的），批准不会改动图谱，请让提交方重新提交。
@@ -589,7 +604,7 @@ function ApprovalCard({ item }: { item: ApprovalDto }) {
           variant="ghost"
           size="sm"
           aria-expanded={detailOpen}
-          title="预检结论与审计时间线"
+          title={graph ? '查看图谱具体参数与审计详情' : '预检结论与审计时间线'}
           onClick={() => setDetailOpen(!detailOpen)}
         >
           {detailOpen ? '收起详情' : '详情'}
@@ -631,6 +646,12 @@ function ApprovalCard({ item }: { item: ApprovalDto }) {
       </div>
 
       {open && item.detail && <pre className="review-detail">{item.detail}</pre>}
+      {detailOpen && graph && item.summary && (
+        <pre className="review-detail">{item.summary}</pre>
+      )}
+      {detailOpen && graph && item.payload && item.payload.action !== 'publish' && (
+        <GraphDiff payload={item.payload} />
+      )}
       {detailOpen && <ApprovalDetail id={item.id} />}
 
       {!pending && item.reason && <p className="review-reason">理由：{item.reason}</p>}
