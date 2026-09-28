@@ -604,7 +604,7 @@ function ApprovalCard({ item }: { item: ApprovalDto }) {
           variant="ghost"
           size="sm"
           aria-expanded={detailOpen}
-          title="预检结论与审计时间线"
+          title={graph ? '查看图谱具体参数与审计详情' : '预检结论与审计时间线'}
           onClick={() => setDetailOpen(!detailOpen)}
         >
           {detailOpen ? '收起详情' : '详情'}
@@ -649,7 +649,7 @@ function ApprovalCard({ item }: { item: ApprovalDto }) {
       {detailOpen && graph && item.summary && (
         <pre className="review-detail">{item.summary}</pre>
       )}
-      {detailOpen && graph && item.payload?.action !== 'publish' && (
+      {detailOpen && graph && item.payload && item.payload.action !== 'publish' && (
         <GraphDiff payload={item.payload} />
       )}
       {detailOpen && <ApprovalDetail id={item.id} />}
