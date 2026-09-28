@@ -4,27 +4,26 @@ import { getApprovals } from '../../api/approvals';
 import { Tabs } from '../../ui/Tabs';
 import { ApprovalList } from './ApprovalList';
 import { ExecutionLog } from './ExecutionLog';
-import { GraphReview } from './GraphReview';
 import './review.css';
 
 /**
- * 四个视图。前两个是「还有什么等着我」，后两个是「已经发生过什么」。
+ * 三个视图：待办、裁决历史、实际执行流水。
  *
- * 图谱单独一个标签而不是混进待审批：SQL 审批批的是一次执行（放不放行），
- * 图谱审批批的是一次内容变更——要看 before/after 才批得下去，卡片和动作都不一样。
- * 「待审批」因此排掉 graph（`excludeKind`），两个标签的角标加起来不重不漏。
+ * 图谱不再单开顶层标签：待裁决的图谱变更跟其它审批一起在「待审批」，
+ * 已裁决记录在「审批记录」，真正落地的图谱变更则和 SQL 一起进入「执行记录」。
  */
 const VIEWS = [
   { key: 'pending', label: '待审批' },
   { key: 'history', label: '审批记录' },
-  { key: 'graph', label: '图谱' },
   { key: 'executions', label: '执行记录' },
 ] as const;
 
 type View = (typeof VIEWS)[number]['key'];
 
-function isView(value: string | null): value is View {
-  return VIEWS.some((item) => item.key === value);
+function resolveView(value: string | null): View {
+  // 兼容旧链接 / 收藏：原 ?tab=graph 已合并进执行记录。
+  if (value === 'graph') return 'executions';
+  return VIEWS.some((item) => item.key === value) ? value as View : 'pending';
 }
 
 /**
@@ -37,10 +36,9 @@ function isView(value: string | null): value is View {
 export function ReviewsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const alias = searchParams.get('alias');
-  // tab 是评审链路的可导航状态：同一路由内从执行记录跳回待审批、或从图谱跳来时，
-  // 不能只在首次 mount 读一次，否则 URL 已变而页面仍停在旧标签。
+  // tab 是评审链路的可导航状态；旧的 graph 链接自动落到已经合并后的执行记录。
   const requestedView = searchParams.get('tab');
-  const view: View = isView(requestedView) ? requestedView : 'pending';
+  const view = resolveView(requestedView);
 
   const setView = (next: View) => {
     const params = new URLSearchParams(searchParams);
@@ -91,13 +89,11 @@ export function ReviewsPage() {
 
       <section className="review-stage" data-view={view} aria-label={`${VIEWS.find((item) => item.key === view)?.label ?? '评审'}内容`}>
         {view === 'executions' && <ExecutionLog alias={alias} />}
-        {view === 'graph' && <GraphReview alias={alias} />}
         {(view === 'pending' || view === 'history') && (
           <ApprovalList
             key={view}
             fixedStatus={view === 'pending' ? 'pending' : undefined}
-            // 待审批不拆类型；审批记录排掉图谱——图谱的历史在图谱标签里，还带变更流水
-            excludeKind={view === 'history' ? 'graph' : undefined}
+            // 图谱不再单开历史标签：审批记录保留所有类型，已落地变更另在执行记录追溯。
             alias={alias}
           />
         )}
