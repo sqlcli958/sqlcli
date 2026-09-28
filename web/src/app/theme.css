@@ -436,6 +436,33 @@ html[data-theme='light'] .settings-tabs button.is-active { color: #2f3338 !impor
 html[data-theme='light'] .settings-block-head-v3 p { color: #626870 !important; }
 html[data-theme='light'] .settings-block { color: #202327 !important; border-color: #d8dadd !important; background: #fff !important; box-shadow: 0 8px 24px rgba(20, 24, 28, .05) !important; }
 html[data-theme='light'] .settings-block-head-v3 h2 { color: #202327 !important; }
+
+html[data-theme='light'] .settings .settings-primary-action {
+  margin-right: 6px;
+  color: #3f454b !important;
+  border-color: #c9cdd2 !important;
+  background: #f5f6f7 !important;
+  box-shadow: 0 1px 2px rgba(20, 24, 28, .04) !important;
+}
+
+html[data-theme='light'] .settings .settings-primary-action:hover:not(:disabled) {
+  color: #202327 !important;
+  border-color: #aeb4ba !important;
+  background: #eceeef !important;
+  box-shadow: 0 3px 8px rgba(20, 24, 28, .07) !important;
+  transform: translateY(-1px);
+}
+
+html[data-theme='light'] .settings .settings-primary-action:active:not(:disabled) {
+  background: #e4e6e8 !important;
+  box-shadow: none !important;
+  transform: translateY(0);
+}
+
+html[data-theme='light'] .settings .settings-primary-action:focus-visible {
+  outline: 2px solid #aeb4ba;
+  outline-offset: 2px;
+}
 html[data-theme='light'] .settings-table { border-color: #d8dadd !important; }
 html[data-theme='light'] .settings-table td { color: #626870 !important; border-bottom-color: #e4e6e8 !important; }
 html[data-theme='light'] .settings-name { color: #202327 !important; }
