@@ -5,15 +5,19 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { ExecutionLog, isWrite } from './ExecutionLog';
 import { formatSql } from './formatSql';
-import type { SqlExecutionRecordDto } from '../../types/api';
+import type { GraphChangeDto, SqlExecutionRecordDto } from '../../types/api';
 
 vi.mock('../../api/executions', () => ({
   getExecutionHistory: vi.fn(),
   getRecoveryPreview: vi.fn(),
   executeRollback: vi.fn(),
 }));
+vi.mock('../../api/graphChanges', () => ({
+  listGraphChanges: vi.fn(),
+}));
 
 const { getExecutionHistory, getRecoveryPreview, executeRollback } = await import('../../api/executions');
+const { listGraphChanges } = await import('../../api/graphChanges');
 
 const failed: SqlExecutionRecordDto = {
   id: 1,
@@ -26,6 +30,27 @@ const failed: SqlExecutionRecordDto = {
   startedAt: 1_700_000_000_000,
   elapsedMs: 12,
   targetSchema: 'qm_pct',
+};
+
+const graphChange: GraphChangeDto = {
+  id: 8,
+  alias: 'demo',
+  operation: 'upsert_column',
+  targetId: 'column:demo:APP.ORDERS.USER_ID',
+  actor: 'agent',
+  revisionBefore: 5,
+  revisionAfter: 6,
+  createdAt: 1_700_000_100_000,
+  approvalId: 7,
+  reason: '补充字段业务描述',
+  payload: {
+    targetId: 'column:demo:APP.ORDERS.USER_ID',
+    operation: 'upsert_column',
+    actor: 'agent',
+    baseRevision: 5,
+    before: { description: '旧描述', businessName: '用户' },
+    after: { description: '下单用户 ID', businessName: '用户' },
+  },
 };
 
 function renderLog() {
@@ -45,6 +70,10 @@ beforeEach(() => {
     schemas: ['qm_pct'],
     total: 1,
   });
+  vi.mocked(listGraphChanges).mockResolvedValue({
+    changes: [graphChange],
+    total: 1,
+  });
 });
 
 test('失败的语句也在列表里，点开能看到失败原因和完整 SQL', async () => {
@@ -57,6 +86,22 @@ test('失败的语句也在列表里，点开能看到失败原因和完整 SQL'
   expect(screen.getByText('Unknown column visible')).toBeTruthy();
   // 列表里是脱敏文本，展开后是原文——否则看不出改的是哪一行
   expect(screen.getByText(/id='9527'/)).toBeTruthy();
+});
+
+test('执行记录包含图谱变更，默认折叠，点击详情后才展开具体内容', async () => {
+  renderLog();
+
+  expect(await screen.findByText('APP.ORDERS.USER_ID')).toBeTruthy();
+  expect(screen.getByText('upsert_column')).toBeTruthy();
+  expect(screen.queryByText('旧描述')).toBeNull();
+  expect(screen.queryByText('下单用户 ID')).toBeNull();
+
+  await userEvent.click(screen.getByRole('button', { name: '详情' }));
+
+  expect(await screen.findByText('旧描述')).toBeTruthy();
+  expect(screen.getByText('下单用户 ID')).toBeTruthy();
+  expect(screen.getByText('r5 → r6')).toBeTruthy();
+  expect(screen.getByText('#7')).toBeTruthy();
 });
 
 test('四个筛选条件都会带进请求', async () => {
