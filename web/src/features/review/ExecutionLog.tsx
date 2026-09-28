@@ -123,7 +123,6 @@ export function ExecutionLog({ alias }: { alias: string | null }) {
       return loadExecutionWindow(alias ?? '', historyWindow, filters, signal);
     },
     enabled: Boolean(alias) && includeSql,
-    placeholderData: (prev) => prev,
   });
 
   const graphLog = useQuery({
@@ -134,7 +133,6 @@ export function ExecutionLog({ alias }: { alias: string | null }) {
       createdAfter: since(range),
     }, historyWindow, signal),
     enabled: Boolean(alias) && includeGraph,
-    placeholderData: (prev) => prev,
   });
 
   // 只看 GRAPH 时 SQL 列表不会请求，但 schema 下拉仍要有历史选项；只取 1 条换目录即可。
@@ -164,7 +162,8 @@ export function ExecutionLog({ alias }: { alias: string | null }) {
       ? graphLog.error
       : null;
   const loaded = (!includeSql || sqlLog.isSuccess) && (!includeGraph || graphLog.isSuccess);
-  const stale = (includeSql && sqlLog.isPlaceholderData) || (includeGraph && graphLog.isPlaceholderData);
+  const stale = (includeSql && sqlLog.isFetching && sqlLog.data != null)
+    || (includeGraph && graphLog.isFetching && graphLog.data != null);
   const filtered = Boolean(schema || type || status || rangeMs(range));
 
   /** 改筛选条件要回到第一页，否则会停在一个新结果集里不存在的页码上。 */
