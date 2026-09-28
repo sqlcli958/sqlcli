@@ -100,7 +100,7 @@ test('执行记录包含图谱变更，默认折叠，点击详情后才展开�
 
   expect(await screen.findByText('旧描述')).toBeTruthy();
   expect(screen.getByText('下单用户 ID')).toBeTruthy();
-  expect(screen.getByText('r5 → r6')).toBeTruthy();
+  expect(screen.getAllByText('r5 → r6')[0]).toBeTruthy();
   expect(screen.getByText('#7')).toBeTruthy();
 });
 
@@ -109,7 +109,7 @@ test('四个筛选条件都会带进请求', async () => {
   await screen.findByTitle('展开完整 SQL');
 
   await userEvent.selectOptions(screen.getByLabelText('按 schema 筛选'), 'qm_pct');
-  await userEvent.selectOptions(screen.getByLabelText('按语句类型筛选'), 'UPDATE');
+  await userEvent.selectOptions(screen.getByLabelText('按记录类型筛选'), 'UPDATE');
   await userEvent.selectOptions(screen.getByLabelText('按执行状态筛选'), 'failed');
   await userEvent.selectOptions(screen.getByLabelText('按时间范围筛选'), '24h');
 
