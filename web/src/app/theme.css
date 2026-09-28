@@ -652,6 +652,41 @@ html[data-theme='light'] .btn.is-primary:hover:not(:disabled) {
   background: #111315 !important;
 }
 
+html[data-theme='light'] .alias-add-page .alias-form-actions .alias-cancel-action {
+  color: #3f454b !important;
+  border-color: #d1d5d9 !important;
+  background: #fff !important;
+  box-shadow: 0 1px 2px rgba(20, 24, 28, .03) !important;
+}
+
+html[data-theme='light'] .alias-add-page .alias-form-actions .alias-cancel-action:hover:not(:disabled) {
+  color: #202327 !important;
+  border-color: #b8bdc3 !important;
+  background: #f7f8f9 !important;
+}
+
+html[data-theme='light'] .alias-add-page .alias-form-actions .alias-save-action {
+  color: #2f3439 !important;
+  border-color: #bcc2c8 !important;
+  background: #eceff1 !important;
+  box-shadow: 0 1px 2px rgba(20, 24, 28, .05) !important;
+  font-weight: 620;
+}
+
+html[data-theme='light'] .alias-add-page .alias-form-actions .alias-save-action:hover:not(:disabled) {
+  color: #202327 !important;
+  border-color: #a8aeb4 !important;
+  background: #e2e5e8 !important;
+  box-shadow: 0 3px 8px rgba(20, 24, 28, .08) !important;
+  transform: translateY(-1px);
+}
+
+html[data-theme='light'] .alias-add-page .alias-form-actions .alias-save-action:active:not(:disabled) {
+  background: #d9dde0 !important;
+  box-shadow: none !important;
+  transform: translateY(0);
+}
+
 html[data-theme='light'] .btn.is-danger {
   color: var(--danger);
   border-color: #e8c6c6;
