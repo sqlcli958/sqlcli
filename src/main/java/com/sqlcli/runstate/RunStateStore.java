@@ -1387,14 +1387,28 @@ public class RunStateStore {
 
     /** 图谱变更流水，最新在前。{@code alias} 为 null 时跨数据源。 */
     public List<GraphChangeRow> listGraphChanges(String alias, String targetId, int limit, int offset) {
-        Filter filter = graphChangeFilter(alias, targetId);
+        return listGraphChanges(alias, targetId, null, null, null, limit, offset);
+    }
+
+    /**
+     * 图谱变更流水的筛选版，供执行记录把 SQL 与图谱放在同一条时间线上。
+     *
+     * <p>{@code targetSchema} 通过 target id 里的 qualified name 匹配；schema 自身对象
+     * （例如 {@code schema:demo:APP}）也会命中。图谱流水只记录已经落地的变更，因此
+     * 在前端统一视为 success。
+     */
+    public List<GraphChangeRow> listGraphChanges(String alias, String targetId,
+                                                Long createdAfter, Long createdBefore,
+                                                String targetSchema, int limit, int offset) {
+        Filter filter = graphChangeFilter(alias, targetId, createdAfter, createdBefore, targetSchema);
         List<Object> args = new ArrayList<>(filter.args());
         args.add(Math.max(1, Math.min(limit, 500)));
         args.add(Math.max(0, offset));
         List<GraphChangeRow> rows = new ArrayList<>();
         try (Connection conn = connect();
              PreparedStatement ps = conn.prepareStatement(
-                     GRAPH_CHANGE_COLUMNS + filter.clause() + " ORDER BY id DESC LIMIT ? OFFSET ?")) {
+                     GRAPH_CHANGE_COLUMNS + filter.clause()
+                             + " ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?")) {
             for (int i = 0; i < args.size(); i++) ps.setObject(i + 1, args.get(i));
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -1410,15 +1424,33 @@ public class RunStateStore {
     }
 
     public int countGraphChanges(String alias, String targetId) {
-        Filter filter = graphChangeFilter(alias, targetId);
+        return countGraphChanges(alias, targetId, null, null, null);
+    }
+
+    public int countGraphChanges(String alias, String targetId,
+                                 Long createdAfter, Long createdBefore, String targetSchema) {
+        Filter filter = graphChangeFilter(alias, targetId, createdAfter, createdBefore, targetSchema);
         return count("SELECT COUNT(*) FROM graph_change_log" + filter.clause(), filter.args());
     }
 
     private static Filter graphChangeFilter(String alias, String targetId) {
+        return graphChangeFilter(alias, targetId, null, null, null);
+    }
+
+    private static Filter graphChangeFilter(String alias, String targetId,
+                                            Long createdAfter, Long createdBefore, String targetSchema) {
         StringBuilder sql = new StringBuilder(" WHERE 1=1");
         List<Object> args = new ArrayList<>();
         appendFilter(sql, args, " AND alias = ?", alias);
         appendFilter(sql, args, " AND target_id = ?", targetId);
+        appendFilter(sql, args, " AND created_at >= ?", createdAfter);
+        appendFilter(sql, args, " AND created_at < ?", createdBefore);
+        if (targetSchema != null && !targetSchema.isBlank()) {
+            String normalized = targetSchema.trim().toLowerCase(Locale.ROOT);
+            sql.append(" AND (LOWER(target_id) LIKE ? OR LOWER(target_id) LIKE ?)");
+            args.add("%:" + normalized + ".%");
+            args.add("%:" + normalized);
+        }
         return new Filter(sql.toString(), args);
     }
 

@@ -337,6 +337,22 @@ class RunStateStoreTest {
         }
     }
 
+    @Test
+    void filtersGraphChangesForUnifiedExecutionHistory(@TempDir Path dir) {
+        RunStateStore store = store(dir);
+        store.recordGraphChange("demo", "upsert_column",
+                "column:demo:qm_pct.orders.id", "agent", 1, 2);
+        store.recordGraphChange("demo", "upsert_column",
+                "column:demo:sys_menu.menu_id", "agent", 2, 3);
+        store.recordGraphChange("other", "upsert_column",
+                "column:other:qm_pct.orders.id", "agent", 1, 2);
+
+        assertEquals(1, store.listGraphChanges(
+                "demo", null, null, null, "qm_pct", 20, 0).size());
+        assertEquals(1, store.countGraphChanges(
+                "demo", null, null, null, "qm_pct"));
+    }
+
     // --------------------------------------------------------------- graph_read
 
     /**

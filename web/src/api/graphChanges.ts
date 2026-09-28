@@ -12,8 +12,16 @@ export interface GraphChangeListDto {
  * `targetId` 用来看单个对象的变更历史——「这个字段的描述是谁什么时候改的」这类问题，
  * 翻整条流水找不现实。
  */
+export interface GraphChangeFilters {
+  alias?: string | null;
+  targetId?: string;
+  schema?: string;
+  createdAfter?: number;
+  createdBefore?: number;
+}
+
 export async function listGraphChanges(
-  params: { alias?: string | null; targetId?: string } = {},
+  params: GraphChangeFilters = {},
   page = 0,
   pageSize = 20,
   signal?: AbortSignal,
@@ -23,6 +31,9 @@ export async function listGraphChanges(
     {
       alias: params.alias ?? undefined,
       targetId: params.targetId,
+      schema: params.schema,
+      createdAfter: params.createdAfter,
+      createdBefore: params.createdBefore,
       limit: pageSize,
       offset: page * pageSize,
     },

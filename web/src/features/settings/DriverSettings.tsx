@@ -51,7 +51,7 @@ export function DriverSettings() {
     <div className="settings-block">
       <div className="settings-block-head">
         <h2>驱动</h2>
-        <ActionIcon action="add" label="新建驱动" primary size="md" onClick={() => setEditing('new')} />
+        <ActionIcon action="add" label="新建驱动" primary size="md" className="settings-primary-action" onClick={() => setEditing('new')} />
       </div>
 
       {drivers.isLoading && <p className="settings-hint">加载中…</p>}
