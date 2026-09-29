@@ -51,6 +51,62 @@ class MetricSqlExpanderTest {
         assertTrue(sql.contains("WHERE (status IN (2,3))"), sql);
     }
 
+    @Test
+    void termScenarioFiltersAreAddedWithoutMutatingMetricDefinition() {
+        GraphWorkspace workspace = seedOrdersOnly();
+        MetricRecord metric = MetricRecord.create(ALIAS, "gmv_paid", GraphActor.agent);
+        metric.setExpression("SUM(orders.amount)");
+        metric.setFilters("deleted = 0");
+        MetricRecord.MetricGrain grain = new MetricRecord.MetricGrain();
+        grain.setTimeColumn(columnId("app.orders.created_at"));
+        metric.setGrain(grain);
+
+        String sql = MetricSqlExpander.expand(workspace, metric, mysql(),
+                new MetricSqlRequest(null, null, null, List.of(),
+                        List.of("status IN (2,3)", "tenant_id = 7")));
+
+        assertTrue(sql.contains("(deleted = 0)"), sql);
+        assertTrue(sql.contains("(status IN (2,3))"), sql);
+        assertTrue(sql.contains("(tenant_id = 7)"), sql);
+        assertEquals("deleted = 0", metric.getFilters(), "场景过滤只能是请求上下文，不能污染指标定义");
+    }
+
+    @Test
+    void termScenarioFilterAppliesToBothSidesOfRatioMetric() {
+        GraphWorkspace workspace = seedOrdersOnly();
+        MetricRecord metric = MetricRecord.create(ALIAS, "paid_rate", GraphActor.agent);
+        MetricRecord.MetricComponent numerator = new MetricRecord.MetricComponent();
+        numerator.setExpression("COUNT(*)");
+        numerator.setFilters("status = 2");
+        metric.setNumerator(numerator);
+        MetricRecord.MetricComponent denominator = new MetricRecord.MetricComponent();
+        denominator.setExpression("COUNT(*)");
+        metric.setDenominator(denominator);
+        MetricRecord.MetricGrain grain = new MetricRecord.MetricGrain();
+        grain.setTimeColumn(columnId("app.orders.created_at"));
+        metric.setGrain(grain);
+
+        String sql = MetricSqlExpander.expand(workspace, metric, mysql(),
+                new MetricSqlRequest(null, null, null, List.of(), List.of("tenant_id = 7")));
+
+        assertEquals(2L, sql.lines().filter(line -> line.contains("(tenant_id = 7)")).count(), sql);
+        assertEquals(1L, sql.lines().filter(line -> line.contains("(status = 2)")).count(), sql);
+    }
+
+    @Test
+    void unresolvedScenarioParameterIsRejectedBeforeSqlCanBeExecuted() {
+        GraphWorkspace workspace = seedOrdersOnly();
+        MetricRecord metric = metricWithGrainAndExpression();
+
+        MetricExpansionException ex = assertThrows(MetricExpansionException.class,
+                () -> MetricSqlExpander.expand(workspace, metric, mysql(),
+                        new MetricSqlRequest(null, null, null, List.of(),
+                                List.of("subject_id = :subjectId"))));
+
+        assertTrue(ex.getMessage().contains(":subjectId"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("未绑定"), ex.getMessage());
+    }
+
     // ------------------------------------------------------------ 跨表 + 复合外键
 
     @Test
