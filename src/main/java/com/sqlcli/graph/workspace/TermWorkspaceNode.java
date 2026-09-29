@@ -51,7 +51,7 @@ public class TermWorkspaceNode extends BaseGraphObject {
 
     public static TermWorkspaceNode create(String sourceAlias, String name, GraphActor actor) {
         TermWorkspaceNode node = new TermWorkspaceNode();
-        node.init(GraphObjectKind.term, "term:" + sourceAlias + ":" + name, actor);
+        node.init(GraphObjectKind.term, GraphIds.termId(sourceAlias, name), actor);
         node.setSourceAlias(sourceAlias);
         node.setName(name);
         node.setDisplayName(name);
