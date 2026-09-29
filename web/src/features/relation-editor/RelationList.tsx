@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { deleteRelation } from '../../api/relations';
+import { getImpact } from '../../api/impact';
 import { onMutationSuccess } from '../../api/mutationHelpers';
 import { useDeleteConfirm } from '../../api/useDeleteConfirm';
 import { useSessionStore } from '../../state/sessionStore';
@@ -133,6 +135,12 @@ function RelationGroup({
   const [editingId, setEditingId] = useState<string | null>(null);
   const remove = useDeleteConfirm((id) => deleteRelation(id, revision, '手动删除'), onRefresh);
   const { deletingId, confirmId: deleteConfirmId, error: deleteError } = remove;
+  const impact = useQuery({
+    queryKey: ['impact', deleteConfirmId],
+    queryFn: ({ signal }) => getImpact(deleteConfirmId!, signal),
+    enabled: deleteConfirmId != null,
+    staleTime: 10_000,
+  });
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -296,7 +304,22 @@ function RelationGroup({
                         />
                         {isConfirming ? (
                           <span className="relation-list-confirm-delete">
-                            <span>确认删除？</span>
+                            <span>
+                              {impact.isPending
+                                ? '正在检查影响…'
+                                : impact.data && impact.data.breaking > 0
+                                  ? `确认删除？将影响 ${impact.data.breaking} 个依赖对象`
+                                  : '确认删除？'}
+                            </span>
+                            {impact.data && impact.data.breaking > 0 && (
+                              <span title={impact.data.impacts.map((item) =>
+                                `${item.kind}: ${item.label || item.id}（${item.dependency}）`).join('\n')}>
+                                {impact.data.impacts.slice(0, 3)
+                                  .map((item) => item.label || item.id)
+                                  .join('、')}
+                                {impact.data.impacts.length > 3 ? '…' : ''}
+                              </span>
+                            )}
                             <Button
                               onClick={(e) => {
                                 e.stopPropagation();
