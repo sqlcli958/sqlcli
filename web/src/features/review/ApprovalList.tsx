@@ -5,6 +5,7 @@ import {
   decideApproval, decideBatch, getApprovalDetail, getApprovals,
 } from '../../api/approvals';
 import { queryClient } from '../../api/queryClient';
+import { getImpact } from '../../api/impact';
 import { Button } from '../../ui/Button';
 import { FilterBar } from '../../ui/FilterBar';
 import { Pagination } from '../../ui/Pagination';
@@ -661,7 +662,7 @@ function ApprovalCard({ item }: { item: ApprovalDto }) {
       {detailOpen && graph && item.payload && item.payload.action !== 'publish' && (
         <GraphDiff payload={item.payload} />
       )}
-      {detailOpen && <ApprovalDetail id={item.id} />}
+      {detailOpen && <ApprovalDetail id={item.id} targetId={graph ? graphTarget : null} />}
 
       {!pending && item.reason && <p className="review-reason">理由：{item.reason}</p>}
       {decide.isError && (
@@ -672,10 +673,16 @@ function ApprovalCard({ item }: { item: ApprovalDto }) {
 }
 
 /** 展开后才拉：详情要读 task_event，比列表重，而且大多数卡片不会被展开。 */
-function ApprovalDetail({ id }: { id: number }) {
+function ApprovalDetail({ id, targetId }: { id: number; targetId?: string | null }) {
   const detail = useQuery({
     queryKey: ['approval', id],
     queryFn: ({ signal }) => getApprovalDetail(id, signal),
+  });
+  const impact = useQuery({
+    queryKey: ['impact', targetId],
+    queryFn: ({ signal }) => getImpact(targetId!, signal),
+    enabled: Boolean(targetId),
+    staleTime: 10_000,
   });
 
   if (detail.isPending) return <p className="review-hint">加载中…</p>;
@@ -690,6 +697,25 @@ function ApprovalDetail({ id }: { id: number }) {
 
   return (
     <div className="review-panel">
+      {impact.data && impact.data.total > 0 && (
+        <section>
+          <h3>变更影响</h3>
+          <p className="review-hint">
+            当前有 {impact.data.total} 个结构化依赖，其中 {impact.data.breaking} 个会因删除/拒绝失去前提。
+          </p>
+          <ul className="review-evidence">
+            {impact.data.impacts.slice(0, 8).map((item) => (
+              <li key={`${item.kind}:${item.id}:${item.dependency}`}>
+                <strong>{item.kind}</strong> · {item.label || objectLabel(item.id)}
+                <span>（{item.dependency}）</span>
+              </li>
+            ))}
+          </ul>
+          {impact.data.impacts.length > 8 && (
+            <p className="review-hint">另有 {impact.data.impacts.length - 8} 个依赖未展开。</p>
+          )}
+        </section>
+      )}
       {candidate && (
         <section>
           <h3>候选关系</h3>
