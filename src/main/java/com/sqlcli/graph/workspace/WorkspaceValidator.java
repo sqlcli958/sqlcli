@@ -159,6 +159,7 @@ public class WorkspaceValidator {
      */
     private void validateTermMetricRefs(GraphWorkspace workspace, String runId) {
         for (TermWorkspaceNode term : workspace.getTerms().values()) {
+            if (term.getStatus() == GraphStatus.ignored) continue;
             for (String metricId : term.getMetricRefs()) {
                 MetricRecord metric = workspace.getMetrics().get(metricId);
                 if (metric == null) {
