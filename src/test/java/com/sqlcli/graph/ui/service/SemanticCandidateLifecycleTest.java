@@ -82,9 +82,9 @@ class SemanticCandidateLifecycleTest {
         assertTrue(result.isSuccess(), result.getErrors().toString());
         TermWorkspaceNode saved = store.load(ALIAS).getTerms().get(termId);
         assertNotNull(saved);
-        assertEquals(GraphStatus.partial, saved.getStatus(),
-                "默认置信度 0.8 应离开 candidate 并定级为 partial");
-        assertEquals(Boolean.FALSE, saved.getVerified());
+        assertEquals(GraphStatus.verified, saved.getStatus(),
+                "人已经批准业务术语，Agent 初始 confidence=0.8 不能把它继续降成 partial");
+        assertEquals(Boolean.TRUE, saved.getVerified());
     }
 
     @Test
