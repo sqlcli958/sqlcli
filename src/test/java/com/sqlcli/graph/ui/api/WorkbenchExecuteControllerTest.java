@@ -6,7 +6,18 @@ import com.sqlcli.approval.ApprovalGate;
 import com.sqlcli.config.DatabaseConfig;
 import com.sqlcli.connection.ConnectionManager;
 import com.sqlcli.graph.ui.JsonHttpSupport;
+import com.sqlcli.graph.workspace.ColumnWorkspaceNode;
+import com.sqlcli.graph.workspace.GraphActor;
+import com.sqlcli.graph.workspace.GraphIds;
+import com.sqlcli.graph.workspace.GraphWorkspace;
+import com.sqlcli.graph.workspace.GraphWorkspaceStore;
+import com.sqlcli.graph.workspace.MetricRecord;
+import com.sqlcli.graph.workspace.TableWorkspaceNode;
+import com.sqlcli.graph.workspace.TermWorkspaceNode;
+import com.sqlcli.metric.MetricSqlExpander;
+import com.sqlcli.metric.MetricSqlRequest;
 import com.sqlcli.runstate.RunStateStore;
+import com.sqlcli.strategy.DatabaseStrategies;
 import com.sqlcli.task.SqlTaskModule;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -36,13 +47,17 @@ class WorkbenchExecuteControllerTest {
     private HttpServer server;
     private Path root;
     private String origin;
+    private RunStateStore runState;
+    private GraphWorkspaceStore workspaceStore;
     private final HttpClient client = HttpClient.newHttpClient();
     private final ObjectMapper mapper = new ObjectMapper();
 
     @BeforeEach
     void startServer() throws Exception {
         root = Files.createTempDirectory("workbench-execute-");
-        RunStateStore runState = new RunStateStore(root.resolve("sqlcli.db"), root.resolve("history"));
+        runState = new RunStateStore(root.resolve("sqlcli.db"), root.resolve("history"));
+        workspaceStore = new GraphWorkspaceStore(root.resolve("graphs"));
+        seedSemanticWorkspace();
         SqlTaskModule taskModule = new SqlTaskModule(
                 new ConnectionManager(), runState, new ApprovalGate(runState, 1000));
 
@@ -54,10 +69,10 @@ class WorkbenchExecuteControllerTest {
         origin = "http://127.0.0.1:" + server.getAddress().getPort();
         server.createContext("/api/workbench/execute", exchange ->
                 new WorkbenchExecuteController(Map.of("locked", locked, "open", open), null,
-                        origin, new JsonHttpSupport(), taskModule, null).handle(exchange));
+                        origin, new JsonHttpSupport(), taskModule, workspaceStore).handle(exchange));
         server.createContext("/api/workbench/cancel", exchange ->
                 new WorkbenchExecuteController(Map.of("locked", locked, "open", open), null,
-                        origin, new JsonHttpSupport(), taskModule, null).handleCancel(exchange));
+                        origin, new JsonHttpSupport(), taskModule, workspaceStore).handleCancel(exchange));
         server.start();
     }
 
@@ -123,6 +138,50 @@ class WorkbenchExecuteControllerTest {
         assertEquals(403, forged.statusCode());
     }
 
+    @Test
+    void semanticContextIsServerVerifiedAndMetricRunKeepsTermAttribution() throws Exception {
+        GraphWorkspace workspace = workspaceStore.load("open");
+        MetricRecord metric = workspace.getMetrics().get(GraphIds.metricId("open", "gmv_paid"));
+        TermWorkspaceNode term = workspace.getTerms().get(GraphIds.termId("open", "paid_orders"));
+        String sql = MetricSqlExpander.expand(
+                workspace,
+                metric,
+                DatabaseStrategies.resolve("mysql"),
+                new MetricSqlRequest("day", null, null, java.util.List.of(), term.getFilters()));
+
+        Map<String, Object> context = new java.util.LinkedHashMap<>();
+        context.put("metricId", metric.getId());
+        context.put("metricRevision", workspace.getManifest().getRevision());
+        context.put("termId", term.getId());
+        context.put("grain", "day");
+        Map<String, Object> request = Map.of("sql", sql, "semanticContext", context);
+
+        HttpResponse<String> accepted = execute("open", mapper.writeValueAsString(request));
+        assertEquals(200, accepted.statusCode(), accepted.body());
+        assertEquals("FAILED", mapper.readTree(accepted.body()).get("status").asText(),
+                "通过语义校验后才会走到故意失败的数据库连接");
+
+        var runs = runState.listMetricRuns("open", metric.getId(), term.getId(), 10);
+        assertEquals(1, runs.size());
+        assertEquals(term.getId(), runs.get(0).termId());
+        assertEquals("failed", runs.get(0).status());
+
+        Map<String, Object> forgedSql = Map.of(
+                "sql", "SELECT 123",
+                "semanticContext", context);
+        HttpResponse<String> rejectedSql = execute("open", mapper.writeValueAsString(forgedSql));
+        assertEquals(400, rejectedSql.statusCode(), rejectedSql.body());
+        assertTrue(mapper.readTree(rejectedSql.body()).get("message").asText().contains("does not match SQL"));
+
+        Map<String, Object> forgedContext = new java.util.LinkedHashMap<>(context);
+        forgedContext.put("termId", GraphIds.termId("open", "all_orders"));
+        HttpResponse<String> rejectedTerm = execute("open", mapper.writeValueAsString(Map.of(
+                "sql", sql,
+                "semanticContext", forgedContext)));
+        assertEquals(400, rejectedTerm.statusCode(), rejectedTerm.body());
+        assertTrue(mapper.readTree(rejectedTerm.body()).get("message").asText().contains("not bound"));
+    }
+
     /** 执行已结束（或 token 不对）时中止不是错误，答 cancelled=false 让前端别标「已中止」。 */
     @Test
     void cancelWithUnknownTokenAnswersFalse() throws Exception {
@@ -142,6 +201,35 @@ class WorkbenchExecuteControllerTest {
                 .uri(URI.create(origin + "/api/workbench/execute?alias=open")).GET().build(),
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(405, response.statusCode());
+    }
+
+    private void seedSemanticWorkspace() throws Exception {
+        GraphWorkspace workspace = GraphWorkspace.create("open", "mysql");
+        TableWorkspaceNode orders = TableWorkspaceNode.create("open", "app", "orders", GraphActor.extractor);
+        for (String name : java.util.List.of("id", "amount", "status", "created_at")) {
+            orders.getColumns().add(ColumnWorkspaceNode.create(name));
+        }
+        workspace.getTables().put(orders.getId(), orders);
+
+        MetricRecord metric = MetricRecord.create("open", "gmv_paid", GraphActor.human);
+        metric.setExpression("SUM(orders.amount)");
+        MetricRecord.MetricGrain grain = new MetricRecord.MetricGrain();
+        grain.setTimeColumn(GraphIds.columnId("open", "app", "orders", "created_at"));
+        grain.setGrains(java.util.List.of("day"));
+        metric.setGrain(grain);
+        workspace.getMetrics().put(metric.getId(), metric);
+
+        TermWorkspaceNode paid = TermWorkspaceNode.create("open", "paid_orders", GraphActor.human);
+        paid.setPrimaryTarget(orders.getId());
+        paid.setFilters(new java.util.ArrayList<>(java.util.List.of("status IN (2,3)")));
+        paid.setMetricRefs(new java.util.ArrayList<>(java.util.List.of(metric.getId())));
+        workspace.getTerms().put(paid.getId(), paid);
+
+        TermWorkspaceNode all = TermWorkspaceNode.create("open", "all_orders", GraphActor.human);
+        all.setPrimaryTarget(orders.getId());
+        workspace.getTerms().put(all.getId(), all);
+
+        workspaceStore.save(workspace);
     }
 
     private HttpResponse<String> execute(String alias, String body) throws Exception {
