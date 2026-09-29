@@ -99,6 +99,7 @@ final class TaskAuditRecorder {
                     ctx.config.getAliasName(),
                     semantic.metricId(),
                     semantic.metricRevision(),
+                    semantic.termId(),
                     executionId,
                     status,
                     semantic.grain(),
