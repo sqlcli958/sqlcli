@@ -2,16 +2,7 @@ package com.sqlcli.cli;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sqlcli.graph.workspace.ColumnWorkspaceNode;
-import com.sqlcli.graph.workspace.GraphActor;
-import com.sqlcli.graph.workspace.GraphIds;
-import com.sqlcli.graph.workspace.GraphStatus;
-import com.sqlcli.graph.workspace.GraphWorkspace;
-import com.sqlcli.graph.workspace.GraphWorkspaceStore;
-import com.sqlcli.graph.workspace.MetricRecord;
-import com.sqlcli.graph.workspace.RelationType;
-import com.sqlcli.graph.workspace.RelationWorkspaceEdge;
-import com.sqlcli.graph.workspace.TableWorkspaceNode;
+import com.sqlcli.graph.workspace.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
