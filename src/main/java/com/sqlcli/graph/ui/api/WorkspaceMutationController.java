@@ -443,8 +443,9 @@ public class WorkspaceMutationController implements HttpHandler {
             json.writeNotFound(exchange, "Metric not found: " + name);
             return;
         }
+        Map<String, String> params = json.parseQueryParams(exchange);
         int limit = 20;
-        String rawLimit = json.getParam(json.parseQueryParams(exchange), "limit", null);
+        String rawLimit = json.getParam(params, "limit", null);
         if (rawLimit != null) {
             try {
                 limit = Math.max(1, Math.min(100, Integer.parseInt(rawLimit)));
@@ -453,7 +454,12 @@ public class WorkspaceMutationController implements HttpHandler {
                 return;
             }
         }
-        List<Map<String, Object>> runs = runState.listMetricRuns(session.getAlias(), metricId, limit).stream()
+        String termId = json.getParam(params, "term", null);
+        if (termId != null && !termId.isBlank() && !termId.startsWith("term:")) {
+            termId = "term:" + session.getAlias() + ":" + termId;
+        }
+        List<Map<String, Object>> runs = runState.listMetricRuns(session.getAlias(), metricId,
+                termId == null || termId.isBlank() ? null : termId, limit).stream()
                 .map(row -> {
                     Map<String, Object> item = new LinkedHashMap<String, Object>();
                     item.put("id", row.id());
