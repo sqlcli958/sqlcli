@@ -11,6 +11,7 @@ vi.mock('../../api/metrics', async () => {
   return {
     ...actual,
     getMetrics: vi.fn(),
+    getMetricRuns: vi.fn(),
     upsertMetric: vi.fn(),
     expandMetricSql: vi.fn(),
   };
@@ -24,7 +25,7 @@ vi.mock('../../api/workbench', async () => {
   return { ...actual, executeWorkbenchSql: vi.fn() };
 });
 
-const { getMetrics, upsertMetric, expandMetricSql } = await import('../../api/metrics');
+const { getMetrics, getMetricRuns, upsertMetric, expandMetricSql } = await import('../../api/metrics');
 const { getAliases } = await import('../../api/aliases');
 const { executeWorkbenchSql } = await import('../../api/workbench');
 
@@ -74,6 +75,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   sessionStorage.clear();
   vi.mocked(getMetrics).mockResolvedValue({ metrics: [gmv], revision: 7 });
+  vi.mocked(getMetricRuns).mockResolvedValue({ metricId: gmv.id, runs: [] });
   vi.mocked(getAliases).mockResolvedValue(aliasDirectory);
 });
 
@@ -194,10 +196,36 @@ test('出图：展开 SQL 走 executeWorkbenchSql，不另写执行路径，画�
 
   await userEvent.click(screen.getByRole('button', { name: '出图' }));
 
-  await waitFor(() => expect(executeWorkbenchSql).toHaveBeenCalledWith('SELECT grain_day, gmv_paid FROM x'));
+  await waitFor(() => expect(executeWorkbenchSql).toHaveBeenCalledWith(
+    'SELECT grain_day, gmv_paid FROM x',
+    false,
+    undefined,
+    undefined,
+    expect.objectContaining({ metricId: gmv.id, metricRevision: 7, grain: 'day' }),
+  ));
   // 展开时带上了默认粒度和一段时间窗——不是裸调用
   expect(vi.mocked(expandMetricSql).mock.calls[0][1]).toMatchObject({ grain: 'day' });
   expect(await screen.findByRole('img', { name: /已支付GMV 趋势/ })).toBeTruthy();
+});
+
+test('显示最近一次指标运行，让定义和真实执行形成反馈', async () => {
+  vi.mocked(getMetricRuns).mockResolvedValue({
+    metricId: gmv.id,
+    runs: [{
+      id: 1,
+      executionId: 9,
+      metricRevision: 7,
+      status: 'success',
+      grain: 'day',
+      rowCount: 30,
+      elapsedMs: 12,
+      startedAt: 1_700_000_000_000,
+    }],
+  });
+  renderPage();
+
+  expect(await screen.findByText(/最近运行：success · 12 ms · 30 行/)).toBeTruthy();
+  expect(screen.getByText(/revision 7/)).toBeTruthy();
 });
 
 test('出图查询为空结果时不画空网格，说明没有数据', async () => {
