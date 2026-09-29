@@ -138,6 +138,77 @@ class SchemaMetricCommandTest {
     }
 
     @Test
+    void expandMetricWithinBoundTermScenarioAddsScenarioFilters() throws Exception {
+        GraphWorkspaceStore store = new GraphWorkspaceStore(temp);
+        GraphWorkspace workspace = seedWorkspace();
+
+        MetricRecord metric = MetricRecord.create(ALIAS, "gmv_paid", GraphActor.agent);
+        metric.setExpression("SUM(orders.amount)");
+        MetricRecord.MetricGrain grain = new MetricRecord.MetricGrain();
+        grain.setTimeColumn(columnId("app.orders.created_at"));
+        grain.setGrains(java.util.List.of("day"));
+        metric.setGrain(grain);
+        workspace.getMetrics().put(metric.getId(), metric);
+
+        TermWorkspaceNode term = TermWorkspaceNode.create(ALIAS, "已支付订单", GraphActor.agent);
+        term.setPrimaryTarget(GraphIds.tableId(ALIAS, "app", "orders"));
+        term.setFilters(new java.util.ArrayList<>(java.util.List.of("status IN (2,3)")));
+        term.setMetricRefs(new java.util.ArrayList<>(java.util.List.of(metric.getId())));
+        workspace.getTerms().put(term.getId(), term);
+        store.save(workspace);
+
+        Run expand = run(store, "expand-metric", command -> {
+            command.setMetricName("gmv_paid");
+            command.setMetricTermRef("已支付订单");
+            command.setRequestedGrain("day");
+            command.setJsonOutput(true);
+        });
+
+        assertEquals(0, expand.exitCode(), expand.stderr());
+        JsonNode data = new ObjectMapper().readTree(expand.stdout()).get("data");
+        assertEquals(term.getId(), data.get("termId").asText());
+        assertTrue(data.get("sql").asText().contains("(status IN (2,3))"), data.toString());
+    }
+
+    @Test
+    void expandMetricRejectsUnboundOrParameterizedTermScenario() throws Exception {
+        GraphWorkspaceStore store = new GraphWorkspaceStore(temp);
+        GraphWorkspace workspace = seedWorkspace();
+
+        MetricRecord metric = MetricRecord.create(ALIAS, "gmv_paid", GraphActor.agent);
+        metric.setExpression("SUM(orders.amount)");
+        MetricRecord.MetricGrain grain = new MetricRecord.MetricGrain();
+        grain.setTimeColumn(columnId("app.orders.created_at"));
+        metric.setGrain(grain);
+        workspace.getMetrics().put(metric.getId(), metric);
+
+        TermWorkspaceNode unbound = TermWorkspaceNode.create(ALIAS, "全部订单", GraphActor.agent);
+        unbound.setPrimaryTarget(GraphIds.tableId(ALIAS, "app", "orders"));
+        workspace.getTerms().put(unbound.getId(), unbound);
+
+        TermWorkspaceNode parameterized = TermWorkspaceNode.create(ALIAS, "租户订单", GraphActor.agent);
+        parameterized.setPrimaryTarget(GraphIds.tableId(ALIAS, "app", "orders"));
+        parameterized.setMetricRefs(new java.util.ArrayList<>(java.util.List.of(metric.getId())));
+        parameterized.setFilters(new java.util.ArrayList<>(java.util.List.of("tenant_id = :tenantId")));
+        workspace.getTerms().put(parameterized.getId(), parameterized);
+        store.save(workspace);
+
+        Run unboundRun = run(store, "expand-metric", command -> {
+            command.setMetricName("gmv_paid");
+            command.setMetricTermRef("全部订单");
+        });
+        assertEquals(1, unboundRun.exitCode());
+        assertTrue(unboundRun.stderr().contains("not bound"), unboundRun.stderr());
+
+        Run parameterizedRun = run(store, "expand-metric", command -> {
+            command.setMetricName("gmv_paid");
+            command.setMetricTermRef("租户订单");
+        });
+        assertEquals(1, parameterizedRun.exitCode());
+        assertTrue(parameterizedRun.stderr().contains(":tenantId"), parameterizedRun.stderr());
+    }
+
+    @Test
     void expandMetricReportsMissingRelation() throws Exception {
         GraphWorkspaceStore store = new GraphWorkspaceStore(temp);
         store.save(seedWorkspace());
