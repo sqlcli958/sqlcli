@@ -747,9 +747,13 @@ export interface WorkspaceCompletenessDto {
     candidateTables: number;
     candidateRelations: number;
     candidateTerms: number;
+    candidateLineage: number;
+    candidateMetrics: number;
     ignoredTables: number;
     ignoredRelations: number;
     ignoredTerms: number;
+    ignoredLineage: number;
+    ignoredMetrics: number;
     /** key 是 ValidationSeverity 原值：error / warning / info。 */
     openIssuesBySeverity: Record<string, number>;
     ignoredIssues: number;

@@ -280,6 +280,20 @@ public class WorkspaceQueryController implements HttpHandler {
                 backlog.setIgnoredTerms(backlog.getIgnoredTerms() + 1);
             }
         }
+        for (LineageRecord record : workspace.getLineage().values()) {
+            if (record.getStatus() == GraphStatus.candidate) {
+                backlog.setCandidateLineage(backlog.getCandidateLineage() + 1);
+            } else if (record.getStatus() == GraphStatus.ignored) {
+                backlog.setIgnoredLineage(backlog.getIgnoredLineage() + 1);
+            }
+        }
+        for (MetricRecord metric : workspace.getMetrics().values()) {
+            if (metric.getStatus() == GraphStatus.candidate) {
+                backlog.setCandidateMetrics(backlog.getCandidateMetrics() + 1);
+            } else if (metric.getStatus() == GraphStatus.ignored) {
+                backlog.setIgnoredMetrics(backlog.getIgnoredMetrics() + 1);
+            }
+        }
 
         for (ValidationIssueRecord issue : workspace.getValidationIssues()) {
             if (issue.getStatus() == ValidationIssueStatus.ignored) {

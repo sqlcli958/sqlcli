@@ -60,11 +60,17 @@ function Wrapper({ graphAvailable }: { graphAvailable: boolean }) {
   );
 }
 
-function renderPage({ graphAvailable = true, alias = 'demo' }: { graphAvailable?: boolean; alias?: string } = {}) {
+function renderPage({
+  graphAvailable = true,
+  alias = 'demo',
+  target,
+}: { graphAvailable?: boolean; alias?: string; target?: string } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[alias ? `/?alias=${alias}` : '/']}>
+      <MemoryRouter initialEntries={[alias
+        ? `/?alias=${alias}${target ? `&target=${encodeURIComponent(target)}` : ''}`
+        : '/']}>
         <Wrapper graphAvailable={graphAvailable} />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -208,24 +214,40 @@ test('出图：展开 SQL 走 executeWorkbenchSql，不另写执行路径，画�
   expect(await screen.findByRole('img', { name: /已支付GMV 趋势/ })).toBeTruthy();
 });
 
-test('显示最近一次指标运行，让定义和真实执行形成反馈', async () => {
+test('显示指标运行健康度、数据新鲜度和失败数，让定义与真实执行形成反馈', async () => {
   vi.mocked(getMetricRuns).mockResolvedValue({
     metricId: gmv.id,
-    runs: [{
-      id: 1,
-      executionId: 9,
-      metricRevision: 7,
-      status: 'success',
-      grain: 'day',
-      rowCount: 30,
-      elapsedMs: 12,
-      startedAt: 1_700_000_000_000,
-    }],
+    runs: [
+      {
+        id: 3, executionId: 11, metricRevision: 7, status: 'success', grain: 'day',
+        rowCount: 30, elapsedMs: 12, startedAt: 1_700_000_000_000, timeTo: '2026-09-29',
+      },
+      {
+        id: 2, executionId: 10, metricRevision: 7, status: 'failed', grain: 'day',
+        rowCount: 0, elapsedMs: 5, startedAt: 1_699_000_000_000, errorSummary: 'timeout',
+      },
+      {
+        id: 1, executionId: 9, metricRevision: 6, status: 'success', grain: 'day',
+        rowCount: 30, elapsedMs: 10, startedAt: 1_698_000_000_000,
+      },
+    ],
   });
   renderPage();
 
   expect(await screen.findByText(/最近运行：success · 12 ms · 30 行/)).toBeTruthy();
-  expect(screen.getByText(/revision 7/)).toBeTruthy();
+  expect(screen.getByText(/数据截至 2026-09-29/)).toBeTruthy();
+  expect(screen.getByText(/近 3 次成功 2 次（67%） · 失败\/拒绝 1 次/)).toBeTruthy();
+});
+
+test('从 Eval 定位指标时滚到并高亮对应指标卡', async () => {
+  const scrollIntoView = vi.fn();
+  Element.prototype.scrollIntoView = scrollIntoView;
+  renderPage({ target: gmv.id });
+
+  expect(await screen.findByText('已支付GMV')).toBeTruthy();
+  const card = document.getElementById(`metric-target-${gmv.id}`);
+  expect(card?.classList.contains('is-targeted')).toBe(true);
+  await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
 });
 
 test('出图查询为空结果时不画空网格，说明没有数据', async () => {

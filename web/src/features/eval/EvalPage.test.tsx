@@ -131,6 +131,15 @@ test('探针分布按探针聚合，硬错误排在前面', async () => {
   expect(rows[0].querySelector('b')!.textContent).toBe('5');
 });
 
+test('工作队列能定位对象，并把历史评估入口明确成修复后复评', async () => {
+  renderPage();
+
+  expect(await screen.findByRole('button', { name: '修复后复评' })).toBeTruthy();
+  const locate = await screen.findAllByRole('link', { name: '定位' });
+  expect(locate[0].getAttribute('href')).toContain('/workspaces/local/knowledge?alias=demo&term=');
+  expect(locate[0].getAttribute('href')).toContain(encodeURIComponent('term:demo:工单0'));
+});
+
 test('工作队列分页，修复命令能一键复制', async () => {
   const writeText = vi.fn().mockResolvedValue(undefined);
   Object.assign(navigator, { clipboard: { writeText } });
@@ -153,5 +162,6 @@ test('没跑过评估时给一句话和 CLI 命令', async () => {
   renderPage('erp_other');
 
   expect(await screen.findByText(/还没跑过评估/)).toBeTruthy();
+  expect(screen.getByRole('button', { name: '跑一次评估' })).toBeTruthy();
   expect(screen.getByText('sql-cli erp_other schema eval')).toBeTruthy();
 });
