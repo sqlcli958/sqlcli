@@ -809,8 +809,21 @@ public class WorkspaceMutationService {
         grade(candidate);
     }
 
-    /** 候选定级：置信度 ≥ 0.9 升为 verified，否则 partial（保留，不再是候选）。 */
+    /**
+     * 候选定级。
+     *
+     * <p>Term 是业务定义：人点“批准”本身就是确认动作，不能再让 Agent 创建时的
+     * 初始 confidence（Term 默认 0.8）把它降成 partial。否则审批中心已经明确通过，
+     * 图谱页却仍表现成“未经人确认”，状态语义自相矛盾。
+     *
+     * <p>其余候选对象继续保留原有置信度规则：≥ 0.9 verified，否则 partial。
+     */
     private static void grade(BaseGraphObject candidate) {
+        if (candidate instanceof TermWorkspaceNode) {
+            candidate.setVerified(true);
+            candidate.setStatus(GraphStatus.verified);
+            return;
+        }
         Double confidence = candidate.getConfidence();
         boolean verified = confidence != null && confidence >= RelationValidator.VERIFIED_MIN_CONFIDENCE;
         candidate.setVerified(verified);
