@@ -440,6 +440,8 @@ export interface TermDto {
   primaryTarget: string | null;
   /** 场景专属过滤，含 `:name` 占位符的是必填参数 */
   filters: string[];
+  /** 显式绑定的权威指标 id；不按名字自动猜。 */
+  metricRefs: string[];
   /** 子图里的表（qualifiedName）。UI 用它把表目录筛到这个场景；非场景术语为空 */
   scenarioTables: string[];
   /** 其中为了连通补进来的——术语并没有映射它们，要标出来 */
@@ -484,6 +486,9 @@ export interface MetricsResponseDto {
 
 export interface MetricSqlDto {
   metric: string;
+  metricId?: string;
+  termId?: string | null;
+  revision?: number;
   sql: string;
 }
 
