@@ -25,6 +25,7 @@ const 报事: TermDto = {
   mappedTargets: [],
   primaryTarget: 'table:demo:app.erp_prop_report',
   filters: ['state IN (0,1,6)'],
+  metricRefs: [],
   scenarioTables: ['app.erp_prop_report', 'app.sys_user'],
   bridgeTables: ['app.sys_user'],
 };
