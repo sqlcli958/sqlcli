@@ -110,6 +110,70 @@ class PolicyRuleProposalsTest {
     }
 
     @Test
+    void manualWebRuleSetSaveWaitsForApprovalAndThenApplies() throws Exception {
+        RuleSet requested = ruleSet("结构规范", "1");
+        PolicyRuleProposals.Proposal proposal = proposals.proposeRuleSet(
+                ALIAS, "structure.yaml", requested, GraphActor.human, "Web 修改规则口径", true);
+
+        assertFalse(proposal.applied());
+        assertFalse(Files.exists(rulesDir().resolve("structure.yaml")), "批准前 Web 保存也不能直接写文件");
+
+        ApprovalRow row = runState.findApproval(proposal.approvalId());
+        GraphChangePayload payload = GraphChangePayload.fromJson(row.payload());
+        assertTrue(payload.isPolicy());
+        assertEquals(PolicyRuleProposals.ruleSetTargetId(ALIAS, "structure.yaml"), payload.targetId());
+
+        new PolicyRuleProposals(store).apply(ALIAS, payload);
+
+        RuleSet saved = new RuleSetLoader().load(rulesDir().resolve("structure.yaml"));
+        assertEquals("1", saved.getVersion());
+        assertEquals("必备字段", saved.getRules().get(0).getTitle());
+    }
+
+    @Test
+    void autoWebRuleSetSaveIsAuditedAndServerOwnsVersionIncrement() throws Exception {
+        PolicyRuleProposals.Proposal created = proposals.proposeRuleSet(
+                ALIAS, "structure.yaml", ruleSet("结构规范", "99"),
+                GraphActor.human, "Web 新建规则口径", false);
+        assertTrue(created.applied());
+        assertEquals("approved", runState.findApproval(created.approvalId()).status());
+        assertEquals("1", new RuleSetLoader().load(rulesDir().resolve("structure.yaml")).getVersion(),
+                "客户端传什么版本都不可信，服务端创建统一从 1 开始");
+
+        RuleSet changed = ruleSet("结构规范", "1");
+        changed.getRules().get(0).setTitle("必备字段 v2");
+        proposals.proposeRuleSet(ALIAS, "structure.yaml", changed,
+                GraphActor.human, "Web 修改规则口径", false);
+
+        RuleSet saved = new RuleSetLoader().load(rulesDir().resolve("structure.yaml"));
+        assertEquals("2", saved.getVersion());
+        assertEquals("必备字段 v2", saved.getRules().get(0).getTitle());
+    }
+
+    @Test
+    void bindingAndDeleteAlsoGoThroughTheSameGovernancePath() throws Exception {
+        proposals.proposeRuleSet(ALIAS, "structure.yaml", ruleSet("结构规范", "1"),
+                GraphActor.human, "seed", false);
+        PolicyRuleSetManager manager = new PolicyRuleSetManager(store);
+        assertFalse(manager.list(ALIAS).get(0).enabled());
+
+        PolicyRuleProposals.Proposal binding = proposals.proposeBinding(
+                ALIAS, "structure.yaml", true, GraphActor.human, "启用校验", true);
+        assertFalse(binding.applied());
+        assertFalse(manager.list(ALIAS).get(0).enabled(), "批准前 binding 不能变化");
+        new PolicyRuleProposals(store).apply(ALIAS,
+                GraphChangePayload.fromJson(runState.findApproval(binding.approvalId()).payload()));
+        assertTrue(manager.list(ALIAS).get(0).enabled());
+
+        PolicyRuleProposals.Proposal deletion = proposals.proposeDeleteRuleSet(
+                ALIAS, "structure.yaml", GraphActor.human, "删除规则集", true);
+        assertTrue(Files.exists(rulesDir().resolve("structure.yaml")), "批准前文件必须仍存在");
+        new PolicyRuleProposals(store).apply(ALIAS,
+                GraphChangePayload.fromJson(runState.findApproval(deletion.approvalId()).payload()));
+        assertFalse(Files.exists(rulesDir().resolve("structure.yaml")));
+    }
+
+    @Test
     void invalidRuleIsRejectedAtProposalTime() {
         PolicyRule bad = rule();
         bad.getWhen().put("tableNameRegex", "([unclosed");
@@ -152,6 +216,16 @@ class PolicyRuleProposalsTest {
 
     private Path rulesDir() {
         return temp.resolve("graphs/demo/policy/rules");
+    }
+
+    private static RuleSet ruleSet(String title, String version) {
+        RuleSet ruleSet = new RuleSet();
+        ruleSet.setKind("PolicyRuleSet");
+        ruleSet.setId("structure-policy");
+        ruleSet.setTitle(title);
+        ruleSet.setVersion(version);
+        ruleSet.getRules().add(rule());
+        return ruleSet;
     }
 
     private static PolicyRule rule() {

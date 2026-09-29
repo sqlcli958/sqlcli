@@ -8,6 +8,7 @@ import com.sqlcli.graph.ui.JsonHttpSupport;
 import com.sqlcli.graph.ui.dto.ApiError;
 import com.sqlcli.graph.ui.service.WorkspaceLockManager;
 import com.sqlcli.graph.ui.service.WorkspaceMutationService;
+import com.sqlcli.runstate.RunStateStore;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import org.slf4j.Logger;
@@ -68,6 +69,7 @@ public class WorkspaceMutationController implements HttpHandler {
     private final WorkspaceLockManager lockManager;
     private final RelationValidator relationValidator;
     private final PolicyService policyService;
+    private final RunStateStore runState;
 
     public WorkspaceMutationController(GraphWorkspace workspace, GraphUiSession session,
                                        JsonHttpSupport json, WorkspaceIndexStore indexStore,
@@ -83,6 +85,7 @@ public class WorkspaceMutationController implements HttpHandler {
                 workspaceStore, validator, lockManager);
         this.relationValidator = new RelationValidator();
         this.policyService = new PolicyService(workspaceStore);
+        this.runState = new RunStateStore();
     }
 
     @Override
@@ -140,6 +143,8 @@ public class WorkspaceMutationController implements HttpHandler {
                 }
             } else if (path.startsWith("/api/metrics/") && path.endsWith("/sql") && "GET".equals(method)) {
                 handleExpandMetric(exchange, path);
+            } else if (path.startsWith("/api/metrics/") && path.endsWith("/runs") && "GET".equals(method)) {
+                handleMetricRuns(exchange, path);
             } else if ("/api/validation/issues".equals(path)) {
                 if ("GET".equals(method)) {
                     handleGetValidationIssues(exchange);
@@ -371,6 +376,10 @@ public class WorkspaceMutationController implements HttpHandler {
             json.writeNotFound(exchange, "Metric not found: " + name);
             return;
         }
+        if (metric.getStatus() == GraphStatus.ignored) {
+            json.writeJson(exchange, 400, ApiError.badRequest("Metric is ignored and cannot be executed: " + name));
+            return;
+        }
         Map<String, String> params = json.parseQueryParams(exchange);
         List<String> dimensionIds = new ArrayList<>();
         String dimensionsCsv = json.getParam(params, "dimensions", null);
@@ -400,8 +409,51 @@ public class WorkspaceMutationController implements HttpHandler {
         }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("metric", metric.getName());
+        body.put("metricId", metric.getId());
+        body.put("revision", workspace.getManifest().getRevision());
         body.put("sql", sql);
         json.writeOk(exchange, body);
+    }
+
+    private void handleMetricRuns(HttpExchange exchange, String path) throws IOException {
+        String encoded = path.substring("/api/metrics/".length(), path.length() - "/runs".length());
+        String name = URLDecoder.decode(encoded, StandardCharsets.UTF_8);
+        String metricId = GraphIds.metricId(session.getAlias(), name);
+        if (!workspace.getMetrics().containsKey(metricId)) {
+            json.writeNotFound(exchange, "Metric not found: " + name);
+            return;
+        }
+        int limit = 20;
+        String rawLimit = json.getParam(json.parseQueryParams(exchange), "limit", null);
+        if (rawLimit != null) {
+            try {
+                limit = Math.max(1, Math.min(100, Integer.parseInt(rawLimit)));
+            } catch (NumberFormatException e) {
+                json.writeJson(exchange, 400, ApiError.badRequest("Invalid limit: " + rawLimit));
+                return;
+            }
+        }
+        List<Map<String, Object>> runs = runState.listMetricRuns(session.getAlias(), metricId, limit).stream()
+                .map(row -> {
+                    Map<String, Object> item = new LinkedHashMap<String, Object>();
+                    item.put("id", row.id());
+                    item.put("executionId", row.executionId());
+                    item.put("metricRevision", row.metricRevision());
+                    item.put("status", row.status());
+                    item.put("grain", row.grain());
+                    item.put("timeFrom", row.timeFrom());
+                    item.put("timeTo", row.timeTo());
+                    item.put("rowCount", row.rowCount());
+                    item.put("elapsedMs", row.elapsedMs());
+                    item.put("errorSummary", row.errorSummary());
+                    item.put("startedAt", row.startedAt());
+                    return item;
+                })
+                .toList();
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("metricId", metricId);
+        response.put("runs", runs);
+        json.writeOk(exchange, response);
     }
 
     /** 列引用 -> 列 id；解析不出来抛 IllegalArgumentException，由调用方转 400。 */

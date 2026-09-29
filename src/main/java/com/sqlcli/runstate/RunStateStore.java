@@ -33,7 +33,7 @@ public class RunStateStore {
     private static final Logger log = LoggerFactory.getLogger(RunStateStore.class);
 
     /** Bump when adding a migration step to {@link #migrate}. */
-    private static final int SCHEMA_VERSION = 12;
+    private static final int SCHEMA_VERSION = 13;
     /**
      * 版本 2 = JSONL 历史已导入。这个门槛必须和 {@link #SCHEMA_VERSION} 分开：
      * 用后者当门槛的话，每加一次表都会让老库重新导一遍 JSONL，历史直接翻倍。
@@ -217,6 +217,32 @@ public class RunStateStore {
             )""",
             "CREATE INDEX IF NOT EXISTS idx_graph_finding_probe "
                     + "ON graph_finding(probe, target_id)",
+            /*
+             * MetricRun：指标定义真正被消费的一次运行。
+             *
+             * <p>sql_execution 仍然保存“这条 SQL 跑了什么”，这里只保存语义归因：
+             * 哪个指标、基于哪个图谱 revision、什么粒度/时间窗、对应哪条 execution。
+             * 两张表职责分开后，指标健康度不需要再靠反解析 SQL 猜。
+             */
+            """
+            CREATE TABLE IF NOT EXISTS metric_run (
+              id              INTEGER PRIMARY KEY AUTOINCREMENT,
+              alias           TEXT    NOT NULL,
+              metric_id       TEXT    NOT NULL,
+              metric_revision INTEGER,
+              execution_id    INTEGER REFERENCES sql_execution(id),
+              status          TEXT    NOT NULL,
+              grain           TEXT,
+              dimensions      TEXT,
+              time_from       TEXT,
+              time_to         TEXT,
+              row_count       INTEGER,
+              elapsed_ms      INTEGER NOT NULL,
+              error_summary   TEXT,
+              started_at      INTEGER NOT NULL
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_metric_run_metric_started "
+                    + "ON metric_run(alias, metric_id, started_at DESC)",
             /*
              * **agent 与 sql-cli 的每一次交互**，一条命令一行。原名 graph_read，
              * 只记 search / describe / path 三个读动作；v12 扩成全部命令并加上成败。
@@ -403,6 +429,88 @@ public class RunStateStore {
         }
     }
 
+
+    /** 一次指标运行。dimensions 存 JSON 文本，避免为可变数量的维度拆子表。 */
+    public record MetricRunRow(
+            long id,
+            String alias,
+            String metricId,
+            Long metricRevision,
+            Long executionId,
+            String status,
+            String grain,
+            String dimensionsJson,
+            String timeFrom,
+            String timeTo,
+            Long rowCount,
+            long elapsedMs,
+            String errorSummary,
+            long startedAt) {
+    }
+
+    /**
+     * 把一次 SQL 执行归因到指标。审计写入失败不能反过来让已经成功/失败的 SQL 任务改变结果。
+     */
+    public long recordMetricRun(String alias, String metricId, Long metricRevision, long executionId,
+            String status, String grain, List<String> dimensions, String timeFrom, String timeTo,
+            Long rowCount, long elapsedMs, String errorSummary, long startedAt) {
+        if (metricId == null || metricId.isBlank()) return 0L;
+        try (Connection conn = connect();
+             PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO metric_run (alias, metric_id, metric_revision, execution_id, status,"
+                             + " grain, dimensions, time_from, time_to, row_count, elapsed_ms,"
+                             + " error_summary, started_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                     Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, alias);
+            ps.setString(2, metricId);
+            setNullableLong(ps, 3, metricRevision);
+            setNullableLong(ps, 4, executionId > 0 ? executionId : null);
+            ps.setString(5, status);
+            ps.setString(6, grain);
+            ps.setString(7, dimensions == null || dimensions.isEmpty() ? null : toJsonArray(dimensions));
+            ps.setString(8, timeFrom);
+            ps.setString(9, timeTo);
+            setNullableLong(ps, 10, rowCount);
+            ps.setLong(11, elapsedMs);
+            ps.setString(12, errorSummary);
+            ps.setLong(13, startedAt);
+            ps.executeUpdate();
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                return keys.next() ? keys.getLong(1) : 0L;
+            }
+        } catch (Exception e) {
+            log.debug("failed to record metric run for {} {}", alias, metricId, e);
+            return 0L;
+        }
+    }
+
+    /** 最近的指标运行，用于指标详情和健康度计算。 */
+    public List<MetricRunRow> listMetricRuns(String alias, String metricId, int limit) {
+        List<MetricRunRow> result = new ArrayList<>();
+        int safeLimit = Math.max(1, Math.min(limit, 200));
+        try (Connection conn = connect();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT id, alias, metric_id, metric_revision, execution_id, status, grain,"
+                             + " dimensions, time_from, time_to, row_count, elapsed_ms, error_summary, started_at"
+                             + " FROM metric_run WHERE alias = ? AND metric_id = ?"
+                             + " ORDER BY started_at DESC, id DESC LIMIT ?")) {
+            ps.setString(1, alias);
+            ps.setString(2, metricId);
+            ps.setInt(3, safeLimit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(new MetricRunRow(
+                            rs.getLong(1), rs.getString(2), rs.getString(3), nullableLong(rs, 4),
+                            nullableLong(rs, 5), rs.getString(6), rs.getString(7), rs.getString(8),
+                            rs.getString(9), rs.getString(10), nullableLong(rs, 11), rs.getLong(12),
+                            rs.getString(13), rs.getLong(14)));
+                }
+            }
+        } catch (Exception e) {
+            log.debug("failed to list metric runs for {} {}", alias, metricId, e);
+        }
+        return result;
+    }
 
     // ------------------------------------------------------- policy evaluation runs
 

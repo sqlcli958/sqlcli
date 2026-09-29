@@ -56,7 +56,9 @@ public class WorkspaceIndexer {
                 snapshot.getDocuments().add(columnDoc);
             }
         }
-        workspace.getTerms().values().forEach(term -> {
+        workspace.getTerms().values().stream()
+                .filter(term -> term.getStatus() != GraphStatus.ignored)
+                .forEach(term -> {
             WorkspaceIndexDocument doc = WorkspaceIndexDocument.namedDoc(
                     term.getId(), "term", term.getName(), term.getDisplayName(), term.getDescription());
             doc.setAliases(term.getAliases());
@@ -65,7 +67,9 @@ public class WorkspaceIndexer {
             snapshot.getDocuments().add(doc);
         });
         // metric 按同一套模式索引：name/businessName/aliases 命中是它有没有用的前提
-        workspace.getMetrics().values().forEach(metric -> {
+        workspace.getMetrics().values().stream()
+                .filter(metric -> metric.getStatus() != GraphStatus.ignored)
+                .forEach(metric -> {
             WorkspaceIndexDocument doc = WorkspaceIndexDocument.namedDoc(
                     metric.getId(), "metric", metric.getName(), metric.getBusinessName(), null);
             doc.setBusinessName(metric.getBusinessName());

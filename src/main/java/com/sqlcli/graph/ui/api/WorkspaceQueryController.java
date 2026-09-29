@@ -8,6 +8,7 @@ import com.sqlcli.graph.ui.GraphUiSession;
 import com.sqlcli.graph.ui.JsonHttpSupport;
 import com.sqlcli.graph.ui.dto.*;
 import com.sqlcli.graph.ui.service.GraphViewService;
+import com.sqlcli.graph.ui.service.ImpactAnalysisService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import org.slf4j.Logger;
@@ -30,6 +31,7 @@ import java.util.stream.Collectors;
  *   <li>GET /api/search - search</li>
  *   <li>GET /api/graph - graph view</li>
  *   <li>GET /api/lineage - single-column lineage, multi-hop</li>
+ *   <li>GET /api/impact?targetId=... - structured dependency impact before destructive changes</li>
  * </ul>
  */
 public class WorkspaceQueryController implements HttpHandler {
@@ -104,6 +106,8 @@ public class WorkspaceQueryController implements HttpHandler {
                 handleLineageNetworkGraph(exchange);
             } else if ("/api/lineage".equals(path)) {
                 handleLineage(exchange);
+            } else if ("/api/impact".equals(path)) {
+                handleImpact(exchange);
             } else if ("/api/workspace/completeness".equals(path)) {
                 handleWorkspaceCompleteness(exchange);
             } else {
@@ -142,6 +146,15 @@ public class WorkspaceQueryController implements HttpHandler {
         result.put("readOnly", session.isReadOnly());
         result.put("capabilities", List.of("read", "write"));
         json.writeOk(exchange, result);
+    }
+
+    private void handleImpact(HttpExchange exchange) throws IOException {
+        String targetId = json.getParam(json.parseQueryParams(exchange), "targetId", null);
+        if (targetId == null || targetId.isBlank()) {
+            json.writeJson(exchange, 400, ApiError.badRequest("targetId is required"));
+            return;
+        }
+        json.writeOk(exchange, new ImpactAnalysisService().analyze(workspace, targetId));
     }
 
     // --- GET /api/workspace ---

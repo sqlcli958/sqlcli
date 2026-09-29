@@ -4,6 +4,7 @@ import com.sqlcli.graph.workspace.ColumnWorkspaceNode;
 import com.sqlcli.graph.workspace.GraphActor;
 import com.sqlcli.graph.workspace.GraphIds;
 import com.sqlcli.graph.workspace.GraphWorkspace;
+import com.sqlcli.graph.workspace.GraphStatus;
 import com.sqlcli.graph.workspace.MetricRecord;
 import com.sqlcli.graph.workspace.RelationType;
 import com.sqlcli.graph.workspace.RelationWorkspaceEdge;
@@ -149,6 +150,17 @@ class MetricSqlExpanderTest {
         MetricExpansionException ex = assertThrows(MetricExpansionException.class,
                 () -> MetricSqlExpander.expand(workspace, metric, mysql(), request("day", null, null)));
         assertTrue(ex.getMessage().contains("grain.timeColumn"), ex.getMessage());
+    }
+
+    @Test
+    void ignoredMetricCannotBeExpandedByCliOrAnyOtherConsumer() {
+        GraphWorkspace workspace = seedOrdersOnly();
+        MetricRecord metric = metricWithGrainAndExpression();
+        metric.setStatus(GraphStatus.ignored);
+
+        MetricExpansionException ex = assertThrows(MetricExpansionException.class,
+                () -> MetricSqlExpander.expand(workspace, metric, mysql(), request(null, null, null)));
+        assertTrue(ex.getMessage().contains("忽略"), ex.getMessage());
     }
 
     // ------------------------------------------------------------ 报错要点名缺什么

@@ -1,4 +1,5 @@
 import type { SqlColumnDto, SqlCellValue } from '../../types/api';
+import type { WorkbenchSemanticContext } from '../../api/workbench';
 
 /**
  * 写语句关键字。**只用来决定按钮文案和走不走确认面板**——真正的强制在服务端，
@@ -70,15 +71,32 @@ export function downloadCsv(fileName: string, content: string): void {
  * 转义得没法读，刷新一次还会重新填一遍。取一次就清掉。
  */
 const PENDING_SQL_KEY = 'sql-cli-workbench-pending-sql';
+const PENDING_SQL_CONTEXT_KEY = 'sql-cli-workbench-pending-context';
 
-export function stashWorkbenchSql(sql: string): void {
+export function stashWorkbenchSql(sql: string, semanticContext?: WorkbenchSemanticContext): void {
   sessionStorage.setItem(PENDING_SQL_KEY, sql);
+  if (semanticContext) {
+    sessionStorage.setItem(PENDING_SQL_CONTEXT_KEY, JSON.stringify(semanticContext));
+  } else {
+    sessionStorage.removeItem(PENDING_SQL_CONTEXT_KEY);
+  }
 }
 
 export function takeWorkbenchSql(): string | null {
   const sql = sessionStorage.getItem(PENDING_SQL_KEY);
   if (sql !== null) sessionStorage.removeItem(PENDING_SQL_KEY);
   return sql;
+}
+
+export function takeWorkbenchSemanticContext(): WorkbenchSemanticContext | undefined {
+  const raw = sessionStorage.getItem(PENDING_SQL_CONTEXT_KEY);
+  if (raw === null) return undefined;
+  sessionStorage.removeItem(PENDING_SQL_CONTEXT_KEY);
+  try {
+    return JSON.parse(raw) as WorkbenchSemanticContext;
+  } catch {
+    return undefined;
+  }
 }
 
 /** 表详情跳工作台时带的默认语句。 */

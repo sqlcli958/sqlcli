@@ -12,6 +12,7 @@ import com.sqlcli.graph.workspace.GraphWorkspace;
 import com.sqlcli.graph.workspace.GraphWorkspaceStore;
 import com.sqlcli.graph.workspace.MetricRecord;
 import com.sqlcli.graph.workspace.TableWorkspaceNode;
+import com.sqlcli.runstate.RunStateStore;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -104,13 +105,33 @@ class MetricApiTest {
         assertEquals(1, listed.get("metrics").size());
         assertEquals("gmv_paid", listed.get("metrics").get(0).get("name").asText());
 
-        String sql = get("/api/metrics/gmv_paid/sql?grain=day", 200).get("sql").asText();
+        JsonNode expanded = get("/api/metrics/gmv_paid/sql?grain=day", 200);
+        assertEquals(GraphIds.metricId(ALIAS, "gmv_paid"), expanded.get("metricId").asText());
+        assertEquals(store.load(ALIAS).getManifest().getRevision(), expanded.get("revision").asLong());
+        String sql = expanded.get("sql").asText();
         // expression 原样进 SELECT，展开层不改写它（MetricRecord#expression 的类注释写明了
         // 「是否可执行由消费方解析」）——被引号包起来的只有展开层自己拼的表名与时间列
         assertTrue(sql.contains("SUM(app.orders.amount)"), sql);
         assertTrue(sql.contains("DATE(`app`.`orders`.`created_at`)"), sql);
         assertTrue(sql.contains("status IN (2,3)"), sql);
         assertTrue(sql.toUpperCase(java.util.Locale.ROOT).contains("GROUP BY"), sql);
+    }
+
+    @Test
+    void exposesRecentMetricRuns() throws Exception {
+        post(gmvBody(revision()), 200);
+        String metricId = GraphIds.metricId(ALIAS, "gmv_paid");
+        RunStateStore runState = new RunStateStore();
+        long executionId = runState.recordExecution(ALIAS, "SELECT", "SELECT 1", "success",
+                null, null, 6, 1000);
+        runState.recordMetricRun(ALIAS, metricId, revision(), executionId, "success",
+                "day", java.util.List.of(), "2026-09-01", "2026-09-30", 30L, 6, null, 1000);
+
+        JsonNode history = get("/api/metrics/gmv_paid/runs", 200);
+        assertEquals(metricId, history.get("metricId").asText());
+        assertEquals(1, history.get("runs").size());
+        assertEquals(executionId, history.get("runs").get(0).get("executionId").asLong());
+        assertEquals("success", history.get("runs").get(0).get("status").asText());
     }
 
     /**

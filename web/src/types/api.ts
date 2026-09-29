@@ -243,13 +243,13 @@ export interface GraphChangePayloadDto {
   operation: string;
   actor?: string | null;
   baseRevision: number;
-  before?: Record<string, unknown> | null;
-  after?: Record<string, unknown> | null;
+  before?: unknown;
+  after?: unknown;
   /**
    * `apply`（缺省）= 变更还没进图谱，批准时才写；
    * `publish` = 候选边已经在图谱里，批准 = 发布，拒绝 = 转 ignored（没有 before/after）。
    */
-  action?: 'apply' | 'publish' | null;
+  action?: 'apply' | 'publish' | 'policy' | null;
 }
 
 /** 一次图谱更新的可追溯记录（graph_change_log）。 */

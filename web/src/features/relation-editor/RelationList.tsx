@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { deleteRelation } from '../../api/relations';
+import { getImpact, type ImpactReportDto } from '../../api/impact';
 import { onMutationSuccess } from '../../api/mutationHelpers';
 import { useDeleteConfirm } from '../../api/useDeleteConfirm';
 import { useSessionStore } from '../../state/sessionStore';
@@ -133,6 +134,24 @@ function RelationGroup({
   const [editingId, setEditingId] = useState<string | null>(null);
   const remove = useDeleteConfirm((id) => deleteRelation(id, revision, '手动删除'), onRefresh);
   const { deletingId, confirmId: deleteConfirmId, error: deleteError } = remove;
+  const [impactReport, setImpactReport] = useState<ImpactReportDto | null>(null);
+  const [impactLoading, setImpactLoading] = useState(false);
+
+  const askDelete = useCallback((id: string) => {
+    remove.ask(id);
+    setImpactReport(null);
+    setImpactLoading(true);
+    void getImpact(id)
+      .then(setImpactReport)
+      .catch(() => setImpactReport(null))
+      .finally(() => setImpactLoading(false));
+  }, [remove]);
+
+  const cancelDelete = useCallback(() => {
+    remove.cancel();
+    setImpactReport(null);
+    setImpactLoading(false);
+  }, [remove]);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -296,7 +315,22 @@ function RelationGroup({
                         />
                         {isConfirming ? (
                           <span className="relation-list-confirm-delete">
-                            <span>确认删除？</span>
+                            <span>
+                              {impactLoading
+                                ? '正在检查影响…'
+                                : impactReport && impactReport.breaking > 0
+                                  ? `确认删除？将影响 ${impactReport.breaking} 个依赖对象`
+                                  : '确认删除？'}
+                            </span>
+                            {impactReport && impactReport.breaking > 0 && (
+                              <span title={impactReport.impacts.map((item) =>
+                                `${item.kind}: ${item.label || item.id}（${item.dependency}）`).join('\n')}>
+                                {impactReport.impacts.slice(0, 3)
+                                  .map((item) => item.label || item.id)
+                                  .join('、')}
+                                {impactReport.impacts.length > 3 ? '…' : ''}
+                              </span>
+                            )}
                             <Button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -311,7 +345,7 @@ function RelationGroup({
                             <Button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                remove.cancel();
+                                cancelDelete();
                               }}
                               disabled={isDeleting}
                               size="sm"
@@ -326,7 +360,7 @@ function RelationGroup({
                             disabled={isDeleting}
                             onClick={(e) => {
                               e.stopPropagation();
-                              remove.ask(rel.id);
+                              askDelete(rel.id);
                             }}
                           />
                         )}

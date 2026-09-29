@@ -24,10 +24,10 @@ public class WorkspaceSearchEngine {
             }
         }
         for (MetricRecord metric : workspace.getMetrics().values()) {
-            addMetricResult(results, keyword, metric);
+            if (metric.getStatus() != GraphStatus.ignored) addMetricResult(results, keyword, metric);
         }
         for (TermWorkspaceNode term : workspace.getTerms().values()) {
-            addTermResult(results, keyword, term);
+            if (term.getStatus() != GraphStatus.ignored) addTermResult(results, keyword, term);
         }
         results.sort(Comparator.comparingDouble(SearchResult::getScore).reversed()
                 .thenComparing(SearchResult::getId));

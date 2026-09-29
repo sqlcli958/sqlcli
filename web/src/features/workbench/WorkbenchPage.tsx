@@ -7,7 +7,7 @@ import { getValidationIssues } from '../../api/validation';
 import { getIndexStatus } from '../../api/indexApi';
 import { navPath } from '../../app/navigation';
 import { SqlEditor } from './SqlEditor';
-import { takeWorkbenchSql } from './workbenchSql';
+import { takeWorkbenchSemanticContext, takeWorkbenchSql } from './workbenchSql';
 import './workbench.css';
 import { buttonClass } from '../../ui/Button';
 import { StatusDot, type Tone } from '../../ui/StatusDot';
@@ -100,7 +100,14 @@ function SourceDirectory() {
 function WorkspaceBoard({ alias }: { alias: string }) {
   // 跨页送进来的 SQL（表详情的「在工作台查询」）只在首次渲染时取一次，取完就清。
   const [sql, setSql] = useState(() => takeWorkbenchSql() ?? '');
+  const [semanticContext, setSemanticContext] = useState(() => takeWorkbenchSemanticContext());
   const editorRef = useRef<HTMLTextAreaElement>(null);
+
+  const changeSql = (next: string) => {
+    setSql(next);
+    // 用户一旦改了从指标页带来的 SQL，就不能再把它算作“原指标定义的一次运行”。
+    setSemanticContext(undefined);
+  };
 
   const aliases = useQuery({
     queryKey: ['aliases'],
@@ -147,7 +154,8 @@ function WorkspaceBoard({ alias }: { alias: string }) {
           alias={alias}
           aliasInfo={current}
           sql={sql}
-          onSqlChange={setSql}
+          onSqlChange={changeSql}
+          semanticContext={semanticContext}
           textareaRef={editorRef}
         />
       </div>
@@ -177,7 +185,8 @@ function WorkspaceBoard({ alias }: { alias: string }) {
           alias={alias}
           aliasInfo={current}
           sql={sql}
-          onSqlChange={setSql}
+          onSqlChange={changeSql}
+          semanticContext={semanticContext}
           textareaRef={editorRef}
         />
       </div>
@@ -206,7 +215,8 @@ function WorkspaceBoard({ alias }: { alias: string }) {
         alias={alias}
         aliasInfo={current}
         sql={sql}
-        onSqlChange={setSql}
+        onSqlChange={changeSql}
+          semanticContext={semanticContext}
         textareaRef={editorRef}
       />
 
