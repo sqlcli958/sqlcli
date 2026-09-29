@@ -10,12 +10,13 @@
  */
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   createPolicyRuleSet, deletePolicyRuleSet, getPolicyRuleSets, setPolicyRuleSetBinding, updatePolicyRuleSet,
 } from '../../api/policyRules';
 import { getSession } from '../../api/session';
 import { queryClient } from '../../api/queryClient';
+import { navPath } from '../../app/navigation';
 import { useSessionStore } from '../../state/sessionStore';
 import type { PolicyRuleDto, PolicyRuleSetDto } from '../../types/api';
 import { ActionIcon } from '../../ui/ActionIcon';
@@ -86,6 +87,7 @@ export function RulesPage() {
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [draft, setDraft] = useState<PolicyRuleSetDto | null>(null);
   const [ruleIndex, setRuleIndex] = useState(0);
+  const [pendingApprovalId, setPendingApprovalId] = useState<number | null>(null);
 
   useEffect(() => {
     if (isConnected) return;
@@ -105,27 +107,39 @@ export function RulesPage() {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['policy-rules', alias] });
   const save = useMutation({
-    mutationFn: () => {
-      const payload = activeStored
-        ? { ...draft!, version: String((Number(draft!.version) || 0) + 1) }
-        : draft!;
-      return activeStored
-        ? updatePolicyRuleSet(activeFile!, payload)
-        : createPolicyRuleSet(activeFile!, payload);
+    mutationFn: () => activeStored
+      ? updatePolicyRuleSet(activeFile!, draft!, 'Web 修改规则口径')
+      : createPolicyRuleSet(activeFile!, draft!, 'Web 新建规则口径'),
+    onSuccess: (result) => {
+      setPendingApprovalId(result.applied ? null : result.approvalId);
+      if (result.applied && result.ruleSet) setDraft(result.ruleSet);
+      if (result.applied) refresh();
     },
-    onSuccess: (saved) => { setDraft(saved.ruleSet); refresh(); },
   });
   const binding = useMutation({
-    mutationFn: ({ name, enabled }: { name: string; enabled: boolean }) => setPolicyRuleSetBinding(name, enabled),
-    onSuccess: refresh,
+    mutationFn: ({ name, enabled }: { name: string; enabled: boolean }) =>
+      setPolicyRuleSetBinding(name, enabled, enabled ? 'Web 启用规则校验' : 'Web 停用规则校验'),
+    onSuccess: (result) => {
+      setPendingApprovalId(result.applied ? null : result.approvalId);
+      if (result.applied) refresh();
+    },
   });
   /** 分组固定，删文件只发生在删掉最后一条规则时——规则集至少要有一条规则才合法。 */
   const removeFile = useMutation({
     mutationFn: deletePolicyRuleSet,
-    onSuccess: () => { setDraft(null); setActiveFile(null); setView('catalog'); refresh(); },
+    onSuccess: (result) => {
+      setPendingApprovalId(result.applied ? null : result.approvalId);
+      if (result.applied) {
+        setDraft(null);
+        setActiveFile(null);
+        setView('catalog');
+        refresh();
+      }
+    },
   });
 
   function select(group: Group, index: number | null) {
+    setPendingApprovalId(null);
     const existing = stored(group)?.ruleSet;
     setActiveFile(group.fileName);
     // id / title 归分组管，旧文件里的值下次保存时一并规范化
@@ -136,6 +150,7 @@ export function RulesPage() {
     setView(index === null && !existing?.rules.length ? 'add-rule' : 'rule');
   }
   function patchRule(next: PolicyRuleDto) {
+    setPendingApprovalId(null);
     setDraft((current) => current && ({
       ...current, rules: current.rules.map((rule, i) => (i === ruleIndex ? next : rule)),
     }));
@@ -273,7 +288,14 @@ export function RulesPage() {
             size="sm"
           >{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>
         </div>
+        {pendingApprovalId != null && (
+          <p className="rules-prefill" role="status">
+            规则变更已提交审批 #{pendingApprovalId}，批准后才会生效。
+            {alias && <Link to={navPath('reviews', alias)}>去评审</Link>}
+          </p>
+        )}
         {save.isError && <p className="rules-error" role="alert">保存失败：{save.error.message}</p>}
+        {binding.isError && <p className="rules-error" role="alert">启停失败：{binding.error.message}</p>}
         {removeFile.isError && <p className="rules-error" role="alert">删除失败：{removeFile.error.message}</p>}
 
         {view === 'add-rule' && (() => {
