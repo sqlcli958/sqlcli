@@ -136,7 +136,7 @@ export function EvalPage() {
       <header className="eval-head">
         <h1>评估</h1>
         <Button size="sm" onClick={() => run.mutate()} disabled={run.isPending}>
-          {run.isPending ? '评估中…' : '修复后复评'}
+          {run.isPending ? '评估中…' : '跑一次评估'}
         </Button>
       </header>
       <p className="eval-empty">
@@ -202,7 +202,7 @@ export function EvalPage() {
         {current.elapsedMs != null && <span className="eval-meta">耗时 {current.elapsedMs} ms</span>}
         <Button size="sm" variant="ghost" onClick={() => run.mutate()} disabled={run.isPending}
           title="按当前图谱再算一次；跟 sql-cli <alias> schema eval 是同一个评估器">
-          {run.isPending ? '评估中…' : '跑一次评估'}
+          {run.isPending ? '评估中…' : '修复后复评'}
         </Button>
         {run.isError && <span className="eval-meta" role="alert">评估失败：{run.error.message}</span>}
       </header>
