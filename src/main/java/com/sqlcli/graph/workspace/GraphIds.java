@@ -47,6 +47,11 @@ public final class GraphIds {
         }
     }
 
+    /** 术语 id 由 name 决定；同名 add-term 是幂等 upsert。 */
+    public static String termId(String alias, String name) {
+        return "term:" + alias + ":" + name;
+    }
+
     /**
      * 指标 id 由 name 决定（同 {@link TermWorkspaceNode} 的做法），不是内容哈希：
      * name 就是指标的稳定标识，同名重写是有意的幂等 upsert，不应该因为改了一个字就变成新对象。
