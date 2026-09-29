@@ -114,6 +114,7 @@ public class SchemaActionCommand implements Runnable {
     private String aliasesCsv;
     private String negativeAliasesCsv;
     private String mappedRefsCsv;
+    private String termMetricsCsv;
     private String primaryTargetRef;
     private List<String> termFilters = new ArrayList<>();
     private String targetRef;
@@ -369,7 +370,7 @@ public class SchemaActionCommand implements Runnable {
                     示例:
                       sql-cli %s schema list
                       sql-cli %s schema list --json
-                    """.formatted(a, a, a);
+                    """.formatted(a, a, a, a);
             case "describe" -> """
                     用途: 查看一张表的字段、主键、注释、行数以及关联关系。候选关系带 [候选] 前缀。
                     用法: sql-cli %s schema describe <schema.table> [--column C] [--refresh-row-count] [--json]
@@ -2575,6 +2576,20 @@ public class SchemaActionCommand implements Runnable {
                         if (primaryTargetId == null) throw new IllegalArgumentException(
                                 "Unable to resolve primary target: " + primaryTargetRef);
                     }
+                    List<String> metricIds = new ArrayList<>();
+                    if (termMetricsCsv != null) {
+                        for (String ref : csvValues(termMetricsCsv)) {
+                            String metricId = ref.startsWith("metric:") ? ref : GraphIds.metricId(alias, ref);
+                            MetricRecord metric = current.getMetrics().get(metricId);
+                            if (metric == null) {
+                                throw new IllegalArgumentException("Metric not found (--metrics): " + ref);
+                            }
+                            if (metric.getStatus() == GraphStatus.ignored) {
+                                throw new IllegalArgumentException("Metric is ignored (--metrics): " + ref);
+                            }
+                            metricIds.add(metricId);
+                        }
+                    }
                     String id = "term:" + alias + ":" + termName;
                     TermWorkspaceNode term = current.getTerms().computeIfAbsent(id,
                             ignored -> TermWorkspaceNode.create(alias, termName, GraphActor.agent));
@@ -2584,6 +2599,7 @@ public class SchemaActionCommand implements Runnable {
                     // filters 整体替换而不是追加：它是一组共同成立的条件，追加会把上一次
                     // 写错的条件永久留在里面，而且没有删除入口。不给 --filter 就不动。
                     if (!termFilters.isEmpty()) term.setFilters(new ArrayList<>(termFilters));
+                    if (termMetricsCsv != null) term.setMetricRefs(new ArrayList<>(metricIds));
                     mergeCsv(term.getAliases(), aliasesCsv);
                     mergeCsv(term.getNegativeAliases(), negativeAliasesCsv);
                     // 新建的映射边必须报给 MutationOutcome。开了图谱审批时，暂存走的是
@@ -2605,7 +2621,7 @@ public class SchemaActionCommand implements Runnable {
     }
 
     /**
-     * 这次调用之后，这条术语会不会「同义词、映射」两样全空。
+     * 这次调用之后，这条术语会不会「同义词、映射、指标绑定」三样全空。
      *
      * <p>看的是**合并后的结果**而不是本次入参：给一条已经挂了映射的术语补 `--display-name`
      * 是正当的，不该被拦。{@code description} 不参与判断——见 {@link #addTerm} 里的注释。
@@ -2613,9 +2629,11 @@ public class SchemaActionCommand implements Runnable {
     private boolean isShellTerm(GraphWorkspace workspace) {
         if (!csvValues(aliasesCsv).isEmpty()) return false;
         if (!csvValues(mappedRefsCsv).isEmpty()) return false;
+        if (termMetricsCsv != null && !csvValues(termMetricsCsv).isEmpty()) return false;
         TermWorkspaceNode existing = workspace.getTerms().get("term:" + alias + ":" + termName);
         if (existing == null) return true;
         return existing.getAliases().isEmpty()
+                && existing.getMetricRefs().isEmpty()
                 && workspace.getRelations().stream().noneMatch(edge ->
                         edge.getType() == RelationType.term_mapping
                                 && edge.getFrom().equals(existing.getId()));
@@ -4870,6 +4888,10 @@ public class SchemaActionCommand implements Runnable {
 
     public void setMappedRefsCsv(String mappedRefsCsv) {
         this.mappedRefsCsv = mappedRefsCsv;
+    }
+
+    public void setTermMetricsCsv(String termMetricsCsv) {
+        this.termMetricsCsv = termMetricsCsv;
     }
 
     public void setTargetRef(String targetRef) {
