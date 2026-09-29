@@ -732,7 +732,7 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
       )}
       {!isLoading && graphData && graphData.nodes.length > 500 && (
         <div className="graph-canvas-hint">
-          关联表优先 · 无关系表单独排列 · 悬停或放大查看表名
+          关联结构优先 · 无关系表右侧收纳 · 悬停或放大查看表名
         </div>
       )}
       {!isLoading && !graphData && (
