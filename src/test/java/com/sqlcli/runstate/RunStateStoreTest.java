@@ -353,6 +353,29 @@ class RunStateStoreTest {
                 "demo", null, null, null, "qm_pct"));
     }
 
+    @Test
+    void recordsMetricRunWithExecutionAndSemanticRevision(@TempDir Path dir) {
+        RunStateStore store = store(dir);
+        long executionId = store.recordExecution("demo", "SELECT", "SELECT 1", "success",
+                null, null, 8, 1000);
+
+        long runId = store.recordMetricRun(
+                "demo", "metric:demo:gmv_paid", 7L, executionId, "success",
+                "day", List.of("column:demo:app.orders.channel"),
+                "2026-09-01", "2026-09-30", 30L, 8, null, 1000);
+
+        assertTrue(runId > 0);
+        List<RunStateStore.MetricRunRow> runs =
+                store.listMetricRuns("demo", "metric:demo:gmv_paid", 20);
+        assertEquals(1, runs.size());
+        RunStateStore.MetricRunRow run = runs.get(0);
+        assertEquals(executionId, run.executionId());
+        assertEquals(7L, run.metricRevision());
+        assertEquals("day", run.grain());
+        assertEquals(30L, run.rowCount());
+        assertEquals("success", run.status());
+    }
+
     // --------------------------------------------------------------- graph_read
 
     /**
