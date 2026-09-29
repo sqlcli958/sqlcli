@@ -345,7 +345,7 @@ function RelationGroup({
                             <Button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                remove.cancel();
+                                cancelDelete();
                               }}
                               disabled={isDeleting}
                               size="sm"
