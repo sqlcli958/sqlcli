@@ -2,7 +2,15 @@ package com.sqlcli.graph.ui.api;
 
 import com.sqlcli.config.DatabaseConfig;
 import com.sqlcli.connection.QueryExecutionOptions;
+import com.sqlcli.graph.workspace.GraphIds;
+import com.sqlcli.graph.workspace.GraphStatus;
+import com.sqlcli.graph.workspace.GraphWorkspace;
 import com.sqlcli.graph.workspace.GraphWorkspaceStore;
+import com.sqlcli.graph.workspace.MetricRecord;
+import com.sqlcli.graph.workspace.TermWorkspaceNode;
+import com.sqlcli.metric.MetricSqlExpander;
+import com.sqlcli.metric.MetricSqlRequest;
+import com.sqlcli.strategy.DatabaseStrategies;
 import com.sqlcli.graph.ui.JsonHttpSupport;
 import com.sqlcli.task.Precheck;
 import com.sqlcli.task.SqlTaskCancelRegistry;
@@ -76,16 +84,88 @@ public class WorkbenchExecuteController {
             }
             boolean dryRun = request.dryRun != null && request.dryRun;
 
+            SqlTaskRequest.SemanticContext semanticContext =
+                    validateSemanticContext(alias, sql, request.semanticContext);
             SqlTaskResult result = taskModule.execute(new SqlTaskRequest(config, sql,
                     QueryExecutionOptions.forAlias(config, "json", Set.of(), false),
                     SqlTaskRequest.Origin.ui_workbench, null, null, null, dryRun,
-                    request.cancelToken, request.semanticContext));
+                    request.cancelToken, semanticContext));
             Map<String, Object> body = toBody(result);
             body.put("columnMeta", columnMeta(alias, sql, result));
             json.writeOk(exchange, body);
         } catch (Exception e) {
             json.writeError(exchange, e);
         }
+    }
+
+    /**
+     * semanticContext 是审计归因，不是一个可随便贴的客户端标签。
+     *
+     * <p>执行前用当前图谱重新展开一次 SQL：metric 必须存在且可用；term（如果有）必须存在、
+     * 没被 ignored，并且显式绑定该 metric；最终 SQL 必须与客户端提交的 SQL 完全一致。
+     * 这样才能保证 MetricRun 的“这次运行属于哪个指标/场景”是真的，而不是伪造或陈旧上下文。
+     */
+    private SqlTaskRequest.SemanticContext validateSemanticContext(
+            String alias, String sql, SqlTaskRequest.SemanticContext context) throws Exception {
+        if (context == null) return null;
+        if (workspaceStore == null || !workspaceStore.exists(alias)) {
+            throw new IllegalArgumentException("semanticContext requires an imported graph workspace");
+        }
+        if (context.metricId() == null || context.metricId().isBlank()) {
+            throw new IllegalArgumentException("semanticContext.metricId is required");
+        }
+
+        GraphWorkspace workspace = workspaceStore.load(alias);
+        MetricRecord metric = workspace.getMetrics().get(context.metricId());
+        if (metric == null || metric.getStatus() == GraphStatus.ignored) {
+            throw new IllegalArgumentException("Metric not found or ignored: " + context.metricId());
+        }
+
+        TermWorkspaceNode term = null;
+        if (context.termId() != null && !context.termId().isBlank()) {
+            term = workspace.getTerms().get(context.termId());
+            if (term == null || term.getStatus() == GraphStatus.ignored) {
+                throw new IllegalArgumentException("Term scenario not found or ignored: " + context.termId());
+            }
+            if (!term.getMetricRefs().contains(metric.getId())) {
+                throw new IllegalArgumentException(
+                        "Metric is not bound to term scenario: " + term.getName() + " -> " + metric.getName());
+            }
+        }
+
+        List<String> dimensions = new java.util.ArrayList<>();
+        for (String ref : context.dimensions() == null ? List.<String>of() : context.dimensions()) {
+            String id = workspace.resolveColumnId(alias, ref);
+            if (id == null) {
+                throw new IllegalArgumentException("Unknown semanticContext dimension: " + ref);
+            }
+            dimensions.add(id);
+        }
+
+        String dbType = workspace.getDataSource() == null ? null : workspace.getDataSource().getDbType();
+        String expected = MetricSqlExpander.expand(
+                workspace,
+                metric,
+                DatabaseStrategies.resolve(dbType),
+                new MetricSqlRequest(
+                        context.grain(),
+                        context.timeFrom(),
+                        context.timeTo(),
+                        dimensions,
+                        term == null ? List.of() : term.getFilters()));
+        if (!expected.strip().equals(sql.strip())) {
+            throw new IllegalArgumentException(
+                    "semanticContext does not match SQL; re-expand the metric before executing");
+        }
+
+        return new SqlTaskRequest.SemanticContext(
+                metric.getId(),
+                context.metricRevision(),
+                term == null ? null : term.getId(),
+                context.grain(),
+                List.copyOf(dimensions),
+                context.timeFrom(),
+                context.timeTo());
     }
 
     /**
