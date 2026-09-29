@@ -299,7 +299,10 @@ public class RunStateStore {
      * 表现成「每次写审批都报 no such column」。踩过一次，别再往 DDL 里加这种索引。
      */
     private static final String[] POST_MIGRATION_DDL = {
-            "CREATE INDEX IF NOT EXISTS idx_approval_batch ON approval_request(batch_id, seq)"
+            "CREATE INDEX IF NOT EXISTS idx_approval_batch ON approval_request(batch_id, seq)",
+            // term_id 是 v14 才补给老库的列，所以索引必须等 ADDED_COLUMNS 之后再建。
+            "CREATE INDEX IF NOT EXISTS idx_metric_run_term_started "
+                    + "ON metric_run(alias, metric_id, term_id, started_at DESC)"
     };
 
     /**
