@@ -36,10 +36,10 @@ class WorkspaceValidatorTermMetricTest {
         new WorkspaceValidator().validate(workspace);
 
         assertTrue(workspace.getValidationIssues().stream().anyMatch(issue ->
-                "dangling_term_metric".equals(issue.getRule())
+                "dangling_term_metric".equals(issue.getCode())
                         && active.getId().equals(issue.getTargetId())));
         assertTrue(workspace.getValidationIssues().stream().anyMatch(issue ->
-                "term_metric_ignored".equals(issue.getRule())
+                "term_metric_ignored".equals(issue.getCode())
                         && active.getId().equals(issue.getTargetId())));
         assertFalse(workspace.getValidationIssues().stream().anyMatch(issue ->
                 rejected.getId().equals(issue.getTargetId())),
