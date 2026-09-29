@@ -160,7 +160,7 @@ public class WorkbenchExecuteController {
 
         return new SqlTaskRequest.SemanticContext(
                 metric.getId(),
-                context.metricRevision(),
+                workspace.getManifest() == null ? null : workspace.getManifest().getRevision(),
                 term == null ? null : term.getId(),
                 context.grain(),
                 List.copyOf(dimensions),
