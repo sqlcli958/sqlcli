@@ -148,7 +148,7 @@ function RelationGroup({
   }, [remove]);
 
   const cancelDelete = useCallback(() => {
-    cancelDelete();
+    remove.cancel();
     setImpactReport(null);
     setImpactLoading(false);
   }, [remove]);
