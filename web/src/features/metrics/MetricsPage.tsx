@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
 import { columnRef, expandMetricSql, getMetricRuns, getMetrics, upsertMetric } from '../../api/metrics';
@@ -123,9 +123,12 @@ export function MetricsPage() {
   // 字段，服务端已经在返回，类型跟着断言一下（详见 api/metrics.ts 里 RatioMetricDto 的注释）。
   const metrics = (list.data?.metrics ?? []) as RatioMetricDto[];
   const term = termId ? terms.data?.terms.find((item) => item.id === termId) ?? null : null;
-  const visibleMetrics = term
-    ? metrics.filter((metric) => term.metricRefs.includes(metric.id))
-    : termId && terms.isSuccess ? [] : metrics;
+  const visibleMetrics = useMemo(
+    () => termId
+      ? (term ? metrics.filter((metric) => term.metricRefs.includes(metric.id)) : [])
+      : metrics,
+    [metrics, term, termId],
+  );
 
   useEffect(() => {
     if (!targetId || !visibleMetrics.some((metric) => metric.id === targetId)) return;
