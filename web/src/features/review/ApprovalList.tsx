@@ -1,5 +1,6 @@
 import { Fragment, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   decideApproval, decideBatch, getApprovalDetail, getApprovals,
 } from '../../api/approvals';
@@ -9,6 +10,7 @@ import { FilterBar } from '../../ui/FilterBar';
 import { Pagination } from '../../ui/Pagination';
 import { Select } from '../../ui/Select';
 import { StatusDot } from '../../ui/StatusDot';
+import { navPath } from '../../app/navigation';
 import type {
   ApprovalBatchDto,
   ApprovalDto,
@@ -251,13 +253,19 @@ export function ApprovalList({
         <p className="review-alert" role="alert">加载失败：{list.error.message}</p>
       )}
       {list.isSuccess && items.length === 0 && (
-        <p className="review-hint">
-          {filtered
-            ? '没有符合条件的记录。'
-            : live
-              ? '没有待审批的操作。要让操作停在这里等放行，去设置页给数据源打开查询 / 更新 / 图谱审批。'
-              : '还没有审批记录。'}
-        </p>
+        <div className="review-empty-state" role="status">
+          <strong>{filtered ? '没有符合条件的记录' : live ? '当前没有待审批的操作' : '还没有审批记录'}</strong>
+          {live ? (
+            <>
+              <p>为数据源开启查询、更新或图谱审批后，待放行的操作会显示在这里。</p>
+              <Link className="review-empty-action" to={navPath('settings', alias ?? null)}>配置审批策略</Link>
+            </>
+          ) : filtered ? (
+            <p>调整筛选条件，或使用上方的清除筛选。</p>
+          ) : (
+            <p>审批通过或拒绝后，处理记录会保留在这里。</p>
+          )}
+        </div>
       )}
 
       <div className="review-list" data-stale={list.isPlaceholderData || undefined}>
@@ -321,6 +329,7 @@ function BatchCard({ batch, items }: { batch: ApprovalBatchDto; items: ApprovalD
   // 存选中集就要在每次刷新后跟数据对账，存排除集不用——没排除的天然是选中
   const [excluded, setExcluded] = useState<Set<number>>(new Set());
   const pending = items.filter((item) => item.status === 'pending');
+  const rejected = items.filter((item) => item.status === 'rejected').length;
   const decidable = batch.status === 'pending' && pending.length > 0;
   const willApprove = pending.filter((item) => !excluded.has(item.id));
   const willReject = pending.filter((item) => excluded.has(item.id));
@@ -369,7 +378,7 @@ function BatchCard({ batch, items }: { batch: ApprovalBatchDto; items: ApprovalD
         <span className="review-batch-count">{items.length} 条</span>
       </button>
       <p className="review-batch-meta">
-        {items.length !== pending.length && <span>已否 {items.length - pending.length} 条</span>}
+        {rejected > 0 && <span>已否 {rejected} 条</span>}
         <Provenance item={items[0]} />
         {!batch.recoverable && <span className="review-batch-warn">本批不可回滚（含 DDL）</span>}
       </p>
@@ -471,13 +480,13 @@ function BatchItem({
           />
         )}
         <span className="review-id">#{item.id}</span>
-        <code className="review-summary">
-          {kind === 'graph' ? (graphTarget ? objectLabel(graphTarget) : '图谱变更') : item.summary}
-        </code>
         {!pending && (
           <span className="review-status">{STATUS_LABEL[item.status] ?? item.status}</span>
         )}
         <TaskOutcome item={item} />
+        <code className="review-summary">
+          {kind === 'graph' ? (graphTarget ? objectLabel(graphTarget) : '图谱变更') : item.summary}
+        </code>
       </div>
       {kind === 'graph' && (
         <div className="review-card-actions">

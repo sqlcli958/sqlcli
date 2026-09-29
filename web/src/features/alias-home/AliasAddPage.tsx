@@ -150,19 +150,19 @@ export function AliasAddPage({ onDone, editName }: { onDone: () => void; editNam
   };
 
   return (
-    <main className="alias-add-page">
+    <section className="alias-add-page">
       <form className="alias-form" onSubmit={submit}>
         <header className="alias-form-header">
           <Button
             aria-label="返回数据源列表"
             title="返回数据源列表"
             onClick={onDone}
-            size="sm"
-            icon
+            className="alias-back-button"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M19 12H5m7 7-7-7 7-7" />
             </svg>
+            <span>返回数据源</span>
           </Button>
           <h1>{editName ?? '新建数据源'}</h1>
           {editName && <span className="alias-form-tag">编辑</span>}
@@ -369,7 +369,7 @@ export function AliasAddPage({ onDone, editName }: { onDone: () => void; editNam
           </Button>
         </div>
       </form>
-    </main>
+    </section>
   );
 }
 

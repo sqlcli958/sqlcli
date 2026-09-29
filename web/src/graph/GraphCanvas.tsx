@@ -9,7 +9,7 @@ import { getRelation } from '../api/relations';
 import { RelationEditor } from '../features/relation-editor/RelationEditor';
 import { RelationTypeBadge } from '../features/relation-editor/RelationTypeBadge';
 import type { GraphViewDto, MutationResultDto, RelationEdgeDto } from '../types/api';
-import { adaptGraph, highlightNodeNeighbors, resetHighlight } from './graphAdapter';
+import { adaptGraph, highlightNodeNeighbors, resetHighlight, SMALL_GRAPH } from './graphAdapter';
 import { useGraphStore } from '../state/graphStore';
 
 interface GraphCanvasProps {
@@ -41,18 +41,11 @@ interface RadialField {
   center: Point;
 }
 
-/**
- * 小图的判据：节点少到「屏幕上每个点都值得看」。
- *
- * <p>超过这个数就有大量孤立表被排到外围的环上，把视野撑到能装下它们，
- * 真正相连的那一簇会缩成一个点——现有布局特意避开的就是这件事。
- */
-const SMALL_GRAPH = 60;
-
 const GRAPH_THEME = {
   dark: {
     label: '#e8f7ff',
     mutedEdge: '#6f8ea8',
+    overviewEdge: '#475569',
     edges: {
       foreign_key: '#65d8ff',
       join_observed: '#ffc266',
@@ -62,6 +55,7 @@ const GRAPH_THEME = {
   light: {
     label: '#173047',
     mutedEdge: '#94a3b8',
+    overviewEdge: '#c4ced8',
     edges: {
       foreign_key: '#087ea4',
       join_observed: '#b45309',
@@ -90,22 +84,17 @@ function getLayoutSettings(nodeCount: number) {
   };
 }
 
-/**
- * 把视野收到正好装下所有节点。
- *
- * <p>不做这一步的话，从全库切到一个十来张表的场景时相机还停在原来的位置和缩放上，
- * 结果是「点变少了，但更难看了」——要么散在屏幕四角，要么小得看不清。
- *
- * <p>**只对小图做。** 大图上相机复位会把最外圈的孤立表也纳入视野，
- * 真正相连的那一簇反而缩成一个点——现有布局特意避开的就是这件事。
- */
+/** 小图看全图；稀疏图先看关联区，孤立表仍可缩远查看。 */
 function fitToNodes(sigma: Sigma, graph: Graph): void {
-  if (graph.order === 0 || graph.order > SMALL_GRAPH) return;
+  const focusConnected = graph.order > SMALL_GRAPH &&
+    graph.getAttribute('layout') === 'grouped' && graph.size > 0;
+  if (graph.order === 0 || (graph.order > SMALL_GRAPH && !focusConnected)) return;
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
-  graph.forEachNode((_, attrs) => {
+  graph.forEachNode((node, attrs) => {
+    if (focusConnected && graph.degree(node) === 0) return;
     const x = Number(attrs.x);
     const y = Number(attrs.y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -115,14 +104,23 @@ function fitToNodes(sigma: Sigma, graph: Graph): void {
     maxY = Math.max(maxY, y);
   });
   if (!Number.isFinite(minX) || !Number.isFinite(minY)) return;
-  // 只把相机拉回默认位置，**不要用 setCustomBBox**。Sigma 每次 refresh 本来就按当前
-  // 节点重算归一化范围，默认相机（0.5, 0.5, ratio 1）已经正好装下整张图；
-  // 再叠一个自定义包围盒不但多余，还会把标签整层画没——实测筛选态标签 0 像素、
-  // 不筛 10749 像素，差别就在这一句。
+  // 不用 setCustomBBox：Sigma 每次 refresh 会按当前节点重算归一化范围，
+  // 自定义包围盒会让小图的标签整层消失。
   // **必须在动画回调里 refresh。** 相机动画期间 Sigma 不画标签，动画结束时也不会自己
   // 补一帧——结果是一屏没有名字的圆点，而节点数据里标签、尺寸、可见性全都是对的
   // （实测：refresh 之前标签 0 像素，调一次就有 1712）。
-  sigma.getCamera().animate({ x: 0.5, y: 0.5, ratio: 1 }, { duration: 320 }, () => sigma.refresh());
+  if (focusConnected) {
+    const a = sigma.viewportToFramedGraph(sigma.graphToViewport({ x: minX, y: minY }));
+    const b = sigma.viewportToFramedGraph(sigma.graphToViewport({ x: maxX, y: maxY }));
+    const { width, height } = sigma.getDimensions();
+    // 关联区占画布约七成，避免全库孤立表把关系缩成一个点。
+    const ratio = Math.max(0.03,
+      Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y) * width / height) * 0.7);
+    sigma.getCamera().animate({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, ratio },
+      { duration: 320 }, () => sigma.refresh());
+    return;
+  }
+  sigma.getCamera().animate({ x: 0.5, y: 0.5, ratio: 1.18 }, { duration: 320 }, () => sigma.refresh());
 }
 
 function getLayoutDuration(nodeCount: number): number {
@@ -137,6 +135,7 @@ function shouldRunForceLayout(graph: Graph): boolean {
   if (graph.order <= SMALL_GRAPH || graph.order < 2 || graph.size === 0) {
     return false;
   }
+  if (graph.getAttribute('layout') === 'grouped') return false;
   const connectedNodeCount = graph.nodes().filter((node) => graph.degree(node) > 0).length;
   return connectedNodeCount / graph.order >= 0.5;
 }
@@ -270,6 +269,8 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
   }, []);
 
   const clearOverlayState = useCallback(() => {
+    sourceTableIdRef.current = null;
+    targetTableIdRef.current = null;
     setSourceTableId(null);
     resetRelationComposer();
   }, [resetRelationComposer]);
@@ -293,6 +294,7 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
     // Build graphology graph from API data
     const graph = adaptGraph(graphData);
     graphRef.current = graph;
+    const grouped = graph.getAttribute('layout') === 'grouped';
 
     // Create sigma renderer
     const sigma = new Sigma(graph, sigmaHostRef.current, {
@@ -306,26 +308,33 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
       // 不存在这个问题，照搬只会得到一屏没有名字的圆点——点变少了反而更难看
       // 这三个阈值是给几百个点防标签互相打架用的；小图（按场景筛出来的十来张表）
       // 没这个问题，放开能让每张表都带上名字
-      labelDensity: graph.order <= SMALL_GRAPH ? 1.5 : 0.6,
-      labelGridCellSize: graph.order <= SMALL_GRAPH ? 60 : 120,
-      labelRenderedSizeThreshold: graph.order <= SMALL_GRAPH ? 1 : 5,
+      labelDensity: graph.order <= SMALL_GRAPH ? 1.5 : grouped ? 0.35 : 0.6,
+      labelGridCellSize: graph.order <= SMALL_GRAPH ? 60 : grouped ? 130 : graph.order > 500 ? 180 : 120,
+      labelRenderedSizeThreshold: graph.order <= SMALL_GRAPH ? 1 : grouped ? 4 : graph.order > 500 ? 7 : 5,
       labelFont: 'Inter, -apple-system, sans-serif',
       labelSize: 12,
       labelWeight: '600',
       labelColor: { color: getGraphTheme().label },
-      minCameraRatio: 0.1,
+      minCameraRatio: 0.01,
       maxCameraRatio: 10,
       zIndex: true,
       nodeReducer: (_node, data) => {
         const ratio = cameraRatioRef.current;
         const emphasized = Boolean(data.emphasized);
         const relationCount = Number(data.relationCount ?? 0);
-        const hideOverviewLabel = graph.order > SMALL_GRAPH && ratio >= 0.9 && relationCount === 0 && !emphasized;
+        const overviewIsolated = graph.order > 500 && ratio >= 0.9 && relationCount === 0;
+        const hideOverviewLabel = graph.order > SMALL_GRAPH && ratio >= 0.9 &&
+          (relationCount === 0 || (graph.order > 500 && relationCount < 5)) && !emphasized;
+        const hideGroupedLabel = grouped && graph.order > 500 && ratio >= 0.06 &&
+          graph.degree(_node) <= 1 && !emphasized;
 
         return {
           ...data,
-          label: hideOverviewLabel ? null : data.label,
-          forceLabel: emphasized,
+          size: grouped && graph.order > 500
+            ? Math.min(Number(data.size ?? 2), graph.degree(_node) === 0 ? 3 : 5)
+            : overviewIsolated ? Math.min(Number(data.size ?? 2), 3) : data.size,
+          label: hideOverviewLabel || hideGroupedLabel || _node === sourceTableIdRef.current ? null : data.label,
+          forceLabel: graph.order <= SMALL_GRAPH || emphasized,
           zIndex: emphasized ? 2 : 0,
         };
       },
@@ -342,6 +351,9 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
         const normalSize = graph.order <= SMALL_GRAPH
           ? Math.max(1.2, raw)
           : Math.max(1.2, Math.min(raw, 1.6));
+        if (graph.order > 500 && ratio >= 0.9) {
+          return { ...data, hidden: false, color: getGraphTheme().overviewEdge, size: 0.8, zIndex: 0 };
+        }
         if (ratio >= 1.8) {
           return { ...data, hidden: false, color: getGraphTheme().mutedEdge, size: 1, zIndex: 0 };
         }
@@ -397,6 +409,17 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
         return;
       }
 
+      sourceTableIdRef.current = node;
+      const displayPosition = sigma.getNodeDisplayData(node);
+      if (displayPosition) {
+        const nodeViewportPosition = sigma.framedGraphToViewport(displayPosition);
+        const nodeGraphPosition = sigma.viewportToFramedGraph(nodeViewportPosition);
+        sigma.getCamera().animate(
+          { x: nodeGraphPosition.x, y: nodeGraphPosition.y },
+          { duration: 220 },
+          () => sigma.refresh(),
+        );
+      }
       setSourceTableId(node);
       setTargetTableId(null);
     };
@@ -707,6 +730,11 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
           <span>正在加载图谱…</span>
         </div>
       )}
+      {!isLoading && graphData && graphData.nodes.length > 500 && (
+        <div className="graph-canvas-hint">
+          关联表优先 · 无关系表单独排列 · 悬停或放大查看表名
+        </div>
+      )}
       {!isLoading && !graphData && (
         <div className="graph-canvas-empty">
           <span>暂无图谱数据</span>
@@ -775,13 +803,7 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
         </button>
       ))}
       {sourceTableId && sourcePosition && sourceTableQuery.data && (
-        <div
-          className="graph-radial-field-caption"
-          style={{
-            left: sourcePosition.x,
-            top: sourcePosition.y + sourcePosition.size + 22,
-          }}
-        >
+        <div className="graph-radial-field-caption">
           拖动字段到另一张表建立关系
         </div>
       )}

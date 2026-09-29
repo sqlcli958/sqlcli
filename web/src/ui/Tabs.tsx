@@ -3,6 +3,7 @@ import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 export interface TabItem<T extends string> {
   key: T;
   label: string;
+  title?: string;
   /** 角标内容，比如待办数量；为空时不渲染 */
   badge?: ReactNode;
 }
@@ -21,12 +22,19 @@ export function Tabs<T extends string>({
   value,
   onChange,
   label,
+  className = 'tabs',
+  buttonClassName,
+  panelId,
 }: {
   items: readonly TabItem<T>[];
   value: T;
   onChange: (key: T) => void;
   /** 这组标签是干什么的，给读屏器 */
   label: string;
+  className?: string;
+  buttonClassName?: string;
+  /** 面板的 id；提供后会把 tab 与其 tabpanel 关联起来。 */
+  panelId?: string;
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -48,9 +56,10 @@ export function Tabs<T extends string>({
   }
 
   return (
-    <div className="tabs" role="tablist" aria-label={label}>
+    <div className={className} role="tablist" aria-label={label}>
       {items.map((item, index) => {
         const active = item.key === value;
+        const classes = [buttonClassName, active && 'is-active'].filter(Boolean).join(' ');
         return (
           <button
             key={item.key}
@@ -58,8 +67,11 @@ export function Tabs<T extends string>({
             type="button"
             role="tab"
             aria-selected={active}
+            aria-controls={panelId}
+            id={panelId ? `${panelId}-tab-${item.key}` : undefined}
             tabIndex={active ? 0 : -1}
-            className={active ? 'is-active' : ''}
+            className={classes}
+            title={item.title}
             onClick={() => onChange(item.key)}
             onKeyDown={(event) => onKeyDown(event, index)}
           >

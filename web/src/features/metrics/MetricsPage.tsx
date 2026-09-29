@@ -34,7 +34,11 @@ export function MetricsPage() {
   const revision = useSessionStore((s) => s.revision);
   const [searchParams] = useSearchParams();
   const alias = searchParams.get('alias');
-  const { graphAvailable } = useOutletContext<{ graphAvailable: boolean }>();
+  const { graphAvailable, graphStatusLoading, graphStatusError } = useOutletContext<{
+    graphAvailable: boolean;
+    graphStatusLoading: boolean;
+    graphStatusError: boolean;
+  }>();
   const [editing, setEditing] = useState<RatioMetricDto | 'new' | null>(null);
 
   const aliases = useQuery({
@@ -55,6 +59,24 @@ export function MetricsPage() {
     return (
       <div className="page metrics-page">
         <p className="term-list-hint">请先在顶栏选择数据源。</p>
+      </div>
+    );
+  }
+
+  if (graphStatusLoading) {
+    return (
+      <div className="page metrics-page">
+        <header className="metrics-head"><h1>指标</h1></header>
+        <p className="term-list-hint" role="status">正在读取图谱状态…</p>
+      </div>
+    );
+  }
+
+  if (graphStatusError) {
+    return (
+      <div className="page metrics-page">
+        <header className="metrics-head"><h1>指标</h1></header>
+        <p className="term-list-hint" role="alert">无法读取图谱状态，请刷新后重试。</p>
       </div>
     );
   }

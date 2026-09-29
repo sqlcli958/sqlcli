@@ -51,7 +51,10 @@ export function DriverSettings() {
     <div className="settings-block">
       <div className="settings-block-head">
         <h2>驱动</h2>
-        <ActionIcon action="add" label="新建驱动" primary size="md" className="settings-primary-action" onClick={() => setEditing('new')} />
+        <Button variant="primary" className="settings-primary-action" onClick={() => setEditing('new')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          <span>新建驱动</span>
+        </Button>
       </div>
 
       {drivers.isLoading && <p className="settings-hint">加载中…</p>}
@@ -167,12 +170,12 @@ function DriverForm({ driver, onDone }: { driver: DriverDto | null; onDone: () =
           aria-label="返回驱动列表"
           title="返回驱动列表"
           onClick={onDone}
-          size="sm"
-          icon
+          className="alias-back-button"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M19 12H5m7 7-7-7 7-7" />
           </svg>
+          <span>返回驱动</span>
         </Button>
         <h1>{isEdit ? driver!.name : '新建驱动'}</h1>
         {isEdit && <span className="alias-form-tag">编辑</span>}
@@ -278,8 +281,8 @@ function DriverForm({ driver, onDone }: { driver: DriverDto | null; onDone: () =
       </section>
 
       <div className="alias-form-actions">
-        <Button onClick={onDone}>取消</Button>
-        <Button type="submit" disabled={save.isPending || upload.isPending} variant="primary">
+        <Button className="alias-cancel-action" onClick={onDone}>取消</Button>
+        <Button className="alias-save-action" type="submit" disabled={save.isPending || upload.isPending} variant="primary">
           {save.isPending ? '保存中…' : '保存'}
         </Button>
       </div>

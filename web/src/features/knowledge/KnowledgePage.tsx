@@ -16,6 +16,14 @@ import { useGraphStore } from '../../state/graphStore';
 import { useSessionStore } from '../../state/sessionStore';
 import './knowledge.css';
 import { Button } from '../../ui/Button';
+import { Tabs } from '../../ui/Tabs';
+
+const KNOWLEDGE_TABS = [
+  { key: 'tables', label: '表目录' },
+  { key: 'terms', label: '术语' },
+  { key: 'lineage', label: '血缘', title: '哪些字段是推导来的，各自有几个上游' },
+] as const;
+type KnowledgeTab = (typeof KNOWLEDGE_TABS)[number]['key'];
 
 /**
  * 图谱页。
@@ -31,7 +39,11 @@ import { Button } from '../../ui/Button';
 export function KnowledgePage() {
   const [searchParams] = useSearchParams();
   const alias = searchParams.get('alias');
-  const { graphAvailable } = useOutletContext<{ graphAvailable: boolean }>();
+  const { graphAvailable, graphStatusLoading, graphStatusError } = useOutletContext<{
+    graphAvailable: boolean;
+    graphStatusLoading: boolean;
+    graphStatusError: boolean;
+  }>();
 
   const isConnected = useSessionStore((s) => s.isConnected);
   const schemaFilters = useGraphStore((s) => s.schemaFilters);
@@ -88,10 +100,11 @@ export function KnowledgePage() {
 
   // 表目录默认收起：图和右侧详情才是主要工作区，目录只在找表时需要。
   // 但还没有图谱时它是唯一能做事的地方，所以默认展开。
-  const [explorerOpen, setExplorerOpen] = useState(!graphAvailable);
+  const [explorerOpenOverride, setExplorerOpen] = useState<boolean | null>(null);
+  const explorerOpen = explorerOpenOverride ?? !graphAvailable;
   // 左侧栏是表目录/术语/血缘共用的一个位置（入口唯一），用 tab 切换而不是各开一块。
   // 指标不在这里：它是「定义口径→展开 SQL→出图」的独立用法，单开一级页面（见 navigation.ts）。
-  const [leftTab, setLeftTab] = useState<'tables' | 'terms' | 'lineage'>('tables');
+  const [leftTab, setLeftTab] = useState<KnowledgeTab>('tables');
   // 左栏点了哪张表：主画布的大图把视野移过去。只在血缘标签下有意义
   const [lineageFocus, setLineageFocus] = useState<string | null>(null);
 
@@ -99,6 +112,13 @@ export function KnowledgePage() {
     (schema: string, table: string) => selectNode(`${schema}.${table}`),
     [selectNode],
   );
+
+  if (graphStatusLoading) {
+    return <div className="page"><p role="status">正在读取图谱状态…</p></div>;
+  }
+  if (graphStatusError) {
+    return <div className="page"><p role="alert">无法读取图谱状态，请刷新后重试。</p></div>;
+  }
 
   if (graphAvailable && !isConnected) {
     return (
@@ -115,7 +135,7 @@ export function KnowledgePage() {
           aria-expanded={explorerOpen}
           aria-label={explorerOpen ? '收起表目录' : '展开表目录'}
           title={explorerOpen ? '收起表目录' : '展开表目录'}
-          onClick={() => setExplorerOpen((open) => !open)}
+          onClick={() => setExplorerOpen((open) => !(open ?? !graphAvailable))}
           size="sm"
           icon
         >
@@ -123,6 +143,9 @@ export function KnowledgePage() {
             <path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h12v2H3v-2z" />
           </svg>
         </Button>
+        <div className="knowledge-page-title">
+          <h1>知识图谱</h1>
+        </div>
         <div className="knowledge-search">
           {graphAvailable ? (
             <SearchBar onSelectTable={handleSelectTable} onSelectColumn={handleSelectTable} />
@@ -154,47 +177,37 @@ export function KnowledgePage() {
         {explorerOpen && (
           <aside className="knowledge-left">
             {graphAvailable && (
-              <div className="knowledge-left-tabs" role="tablist">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={leftTab === 'tables'}
-                  className={`knowledge-left-tab${leftTab === 'tables' ? ' is-active' : ''}`}
-                  onClick={() => setLeftTab('tables')}
-                >
-                  表目录
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={leftTab === 'terms'}
-                  className={`knowledge-left-tab${leftTab === 'terms' ? ' is-active' : ''}`}
-                  onClick={() => setLeftTab('terms')}
-                >
-                  术语
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={leftTab === 'lineage'}
-                  className={`knowledge-left-tab${leftTab === 'lineage' ? ' is-active' : ''}`}
-                  onClick={() => setLeftTab('lineage')}
-                  title="哪些字段是推导来的，各自有几个上游"
-                >
-                  血缘
-                </button>
-              </div>
+              <Tabs
+                label="图谱侧栏"
+                items={KNOWLEDGE_TABS}
+                value={leftTab}
+                onChange={setLeftTab}
+                className="knowledge-left-tabs"
+                buttonClassName="knowledge-left-tab"
+                panelId="knowledge-sidebar-panel"
+              />
             )}
-            {leftTab === 'terms' && graphAvailable ? (
-              <TermList onPick={() => setLeftTab('tables')} />
-            ) : leftTab === 'lineage' && graphAvailable ? (
-              <LineageList onFocus={setLineageFocus} />
+            {graphAvailable ? (
+              <div
+                id="knowledge-sidebar-panel"
+                role="tabpanel"
+                aria-labelledby={`knowledge-sidebar-panel-tab-${leftTab}`}
+                tabIndex={0}
+              >
+                {leftTab === 'terms' ? (
+                  <TermList onPick={() => setLeftTab('tables')} />
+                ) : leftTab === 'lineage' ? (
+                  <LineageList onFocus={setLineageFocus} />
+                ) : (
+                  <SchemaExplorer onSelectTable={handleSelectTable} />
+                )}
+              </div>
             ) : (
               <SchemaExplorer onSelectTable={handleSelectTable} />
             )}
           </aside>
         )}
-        <main className="knowledge-center">
+        <section className="knowledge-center" aria-label="图谱内容">
           {/* 血缘标签下主画布换成全库血缘大图：关系图答「怎么连」，血缘图答「值从哪来」，
               两张图叠在一个画布上谁也看不清。切回表目录 / 术语时关系图重新挂载 */}
           {leftTab === 'lineage' && graphAvailable ? (
@@ -202,7 +215,7 @@ export function KnowledgePage() {
           ) : (
             <GraphCanvas graphData={graphData} isLoading={isLoading} />
           )}
-        </main>
+        </section>
         {selectedNodeId && (
           <aside className="knowledge-right">
             <TableInspector />

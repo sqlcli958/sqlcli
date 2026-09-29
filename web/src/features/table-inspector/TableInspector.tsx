@@ -257,7 +257,9 @@ function typeLength(dataType: ColumnRowProps['column']['dataType']): string {
   if (dataType.precision != null && dataType.scale != null && dataType.scale > 0) {
     return `${dataType.precision},${dataType.scale}`;
   }
-  if (dataType.length != null && dataType.length > 0) {
+  // JDBC metadata reports unbounded SQLite TEXT/INTEGER sizes as 2,000,000,000.
+  // That sentinel is not a declared column length and makes the inspector misleading.
+  if (dataType.length != null && dataType.length > 0 && dataType.length < 1_000_000_000) {
     return String(dataType.length);
   }
   return '—';
@@ -302,24 +304,30 @@ function ColumnRow({ tableId, tableQualifiedName, column, revision, onRefetch }:
       <tr
         className={`column-row ${expanded ? 'column-row-expanded' : ''}`}
         onClick={() => setExpanded(!expanded)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') setExpanded(!expanded);
-        }}
         title="点击展开，可维护业务名、业务描述与语义类型"
       >
         <td className="col-name">
-          <span className={`column-expand-chevron ${expanded ? 'expanded' : ''}`}>
-            &#9662;
-          </span>
-          {column.name}
-          {column.primaryKey && <span className="col-pk-badge" title="主键">主键</span>}
+          <button
+            type="button"
+            className="column-expand-button"
+            aria-expanded={expanded}
+            aria-label={`${expanded ? '收起' : '展开'} ${column.name} 的字段详情`}
+            onClick={(event) => {
+              event.stopPropagation();
+              setExpanded(!expanded);
+            }}
+          >
+            <span className={`column-expand-chevron ${expanded ? 'expanded' : ''}`}>
+              &#9662;
+            </span>
+            {column.name}
+            {column.primaryKey && <span className="col-pk-badge">主键</span>}
+          </button>
           <Button
             title="查看血缘"
             aria-label={`查看 ${column.name} 的血缘`}
-            onClick={(e) => {
-              e.stopPropagation();
+            onClick={(event) => {
+              event.stopPropagation();
               setLineageOpen((v) => !v);
             }}
             size="sm"

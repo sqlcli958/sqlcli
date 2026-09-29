@@ -106,3 +106,17 @@ test('全部勾选时按钮回到整批文案，理由不必填', async () => {
   const approve = screen.getByRole('button', { name: /批准这一批（3 条）/ });
   expect(approve).not.toBeDisabled();
 });
+
+test('整批批准后不把已批准条目算作已否', async () => {
+  vi.mocked(getApprovals).mockResolvedValue({
+    approvals: [1, 2, 3, 4].map((id) => ({ ...item(id), status: 'approved' })),
+    batches: [{ ...batch, status: 'applied' }],
+    total: 4,
+    pending: 0,
+  });
+  renderList();
+  await screen.findByText('梳理报事域状态字段');
+
+  expect(screen.getByText('4 条')).toBeTruthy();
+  expect(screen.queryByText(/已否/)).toBeNull();
+});

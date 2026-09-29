@@ -84,10 +84,19 @@ export function ReviewsPage() {
           items={VIEWS.map((item) => ({ ...item, badge: counts[item.key] }))}
           value={view}
           onChange={(next) => setView(next as View)}
+          panelId="review-tabs-panel"
         />
       </header>
 
-      <section className="review-stage" data-view={view} aria-label={`${VIEWS.find((item) => item.key === view)?.label ?? '评审'}内容`}>
+      <section
+        id="review-tabs-panel"
+        className="review-stage"
+        role="tabpanel"
+        aria-labelledby={`review-tabs-panel-tab-${view}`}
+        tabIndex={0}
+        data-view={view}
+        aria-label={`${VIEWS.find((item) => item.key === view)?.label ?? '评审'}内容`}
+      >
         {view === 'executions' && <ExecutionLog alias={alias} />}
         {(view === 'pending' || view === 'history') && (
           <ApprovalList

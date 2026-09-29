@@ -10,13 +10,11 @@ import { buttonClass } from './Button';
 
 export type ActionName = 'add' | 'edit' | 'delete' | 'more' | 'test';
 
-const PATHS: Record<ActionName, string> = {
-  add: 'M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z',
-  edit: 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z',
-  delete: 'M9 3h6l1 2h4v2H4V5h4l1-2zM6 9h12l-1 12H7L6 9z',
-  more: 'M6 10a2 2 0 110 4 2 2 0 010-4zm6 0a2 2 0 110 4 2 2 0 010-4zm6 0a2 2 0 110 4 2 2 0 010-4z',
-  // 闪电 = 「跑一下试试」。插头形状更贴「连接」，但缩到 14px 就糊成一团了
-  test: 'M13 2L4.09 12.97h6.16L11 22l8.91-10.97h-6.16L13 2z',
+const PATHS: Record<Exclude<ActionName, 'more'>, string> = {
+  add: 'M12 5v14M5 12h14',
+  edit: 'M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z',
+  delete: 'M3 6h18M8 6V4h8v2m2 0-1 14H7L6 6m4 5v5m4-5v5',
+  test: 'M13 2 3 14h7l-1 8 12-14h-7l1-6z',
 };
 
 /** 默认文案，调用方给了 title 就用调用方的（比如「删除数据源」比「删除」更清楚）。 */
@@ -57,8 +55,26 @@ export const ActionIcon = forwardRef<HTMLButtonElement, Props>(function ActionIc
       aria-label={text}
       {...rest}
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d={PATHS[action]} />
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {action === 'more' ? (
+          <>
+            <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" />
+            <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+            <circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" />
+          </>
+        ) : (
+          <path d={PATHS[action]} />
+        )}
       </svg>
     </button>
   );

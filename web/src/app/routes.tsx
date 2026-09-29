@@ -1,13 +1,22 @@
+import { lazy } from 'react';
 import { Navigate, createBrowserRouter, useLocation, useSearchParams } from 'react-router-dom';
 import { AppShell } from './AppShell';
 import { WORKSPACE_BASE } from './navigation';
-import { WorkbenchPage } from '../features/workbench/WorkbenchPage';
-import { KnowledgePage } from '../features/knowledge/KnowledgePage';
-import { MetricsPage } from '../features/metrics/MetricsPage';
-import { RulesPage } from '../features/policy/RulesPage';
-import { EvalPage } from '../features/eval/EvalPage';
-import { SettingsPage } from '../features/settings/SettingsPage';
-import { ReviewsPage } from '../features/review/ReviewsPage';
+
+const WorkbenchPage = lazy(() => import('../features/workbench/WorkbenchPage')
+  .then(({ WorkbenchPage }) => ({ default: WorkbenchPage })));
+const KnowledgePage = lazy(() => import('../features/knowledge/KnowledgePage')
+  .then(({ KnowledgePage }) => ({ default: KnowledgePage })));
+const MetricsPage = lazy(() => import('../features/metrics/MetricsPage')
+  .then(({ MetricsPage }) => ({ default: MetricsPage })));
+const RulesPage = lazy(() => import('../features/policy/RulesPage')
+  .then(({ RulesPage }) => ({ default: RulesPage })));
+const EvalPage = lazy(() => import('../features/eval/EvalPage')
+  .then(({ EvalPage }) => ({ default: EvalPage })));
+const SettingsPage = lazy(() => import('../features/settings/SettingsPage')
+  .then(({ SettingsPage }) => ({ default: SettingsPage })));
+const ReviewsPage = lazy(() => import('../features/review/ReviewsPage')
+  .then(({ ReviewsPage }) => ({ default: ReviewsPage })));
 
 /** 保留当前 query（数据源上下文）跳转到同一 workspace 下的另一页。 */
 function KeepQuery({ to }: { to: string }) {

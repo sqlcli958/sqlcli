@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useId, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getSession } from '../api/session';
@@ -19,6 +19,8 @@ export function AppShell() {
   const alias = searchParams.get('alias');
   const navigate = useNavigate();
   const location = useLocation();
+  const mainRef = useRef<HTMLElement>(null);
+  const previousPath = useRef(location.pathname);
 
   const setSession = useSessionStore((s) => s.setSession);
   const clearSession = useSessionStore((s) => s.clearSession);
@@ -35,6 +37,7 @@ export function AppShell() {
 
   const current = aliases.data?.aliases.find((a) => a.name === alias);
   const graphAvailable = current?.graphAvailable ?? false;
+  const graphStatusError = aliases.isError && !aliases.data;
   const names = aliases.data?.aliases.map((a) => a.name) ?? [];
 
   const switchAlias = (next: string, replace = false) => {
@@ -46,11 +49,20 @@ export function AppShell() {
   useEffect(() => setDraft(alias ?? ''), [alias]);
 
   const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem('shell-nav-collapsed') !== '0',
+    () => localStorage.getItem('shell-nav-collapsed') === '1',
   );
   useEffect(() => {
     localStorage.setItem('shell-nav-collapsed', collapsed ? '1' : '0');
   }, [collapsed]);
+
+  useEffect(() => {
+    if (previousPath.current === location.pathname) return;
+    previousPath.current = location.pathname;
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+      mainRef.current.focus();
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     if (alias || !aliases.data?.aliases.length) return;
@@ -110,14 +122,32 @@ export function AppShell() {
   });
   const pendingCount = approvals.data?.pending ?? 0;
 
-  const graphTone: Tone = graphAvailable ? 'ok' : 'bad';
-  const graphDetail = graphAvailable ? '图谱已导入' : '图谱未导入，到工作台导入';
+  const graphTone: Tone = aliases.isPending ? 'warn' : graphAvailable ? 'ok' : 'bad';
+  const graphStatus = aliases.isPending
+    ? '加载中'
+    : graphStatusError
+      ? '读取失败'
+      : graphAvailable
+        ? '已导入'
+        : '未导入';
+  const graphDetail = aliases.isPending
+    ? '正在读取图谱状态'
+    : graphStatusError
+      ? '无法读取数据源状态，请重试'
+      : graphAvailable
+        ? '图谱已导入'
+        : '图谱未导入，到工作台导入';
 
   const connectionTone: Tone = connection.isPending
     ? 'warn'
     : connection.data?.success
       ? 'ok'
       : 'bad';
+  const connectionStatus = connection.isPending
+    ? '连接中'
+    : connection.data?.success
+      ? '正常'
+      : '失败';
   const connectionDetail = connection.isPending
     ? '正在测试连接'
     : connection.data?.success
@@ -125,25 +155,46 @@ export function AppShell() {
       : `连接失败${connection.data?.message ? `：${connection.data.message}` : ''}`;
 
   const indexState = index.data?.status ?? 'unknown';
-  const indexTone: Tone = !graphAvailable || indexState === 'unknown'
+  const indexLoading = aliases.isPending || (graphAvailable && index.isPending);
+  const indexTone: Tone = indexLoading
     ? 'warn'
-    : indexState === 'ready'
-      ? 'ok'
-      : indexState === 'stale'
-        ? 'warn'
-        : 'bad';
-  const indexDetail = !graphAvailable
-    ? '图谱未导入，索引不可用'
-    : indexState === 'ready'
-      ? '搜索索引已就绪'
-      : indexState === 'stale'
-        ? '图谱已变更，索引待重建（图谱页可重建）'
-        : indexState === 'missing'
-          ? '索引缺失，搜索不可用'
-          : '索引状态未知';
+    : graphStatusError || !graphAvailable
+      ? 'bad'
+      : indexState === 'ready'
+        ? 'ok'
+        : indexState === 'stale' || indexState === 'unknown'
+          ? 'warn'
+          : 'bad';
+  const indexDetail = indexLoading
+    ? '正在读取索引状态'
+    : graphStatusError
+      ? '无法读取数据源状态，请重试'
+      : !graphAvailable
+        ? '图谱未导入，索引不可用'
+        : indexState === 'ready'
+          ? '搜索索引已就绪'
+          : indexState === 'stale'
+            ? '图谱已变更，索引待重建（图谱页可重建）'
+            : indexState === 'missing'
+              ? '索引缺失，搜索不可用'
+              : '索引状态未知';
+  const indexStatus = indexLoading
+    ? '加载中'
+    : graphStatusError
+      ? '读取失败'
+      : !graphAvailable
+        ? '不可用'
+        : indexState === 'ready'
+          ? '就绪'
+          : indexState === 'stale'
+            ? '待重建'
+            : indexState === 'missing'
+              ? '缺失'
+              : '未知';
 
   return (
     <div className="shell" data-nav-collapsed={collapsed || undefined}>
+      <a className="shell-skip-link" href="#main-content">跳到主内容</a>
       <header className="shell-header">
         <Link className="shell-brand" to={navPath('sql', alias)}>
           sql-cli
@@ -171,10 +222,10 @@ export function AppShell() {
         </label>
 
         {alias && (
-          <div className="shell-status" role="status">
-            <StatusDot label="图谱" tone={graphTone} detail={graphDetail} />
-            <StatusDot label="连接" tone={connectionTone} detail={connectionDetail} />
-            <StatusDot label="索引" tone={indexTone} detail={indexDetail} />
+          <div className="shell-status" role="group" aria-label="数据源状态">
+            <StatusDot label="图谱" status={graphStatus} tone={graphTone} detail={graphDetail} />
+            <StatusDot label="连接" status={connectionStatus} tone={connectionTone} detail={connectionDetail} />
+            <StatusDot label="索引" status={indexStatus} tone={indexTone} detail={indexDetail} />
             {readOnly && (
               <span className="shell-lock" title="只读数据源，不能执行写操作" aria-label="只读">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -264,8 +315,15 @@ export function AppShell() {
         </div>
       </nav>
 
-      <main className="shell-main">
-        <Outlet context={{ alias, graphAvailable }} />
+      <main id="main-content" ref={mainRef} tabIndex={-1} className="shell-main">
+        <Suspense fallback={<p className="shell-route-loading" role="status">正在加载页面…</p>}>
+          <Outlet context={{
+            alias,
+            graphAvailable,
+            graphStatusLoading: aliases.isPending,
+            graphStatusError,
+          }} />
+        </Suspense>
       </main>
     </div>
   );
@@ -288,11 +346,27 @@ function PendingApprovalNotice({ alias }: { alias: string | null }) {
   );
 }
 
-function StatusDot({ label, tone, detail }: { label: string; tone: Tone; detail: string }) {
+function StatusDot({ label, status, tone, detail }: {
+  label: string;
+  status: string;
+  tone: Tone;
+  detail: string;
+}) {
+  const detailId = useId();
   return (
-    <span className="shell-dot" data-tone={tone} data-tip={`${label}：${detail}`} tabIndex={0}>
+    <span
+      className="shell-dot"
+      data-tone={tone}
+      tabIndex={0}
+      role="group"
+      aria-label={`${label}：${status}`}
+      aria-describedby={detailId}
+    >
       <span className="shell-dot-mark" aria-hidden="true" />
-      <span className="sr-only">{`${label}：${detail}`}</span>
+      <span className="shell-dot-label" aria-hidden="true">{label}</span>
+      <span className="shell-dot-status" aria-hidden="true">{status}</span>
+      <span className="shell-dot-tooltip" aria-hidden="true">{detail}</span>
+      <span id={detailId} className="sr-only">{detail}</span>
     </span>
   );
 }

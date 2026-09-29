@@ -16,7 +16,9 @@
 }
 
 .metrics-head h1 {
-  font-size: 20px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.022em;
   margin: 0;
 }
 
@@ -56,4 +58,16 @@
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .metrics-page > .term-list-hint {
+    min-width: 0;
+  }
+
+  .metrics-page .metric-sql {
+    max-width: 100%;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
 }

@@ -190,6 +190,7 @@ export function RulesPage() {
   return <div className={`rules-page${collapsed ? ' is-collapsed' : ''}`}>
     <aside className="rules-side">
       <div className="rules-side-head">
+        <h1 className="rules-side-title">规则管理</h1>
         <Button
           onClick={() => setCollapsed((value) => !value)}
           title={collapsed ? '展开规则列表' : '收起规则列表'}
@@ -247,7 +248,7 @@ export function RulesPage() {
       </div>}
     </aside>
 
-    <main className="rules-main">
+    <section className="rules-main" aria-label="规则编辑区">
       {!isConnected && <p className="rules-error">正在连接图谱工作区…</p>}
       {view === 'catalog' && <RuleCatalog />}
 
@@ -301,6 +302,6 @@ export function RulesPage() {
           <RuleForm rule={draft.rules[ruleIndex]} onChange={patchRule} />
         </section>}
       </>}
-    </main>
+    </section>
   </div>;
 }

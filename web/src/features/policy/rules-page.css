@@ -7,6 +7,8 @@
 .rules-side { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--color-border); background: var(--color-surface); }
 /* 和右侧工具条同高，两条下边框拉平 —— 左右各自一个高度会显得整页没对齐。 */
 .rules-side-head { display: flex; align-items: center; gap: 4px; height: var(--toolbar-height); padding: 0 8px; border-bottom: 1px solid var(--color-border); }
+.rules-side-title { flex: 1; min-width: 0; margin: 0; color: var(--color-text); font-size: 15px; font-weight: 650; }
+.rules-page.is-collapsed .rules-side-title { display: none; }
 .rules-tree { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; display: grid; align-content: start; gap: 4px; }
 .rules-error { margin: 0; padding: 8px; color: var(--color-error); }
 .rules-warn { margin: 0 0 12px; padding: 10px 12px; border-left: 2px solid var(--color-warning); background: var(--color-surface); color: var(--color-text-muted); line-height: 1.7; }
@@ -67,7 +69,27 @@
 .rf-row { display: flex; align-items: start; gap: 8px; width: 100%; padding: 12px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-surface); }
 .rf-row .rf-grid { flex: 1; min-width: 0; }
 
-@media (max-width: 720px) { .rules-page, .rules-page.is-collapsed { grid-template-columns: 1fr; } }
+@media (max-width: 720px) {
+  .rules-page,
+  .rules-page.is-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(140px, 28dvh) minmax(0, 1fr);
+  }
+
+  .rules-side {
+    min-width: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .rules-form {
+    padding: 16px 14px 28px;
+  }
+
+  .rules-bar {
+    padding-inline: 12px;
+  }
+}
 /* 勾选项不许折行——「普通表」被拆成三行竖排比没有标签还难认。 */
 .rf-checks label { white-space: nowrap; }
 /* 行内删除图标默认压低存在感，指到那一行才亮起来。 */

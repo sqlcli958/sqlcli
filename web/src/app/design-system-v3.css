@@ -1,8 +1,7 @@
 /* SQLCLI product design system v3.
  *
- * This layer intentionally centralizes typography, spacing, surface depth and the
- * remaining legacy pages. It is loaded last so older feature CSS can keep its
- * structural rules while the product language has one source of truth.
+ * This layer centralizes shared typography and control sizing after the base and
+ * product layout layers. theme.css applies the final theme-specific colors.
  */
 
 :root {
@@ -22,7 +21,7 @@
   --surface-raised: #10233a;
   --surface-panel: #0b1b2e;
   --surface-subtle: rgba(255, 255, 255, .022);
-  --surface-hover-strong: rgba(33, 201, 255, .075);
+  --surface-hover-strong: rgba(96, 165, 250, .075);
   --border-soft: #1c344d;
   --border-strong: #294b68;
   --shadow-card: 0 14px 36px rgba(0, 0, 0, .15), inset 0 1px 0 rgba(255, 255, 255, .025);
@@ -47,9 +46,14 @@ textarea {
 }
 
 body {
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.55;
   letter-spacing: 0;
+}
+
+:is(.wb-head h1, .metrics-head h1, .eval-head h1, .settings-head h1, .review-head h1) {
+  font-size: clamp(24px, 2vw, 30px);
+  line-height: 1.25;
 }
 
 h1,
@@ -118,11 +122,11 @@ textarea::placeholder {
 
 input[type='checkbox'],
 input[type='radio'] {
-  accent-color: #21c9ff;
+  accent-color: var(--color-primary);
 }
 
 :where(a, button, input, textarea, select, [tabindex]):focus-visible {
-  outline: 2px solid rgba(33, 201, 255, .9);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -228,14 +232,14 @@ input[type='radio'] {
   border: 1px solid #213d59;
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(circle at 92% 0%, rgba(32, 224, 199, .095), transparent 18rem),
+    radial-gradient(circle at 92% 0%, rgba(96, 165, 250, .095), transparent 18rem),
     linear-gradient(110deg, rgba(14, 32, 53, .98), rgba(9, 24, 41, .98));
   box-shadow: var(--shadow-card);
 }
 
 .settings-head {
-  gap: 10px;
-  padding: 20px 22px 0;
+  gap: 8px;
+  padding: 14px 18px 0;
 }
 
 .settings-head h1,
@@ -249,9 +253,9 @@ input[type='radio'] {
 
 .metrics-head,
 .eval-head {
-  min-height: 118px;
-  padding: 20px 22px;
-  align-items: flex-start;
+  min-height: 76px;
+  padding: 14px 18px;
+  align-items: center;
 }
 
 .metrics-head {
@@ -270,20 +274,20 @@ input[type='radio'] {
 /* ───────────────────────── Settings ───────────────────────── */
 
 .settings {
-  gap: 18px;
+  gap: 14px;
 }
 
 .settings-tabs {
-  width: calc(100% + 44px);
-  margin: 4px -22px 0;
-  padding: 0 22px;
+  width: calc(100% + 36px);
+  margin: 4px -18px 0;
+  padding: 0 18px;
   gap: 4px;
   border-bottom-color: #203a54;
   background: rgba(6, 19, 33, .3);
 }
 
 .settings-tabs button {
-  min-height: 42px;
+  min-height: 38px;
   padding-inline: 14px;
   border-radius: 8px 8px 0 0;
   font-size: 13px;
@@ -291,9 +295,9 @@ input[type='radio'] {
 }
 
 .settings-tabs button.is-active {
-  color: #c8f5ff;
-  border-bottom-color: #21c9ff;
-  background: rgba(33, 201, 255, .065);
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  background: rgba(96, 165, 250, .08);
 }
 
 .settings-block {
@@ -344,7 +348,7 @@ input[type='radio'] {
 }
 
 .settings-table tbody tr:hover td {
-  background: rgba(33, 201, 255, .035);
+  background: rgba(96, 165, 250, .035);
 }
 
 .settings-name {
@@ -382,9 +386,9 @@ input[type='radio'] {
 }
 
 .settings-switches label:has(input:checked) {
-  color: #a8f1dc;
-  border-color: rgba(54, 215, 164, .34);
-  background: rgba(54, 215, 164, .075);
+  color: var(--color-primary);
+  border-color: rgba(96, 165, 250, .38);
+  background: rgba(96, 165, 250, .08);
   font-weight: 620;
 }
 
@@ -438,7 +442,7 @@ input[type='radio'] {
 /* ───────────────────────── Metrics ───────────────────────── */
 
 .metrics-page {
-  gap: 18px;
+  gap: 14px;
 }
 
 .metrics-page > .term-list {
@@ -577,7 +581,7 @@ input[type='radio'] {
 .rules-catalog-link.is-active,
 .rules-set-head.is-active,
 .rules-list li:has(button.is-active) {
-  background: linear-gradient(90deg, rgba(47,123,255,.13), rgba(32,224,199,.055));
+  background: linear-gradient(90deg, rgba(59,130,246,.13), rgba(96,165,250,.055));
 }
 
 .rules-set {
@@ -587,8 +591,8 @@ input[type='radio'] {
 }
 
 .rules-set:has(.rules-set-head.is-active) {
-  border-color: rgba(33,201,255,.12);
-  background: rgba(33,201,255,.025);
+  border-color: rgba(96,165,250,.12);
+  background: rgba(96,165,250,.025);
 }
 
 .rules-set-name {
@@ -617,7 +621,7 @@ input[type='radio'] {
 
 .rules-warn {
   border: 1px solid rgba(248,185,78,.2);
-  border-left: 3px solid #f8b94e;
+  border-left: 3px solid var(--color-warning);
   border-radius: 8px;
   background: rgba(248,185,78,.055);
   color: #d7be8c;
@@ -638,8 +642,8 @@ input[type='radio'] {
 /* ───────────────────────── Evaluation / graph quality ───────────────────────── */
 
 .eval-page {
-  gap: 16px;
-  padding: 28px 32px 52px;
+  gap: 14px;
+  padding: 20px 32px 40px;
 }
 
 .eval-kpis {
@@ -691,7 +695,7 @@ input[type='radio'] {
 
 .eval-bar-fill {
   border-radius: 999px;
-  background: linear-gradient(90deg, #2f7bff, #21c9ff);
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
 }
 
 .eval-table {
@@ -715,7 +719,7 @@ input[type='radio'] {
 }
 
 .eval-table tbody tr:hover td {
-  background: rgba(33,201,255,.035);
+  background: rgba(96,165,250,.035);
 }
 
 .eval-empty,
@@ -766,7 +770,14 @@ input[type='radio'] {
 }
 
 @media (max-width: 640px) {
-  body { font-size: 13px; }
+  body { font-size: 16px; }
+
+  input,
+  textarea,
+  .select > select,
+  .select.is-sm > select {
+    font-size: 16px;
+  }
 
   .settings-head,
   .metrics-head,
@@ -796,6 +807,25 @@ input[type='radio'] {
 
   .eval-bar-track {
     display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  button,
+  .btn,
+  .btn.is-sm,
+  .select > select,
+  .select.is-sm > select,
+  .shell-nav-item,
+  .shell-dot,
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
+  textarea {
+    min-height: 44px;
+  }
+
+  button.is-icon,
+  .btn.is-icon {
+    min-width: 44px;
   }
 }
 
@@ -863,7 +893,7 @@ input[type='radio'] {
   border: 1px dashed #2b4b66;
   border-radius: var(--radius-md);
   background:
-    radial-gradient(circle at 10% 0%, rgba(33,201,255,.07), transparent 16rem),
+    radial-gradient(circle at 10% 0%, rgba(96,165,250,.07), transparent 16rem),
     rgba(7, 20, 34, .58);
 }
 
@@ -929,7 +959,7 @@ input[type='radio'] {
 }
 
 .settings-overview-card b {
-  color: #7ee6ff;
+  color: var(--color-primary);
   font-family: var(--font-display);
   font-size: 23px;
   font-weight: 720;
@@ -976,7 +1006,7 @@ input[type='radio'] {
 }
 
 .settings-state.is-ok i {
-  background: #36d7a4;
+  background: var(--color-success);
   box-shadow: 0 0 10px rgba(54,215,164,.22);
 }
 
@@ -1022,7 +1052,7 @@ input[type='radio'] {
 /* ── Guardrail control center ── */
 .rules-page {
   background:
-    radial-gradient(circle at 78% 0%, rgba(33,201,255,.035), transparent 28rem),
+    radial-gradient(circle at 78% 0%, rgba(96,165,250,.035), transparent 28rem),
     transparent;
 }
 
@@ -1049,14 +1079,14 @@ input[type='radio'] {
 
 .rules-catalog-link:hover,
 .rules-set-head:hover {
-  border-color: rgba(33,201,255,.09);
-  background: rgba(33,201,255,.04);
+  border-color: rgba(96,165,250,.09);
+  background: rgba(96,165,250,.04);
 }
 
 .rules-catalog-link.is-active,
 .rules-set-head.is-active {
-  border-color: rgba(33,201,255,.18);
-  background: linear-gradient(90deg, rgba(47,123,255,.12), rgba(32,224,199,.05));
+  border-color: rgba(96,165,250,.18);
+  background: linear-gradient(90deg, rgba(59,130,246,.12), rgba(96,165,250,.05));
 }
 
 .rules-form,
@@ -1094,9 +1124,9 @@ input[type='radio'] {
 }
 
 .eval-kpi:first-child {
-  border-color: rgba(33,201,255,.3);
+  border-color: rgba(96,165,250,.3);
   background:
-    radial-gradient(circle at 92% 0%, rgba(33,201,255,.08), transparent 9rem),
+    radial-gradient(circle at 92% 0%, rgba(96,165,250,.08), transparent 9rem),
     linear-gradient(180deg, #102940, #0a1c2f);
 }
 
@@ -1120,7 +1150,7 @@ input[type='radio'] {
 }
 
 .eval-table tbody tr:hover td {
-  background: rgba(33,201,255,.035);
+  background: rgba(96,165,250,.035);
 }
 
 .eval-bar-track {

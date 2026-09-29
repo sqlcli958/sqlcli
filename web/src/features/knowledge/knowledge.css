@@ -18,6 +18,18 @@
   flex-shrink: 0;
 }
 
+.knowledge-page-title {
+  flex: none;
+}
+
+.knowledge-page-title h1 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
 .knowledge-search {
   flex: 1;
   max-width: 480px;
@@ -98,12 +110,70 @@
 
 /* 目录收起后画布不该被挤成一条缝，详情面板可以再宽一点。 */
 .knowledge-body.is-explorer-hidden .knowledge-right {
-  flex-basis: clamp(300px, 28vw, 540px);
+  flex-basis: clamp(300px, 32vw, 560px);
 }
 
 @media (max-width: 1100px) {
+  .knowledge-body {
+    position: relative;
+  }
+
   .knowledge-right {
+    position: absolute;
+    z-index: 4;
+    inset: 8px 8px 8px auto;
+    display: flex;
+    width: min(420px, calc(100% - 16px));
+    min-width: 0;
+    flex: none;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, .16);
+  }
+}
+
+@media (max-width: 720px) {
+  .knowledge-bar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px 10px;
+    padding: 10px 12px;
+  }
+
+  .knowledge-page-title {
+    grid-column: 2;
+  }
+
+  .knowledge-search,
+  .knowledge-index,
+  .knowledge-stats {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    margin-left: 0;
+    white-space: normal;
+  }
+
+  .knowledge-left {
+    position: absolute;
+    z-index: 3;
+    inset: 0 auto 0 0;
+    width: min(var(--left-panel-width), 86vw);
+    min-width: 0;
+    max-width: 86vw;
+    box-shadow: 12px 0 28px rgba(15, 23, 42, .14);
+  }
+
+  .knowledge-body:has(.knowledge-right) .knowledge-left {
     display: none;
+  }
+
+  .knowledge-right {
+    inset: auto 8px 8px;
+    width: auto;
+    max-height: 72dvh;
+    border-radius: 12px;
   }
 }
 

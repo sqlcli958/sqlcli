@@ -10,8 +10,13 @@ import { DriverSettings } from './DriverSettings';
 import './settings.css';
 import { Button } from '../../ui/Button';
 import { Menu, MenuItem } from '../../ui/Menu';
+import { Tabs } from '../../ui/Tabs';
 
 type Tab = 'sources' | 'drivers';
+const SETTINGS_TABS = [
+  { key: 'sources', label: '数据源' },
+  { key: 'drivers', label: '驱动' },
+] as const;
 
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('sources');
@@ -21,18 +26,29 @@ export function SettingsPage() {
     <div className="page settings">
       <header className="settings-head">
         <h1>设置</h1>
-        <div className="settings-tabs" role="tablist">
-          <button type="button" role="tab" aria-selected={tab === 'sources'} className={tab === 'sources' ? 'is-active' : ''} onClick={() => setTab('sources')}>数据源</button>
-          <button type="button" role="tab" aria-selected={tab === 'drivers'} className={tab === 'drivers' ? 'is-active' : ''} onClick={() => setTab('drivers')}>驱动</button>
-        </div>
+        <Tabs
+          label="设置分类"
+          items={SETTINGS_TABS}
+          value={tab}
+          onChange={setTab}
+          className="settings-tabs"
+          panelId="settings-tabs-panel"
+        />
       </header>
 
-      {tab === 'sources' && (editing !== null ? (
-        <AliasAddPage key={editing} editName={editing || undefined} onDone={() => setEditing(null)} />
-      ) : (
-        <SourceSettings onAdd={() => setEditing('')} onEdit={setEditing} />
-      ))}
-      {tab === 'drivers' && <DriverSettings />}
+      <section
+        id="settings-tabs-panel"
+        role="tabpanel"
+        aria-labelledby={`settings-tabs-panel-tab-${tab}`}
+        tabIndex={0}
+      >
+        {tab === 'sources' && (editing !== null ? (
+          <AliasAddPage key={editing} editName={editing || undefined} onDone={() => setEditing(null)} />
+        ) : (
+          <SourceSettings onAdd={() => setEditing('')} onEdit={setEditing} />
+        ))}
+        {tab === 'drivers' && <DriverSettings />}
+      </section>
     </div>
   );
 }
@@ -79,7 +95,10 @@ function SourceSettings({ onAdd, onEdit }: { onAdd: () => void; onEdit: (name: s
           <h2>数据源控制台</h2>
           <p>连接、图谱状态和审批策略集中管理；高频策略可以直接在列表中切换。</p>
         </div>
-        <ActionIcon action="add" label="新建数据源" primary size="md" className="settings-primary-action" onClick={onAdd} />
+        <Button variant="primary" className="settings-primary-action" onClick={onAdd}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          <span>新建数据源</span>
+        </Button>
       </div>
 
       {!isLoading && !isError && (

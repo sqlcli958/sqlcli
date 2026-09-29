@@ -896,17 +896,21 @@ html, body, #root {
 /* 名称 / 类型 / 可空 / 主键 / 注释——注释吃掉剩余宽度并换行，
    这样不用横向拖动也能看全。 */
 /* 字段名 / 类型 / 长度 / 可空 / 注释——注释吃掉剩余宽度并换行。 */
-.columns-table th:nth-child(1) { width: 28%; }
-.columns-table th:nth-child(2) { width: 17%; }
-.columns-table th:nth-child(3) { width: 10%; }
-.columns-table th:nth-child(4) { width: 8%; }
+.columns-table th:nth-child(1) { width: 34%; }
+.columns-table th:nth-child(2) { width: 22%; }
+.columns-table th:nth-child(3) { width: 12%; }
+.columns-table th:nth-child(4) { width: 9%; }
 
 .col-len {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
+
+.col-type,
+.columns-table td:first-child { white-space: nowrap; }
 
 .columns-table th {
   /* 滚动时列名要一直可见 */
@@ -1056,6 +1060,22 @@ html, body, #root {
   outline: none;
 }
 
+.graph-canvas-hint {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 2;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
 .graph-canvas-loading,
 .graph-canvas-empty {
   position: absolute;
@@ -1178,14 +1198,17 @@ html, body, #root {
 
 .graph-radial-field-caption {
   position: absolute;
-  transform: translate(-50%, 0);
-  padding: 3px 7px;
-  border-radius: 3px;
-  background: rgba(15, 23, 42, 0.78);
-  color: #fff;
+  top: 12px;
+  left: 12px;
+  padding: 6px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
   font-size: 10px;
   white-space: nowrap;
   pointer-events: none;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
   z-index: 17;
 }
 
@@ -1487,6 +1510,24 @@ html, body, #root {
 
 .column-expand-chevron:not(.expanded) {
   transform: rotate(-90deg);
+}
+
+.column-expand-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 4px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  max-width: calc(100% - 28px);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .col-pk-badge {

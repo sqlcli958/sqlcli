@@ -1,11 +1,13 @@
 import Graph from 'graphology';
+import forceAtlas2 from 'graphology-layout-forceatlas2';
 import type { GraphViewDto } from '../types/api';
 import { getSchemaColor, calculateNodeSize, nodeWeight, getRelationColor, getRelationLineStyle, NODE_SIZE } from './graphStyles';
 
+/** Below this count, stable rings keep every table easy to locate. */
+export const SMALL_GRAPH = 60;
+
 /**
- * Give related tables a stable, readable starting point. High-degree tables
- * are alternated across the circle instead of being placed next to each other,
- * while isolated tables are kept on separate outer rings.
+ * Keep small or dense graphs on stable rings; pack sparse graphs by component.
  */
 function initializeNodePositions(graph: Graph): void {
   const connected = graph.nodes()
@@ -14,6 +16,18 @@ function initializeNodePositions(graph: Graph): void {
   const isolated = graph.nodes()
     .filter((node) => graph.degree(node) === 0)
     .sort();
+
+  if (graph.order > SMALL_GRAPH) {
+    const components = getConnectedComponents(graph);
+    const relatedCount = components.reduce((count, component) => count + component.length, 0);
+    // ponytail: cap synchronous per-component layout at 500 related nodes; denser graphs use the existing worker.
+    if (relatedCount <= 500 &&
+        (graph.order > 500 || relatedCount / graph.order < 0.5)) {
+      initializeGroupedPositions(graph, components, isolated);
+      graph.setAttribute('layout', 'grouped');
+      return;
+    }
+  }
 
   const connectedRadius = Math.max(420, connected.length * 46);
   const half = Math.ceil(connected.length / 2);
@@ -47,6 +61,122 @@ function initializeNodePositions(graph: Graph): void {
     placed += count;
     ringRadius += RING_GAP;
   }
+}
+
+function getConnectedComponents(graph: Graph): string[][] {
+  const adjacency = new Map(graph.nodes().map((node) => [node, new Set<string>()]));
+  graph.forEachEdge((_edge, _attrs, source, target) => {
+    adjacency.get(source)?.add(target);
+    adjacency.get(target)?.add(source);
+  });
+
+  const remaining = new Set(
+    [...adjacency.keys()].filter((node) => adjacency.get(node)!.size > 0).sort(),
+  );
+  const components: string[][] = [];
+  while (remaining.size > 0) {
+    const seed = remaining.values().next().value as string;
+    remaining.delete(seed);
+    const component = [seed];
+    for (let index = 0; index < component.length; index++) {
+      for (const neighbor of adjacency.get(component[index]!) ?? []) {
+        if (!remaining.delete(neighbor)) continue;
+        component.push(neighbor);
+      }
+    }
+    components.push(component.sort());
+  }
+  return components.sort((left, right) => right.length - left.length || left[0]!.localeCompare(right[0]!));
+}
+
+function initializeGroupedPositions(graph: Graph, components: string[][], isolated: string[]): void {
+  const padding = 100;
+  const groups = components.map((nodes) => {
+    const component = new Graph({ type: 'directed', multi: true });
+    const nodeSet = new Set(nodes);
+    const initialRadius = Math.max(55, Math.sqrt(nodes.length) * 45);
+
+    nodes.forEach((node, nodeIndex) => {
+      const angle = -Math.PI / 2 + (Math.PI * 2 * nodeIndex) / nodes.length;
+      component.addNode(node, {
+        ...graph.getNodeAttributes(node),
+        x: Math.cos(angle) * initialRadius,
+        y: Math.sin(angle) * initialRadius,
+      });
+    });
+    graph.forEachEdge((edge, attrs, source, target) => {
+      if (nodeSet.has(source) && nodeSet.has(target)) {
+        component.addDirectedEdgeWithKey(edge, source, target, { ...attrs });
+      }
+    });
+
+    if (nodes.length > 3) {
+      forceAtlas2.assign(component, {
+        iterations: 140,
+        settings: {
+          adjustSizes: true,
+          edgeWeightInfluence: 0.5,
+          gravity: 0.2,
+          scalingRatio: 18,
+          slowDown: 2,
+        },
+      });
+    }
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    component.forEachNode((_node, attrs) => {
+      minX = Math.min(minX, Number(attrs.x));
+      maxX = Math.max(maxX, Number(attrs.x));
+      minY = Math.min(minY, Number(attrs.y));
+      maxY = Math.max(maxY, Number(attrs.y));
+    });
+
+    return { component, minX, minY, width: maxX - minX + padding, height: maxY - minY + padding };
+  });
+
+  // Pack measured component bounds into rows; a fixed cell used to squeeze large groups.
+  const targetWidth = Math.max(0, ...groups.map((group) => group.width),
+    Math.sqrt(groups.reduce((area, group) => area + group.width * group.height, 0)) * 1.3);
+  let x = 0;
+  let y = 0;
+  let rowHeight = 0;
+  let connectedWidth = 0;
+  for (const group of groups) {
+    if (x > 0 && x + group.width > targetWidth) {
+      x = 0;
+      y += rowHeight;
+      rowHeight = 0;
+    }
+    group.component.forEachNode((node, attrs) => {
+      graph.mergeNodeAttributes(node, {
+        x: x + Number(attrs.x) - group.minX + padding / 2,
+        y: y + Number(attrs.y) - group.minY + padding / 2,
+      });
+    });
+    x += group.width;
+    connectedWidth = Math.max(connectedWidth, x);
+    rowHeight = Math.max(rowHeight, group.height);
+  }
+
+  const isolatedSpacing = 120;
+  const columns = Math.ceil(Math.sqrt(isolated.length));
+  const isolatedWidth = Math.max(0, (columns - 1) * isolatedSpacing);
+  const connectedOffset = Math.max(0, (isolatedWidth - connectedWidth) / 2);
+  if (connectedOffset > 0) {
+    graph.forEachNode((node, attrs) => {
+      if (graph.degree(node) > 0) graph.setNodeAttribute(node, 'x', Number(attrs.x) + connectedOffset);
+    });
+  }
+  const isolatedOffset = Math.max(0, (connectedWidth - isolatedWidth) / 2);
+  isolated.forEach((node, index) => {
+    graph.mergeNodeAttributes(node, {
+      x: isolatedOffset + (index % columns) * isolatedSpacing,
+      y: y + rowHeight + 160 + Math.floor(index / columns) * isolatedSpacing,
+    });
+  });
 }
 
 /** Convert API graph DTO to Graphology graph */

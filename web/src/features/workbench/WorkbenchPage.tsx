@@ -135,12 +135,31 @@ function WorkspaceBoard({ alias }: { alias: string }) {
     enabled: graphAvailable,
   });
 
+  if (aliases.isPending || (aliases.isError && !aliases.data)) {
+    const status = aliases.isPending ? '正在读取图谱状态…' : '无法读取图谱状态，请刷新后重试。';
+    return (
+      <div className="page wb">
+        <header className="wb-head">
+          <h1>SQL 工作台</h1>
+          <p role={aliases.isPending ? 'status' : 'alert'}>数据源 {alias} · {status}</p>
+        </header>
+        <SqlEditor
+          alias={alias}
+          aliasInfo={current}
+          sql={sql}
+          onSqlChange={setSql}
+          textareaRef={editorRef}
+        />
+      </div>
+    );
+  }
+
   if (!graphAvailable) {
     return (
       <div className="page wb">
         <header className="wb-head">
-          <h1>{alias}</h1>
-          <p>还没有图谱，导入后才能搜索表和维护关系。</p>
+          <h1>SQL 工作台</h1>
+          <p>数据源 {alias} · 尚未导入图谱；SQL 查询仍可直接执行。</p>
         </header>
         <div className="wb-empty">
           <Link className={buttonClass('primary')} to={navPath('knowledge', alias)}>
@@ -175,9 +194,10 @@ function WorkspaceBoard({ alias }: { alias: string }) {
   return (
     <div className="page wb">
       <header className="wb-head">
-        <h1>{alias}</h1>
+        <h1>SQL 工作台</h1>
         <p>
-          {current?.description || '数据源概览'}
+          <span>数据源 {alias}</span>
+          <span>{current?.description || '数据源概览'}</span>
           {current?.readOnly && <span className="wb-tag is-lock">只读</span>}
         </p>
       </header>

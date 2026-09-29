@@ -334,6 +334,13 @@ export function SqlEditor({
         {write && <span className="wb-muted">写语句</span>}
       </div>
 
+      {!busy && !dry.data && !run.data && !dry.isError && !run.isError && !aborted && (
+        <div className="wb-result-empty">
+          <strong>查询结果会显示在这里</strong>
+          <span>输入 SQL 后点击“执行”，或按 Ctrl + Enter。</span>
+        </div>
+      )}
+
       {run.isPending && needsApproval && (
         <p className="wb-approval" role="status">
           等待审批中，请到评审页放行。
