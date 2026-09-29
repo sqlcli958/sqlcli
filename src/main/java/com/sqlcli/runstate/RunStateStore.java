@@ -455,6 +455,14 @@ public class RunStateStore {
     /**
      * 把一次 SQL 执行归因到指标。审计写入失败不能反过来让已经成功/失败的 SQL 任务改变结果。
      */
+    /** 兼容没有 Term 场景的旧调用方。 */
+    public long recordMetricRun(String alias, String metricId, Long metricRevision, long executionId,
+            String status, String grain, List<String> dimensions, String timeFrom, String timeTo,
+            Long rowCount, long elapsedMs, String errorSummary, long startedAt) {
+        return recordMetricRun(alias, metricId, metricRevision, null, executionId, status, grain,
+                dimensions, timeFrom, timeTo, rowCount, elapsedMs, errorSummary, startedAt);
+    }
+
     public long recordMetricRun(String alias, String metricId, Long metricRevision, String termId, long executionId,
             String status, String grain, List<String> dimensions, String timeFrom, String timeTo,
             Long rowCount, long elapsedMs, String errorSummary, long startedAt) {
@@ -489,19 +497,27 @@ public class RunStateStore {
         }
     }
 
-    /** 最近的指标运行，用于指标详情和健康度计算。 */
+    /** 最近的指标运行，用于指标详情和健康度计算；不传 termId 时看该指标全部运行。 */
     public List<MetricRunRow> listMetricRuns(String alias, String metricId, int limit) {
+        return listMetricRuns(alias, metricId, null, limit);
+    }
+
+    /** 某个 Term 场景下的指标运行；用于场景指标健康度，不混入全量/其他场景。 */
+    public List<MetricRunRow> listMetricRuns(String alias, String metricId, String termId, int limit) {
         List<MetricRunRow> result = new ArrayList<>();
         int safeLimit = Math.max(1, Math.min(limit, 200));
+        String sql = "SELECT id, alias, metric_id, metric_revision, term_id, execution_id, status, grain,"
+                + " dimensions, time_from, time_to, row_count, elapsed_ms, error_summary, started_at"
+                + " FROM metric_run WHERE alias = ? AND metric_id = ?"
+                + (termId == null ? "" : " AND term_id = ?")
+                + " ORDER BY started_at DESC, id DESC LIMIT ?";
         try (Connection conn = connect();
-             PreparedStatement ps = conn.prepareStatement(
-                     "SELECT id, alias, metric_id, metric_revision, term_id, execution_id, status, grain,"
-                             + " dimensions, time_from, time_to, row_count, elapsed_ms, error_summary, started_at"
-                             + " FROM metric_run WHERE alias = ? AND metric_id = ?"
-                             + " ORDER BY started_at DESC, id DESC LIMIT ?")) {
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, alias);
             ps.setString(2, metricId);
-            ps.setInt(3, safeLimit);
+            int index = 3;
+            if (termId != null) ps.setString(index++, termId);
+            ps.setInt(index, safeLimit);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     result.add(new MetricRunRow(
@@ -512,7 +528,7 @@ public class RunStateStore {
                 }
             }
         } catch (Exception e) {
-            log.debug("failed to list metric runs for {} {}", alias, metricId, e);
+            log.debug("failed to list metric runs for {} {} term={}", alias, metricId, termId, e);
         }
         return result;
     }
