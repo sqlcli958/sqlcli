@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
-import { columnRef, expandMetricSql, getMetrics, upsertMetric } from '../../api/metrics';
+import { columnRef, expandMetricSql, getMetricRuns, getMetrics, upsertMetric } from '../../api/metrics';
 import type { MetricAdditivity, RatioMetricDto } from '../../api/metrics';
 import { executeWorkbenchSql } from '../../api/workbench';
 import { getAliases } from '../../api/aliases';
@@ -191,6 +191,12 @@ function MetricItem({
   const expand = useMutation({
     mutationFn: () => expandMetricSql(metric.name, { grain: grain || undefined }),
   });
+  const runs = useQuery({
+    queryKey: ['metric-runs', metric.id],
+    queryFn: ({ signal }) => getMetricRuns(metric.name, 10, signal),
+    staleTime: 15_000,
+  });
+  const latestRun = runs.data?.runs[0];
   const grains = metric.grain?.grains ?? [];
   const isRatio = !!(metric.numerator && metric.denominator);
   // 比率结构由展开器强制推定成 non_additive，不看 metric.additivity 填的是什么；
@@ -235,6 +241,16 @@ function MetricItem({
           JOIN：{metric.joinPath.map((step) => step.joinType).join(' / ')}（共 {metric.joinPath.length} 步）
         </p>
       )}
+      {latestRun ? (
+        <p className="term-list-line">
+          最近运行：{latestRun.status} · {latestRun.elapsedMs} ms
+          {latestRun.rowCount != null && ` · ${latestRun.rowCount} 行`}
+          {' · '}{new Date(latestRun.startedAt).toLocaleString()}
+          {latestRun.metricRevision != null && ` · revision ${latestRun.metricRevision}`}
+        </p>
+      ) : runs.isSuccess ? (
+        <p className="term-list-line">最近运行：尚无记录</p>
+      ) : null}
 
       <div className="metric-item-actions">
         {grains.length > 0 && (
@@ -252,7 +268,12 @@ function MetricItem({
             ))}
           </Select>
         )}
-        <Button size="sm" onClick={() => expand.mutate()} disabled={expand.isPending}>
+        <Button
+          size="sm"
+          onClick={() => expand.mutate()}
+          disabled={expand.isPending || metric.status === 'ignored'}
+          title={metric.status === 'ignored' ? '已忽略指标不能展开或执行' : undefined}
+        >
           {expand.isPending ? '展开中…' : '展开 SQL'}
         </Button>
         <Button size="sm" onClick={onToggleEdit}>
@@ -271,14 +292,18 @@ function MetricItem({
           <Link
             className={buttonClass('default', 'sm')}
             to={navPath('sql', alias)}
-            onClick={() => stashWorkbenchSql(expand.data.sql)}
+            onClick={() => stashWorkbenchSql(expand.data.sql, {
+              metricId: metric.id,
+              metricRevision: expand.data.revision ?? revision,
+              grain: grain || undefined,
+            })}
           >
             去工作台执行
           </Link>
         </div>
       )}
 
-      <MetricChartSection metric={metric} alias={alias} aliasInfo={aliasInfo} />
+      <MetricChartSection metric={metric} alias={alias} aliasInfo={aliasInfo} revision={revision} />
 
       {editing && <MetricForm metric={metric} revision={revision} onDone={onDone} />}
     </li>
@@ -301,10 +326,12 @@ function MetricChartSection({
   metric,
   alias,
   aliasInfo,
+  revision,
 }: {
   metric: RatioMetricDto;
   alias: string | null;
   aliasInfo?: { approveQuery: boolean };
+  revision: number;
 }) {
   const grains = metric.grain?.grains ?? [];
   const [grain, setGrain] = useState(grains[0] ?? '');
@@ -314,15 +341,28 @@ function MetricChartSection({
     mutationFn: async () => {
       const to = new Date();
       const from = new Date(to.getTime() - Number(range) * 86_400_000);
-      const { sql } = await expandMetricSql(metric.name, {
+      const timeFrom = from.toISOString().slice(0, 10);
+      const timeTo = to.toISOString().slice(0, 10);
+      const { sql, revision: expandedRevision } = await expandMetricSql(metric.name, {
         grain,
-        timeFrom: from.toISOString().slice(0, 10),
-        timeTo: to.toISOString().slice(0, 10),
+        timeFrom,
+        timeTo,
       });
-      // 铁律：执行走 executeWorkbenchSql，不另写一条执行路径（CLAUDE.md「一条管线，两个结尾」）。
-      return executeWorkbenchSql(sql);
+      // 铁律：执行走 executeWorkbenchSql，不另写一条执行路径；额外带语义上下文只做审计归因。
+      return executeWorkbenchSql(sql, false, undefined, undefined, {
+        metricId: metric.id,
+        metricRevision: expandedRevision ?? revision,
+        grain,
+        timeFrom,
+        timeTo,
+      });
     },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['metric-runs', metric.id] }),
   });
+
+  if (metric.status === 'ignored') {
+    return <p className="term-list-hint">这条指标已被忽略，保留历史但不允许继续执行。</p>;
+  }
 
   if (!metric.grain?.timeColumn || grains.length === 0) {
     return (
