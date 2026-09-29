@@ -71,3 +71,29 @@
     overflow-wrap: anywhere;
   }
 }
+
+.metrics-page .term-list-item.is-targeted {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+
+.metric-scenario-context {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-surface);
+}
+.metric-scenario-context > div { display: grid; gap: 2px; }
+.metric-scenario-context span { color: var(--color-text-muted); font-size: 12px; }
+.metric-scenario-context code {
+  max-width: 60%;
+  overflow-wrap: anywhere;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}

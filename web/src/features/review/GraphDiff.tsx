@@ -18,6 +18,8 @@ const KIND_LABEL: Record<string, string> = {
   metric: '指标',
   /** agent 提议的结构规则（policy:<alias>:<file>/<ruleId>），批准 = 写进规则集并启用 */
   policy: '规则',
+  'policy-ruleset': '规则集',
+  'policy-binding': '规则启停',
 };
 
 function kindLabel(targetId?: string | null): string {
@@ -44,14 +46,24 @@ function render(value: unknown): string {
  * 新增（before 为空）时全部字段都算变化，但仍然过滤掉时间戳这类记账字段。
  */
 export function GraphDiff({ payload }: { payload: GraphChangePayloadDto }) {
-  const before = payload.before ?? {};
-  const after = payload.after ?? {};
-  const keys = Array.from(new Set([...Object.keys(before), ...Object.keys(after)]))
-    .filter((key) => !NOISE_FIELDS.has(key))
-    .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]));
-
   const removed = payload.after == null;
   const added = payload.before == null;
+  const beforeObject =
+    payload.before != null && typeof payload.before === 'object' && !Array.isArray(payload.before)
+      ? payload.before as Record<string, unknown>
+      : null;
+  const afterObject =
+    payload.after != null && typeof payload.after === 'object' && !Array.isArray(payload.after)
+      ? payload.after as Record<string, unknown>
+      : null;
+  const scalarChange = !added && !removed && (!beforeObject || !afterObject);
+  const before = beforeObject ?? {};
+  const after = afterObject ?? {};
+  const keys = scalarChange
+    ? []
+    : Array.from(new Set([...Object.keys(before), ...Object.keys(after)]))
+      .filter((key) => !NOISE_FIELDS.has(key))
+      .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]));
 
   return (
     <div className="review-panel">
@@ -62,7 +74,18 @@ export function GraphDiff({ payload }: { payload: GraphChangePayloadDto }) {
         </h3>
         <p className="review-hint" title={payload.targetId}>{objectLabel(payload.targetId)}</p>
 
-        {keys.length === 0 ? (
+        {scalarChange ? (
+          <dl className="review-facts review-diff">
+            <div className="review-diff-row">
+              <dt>状态</dt>
+              <dd>
+                <del>{render(payload.before)}</del>
+                <span aria-hidden="true">→</span>
+                <ins>{render(payload.after)}</ins>
+              </dd>
+            </div>
+          </dl>
+        ) : keys.length === 0 ? (
           <p className="review-hint">没有字段级差异。</p>
         ) : (
           <dl className="review-facts review-diff">

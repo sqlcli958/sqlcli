@@ -39,6 +39,7 @@ type KnowledgeTab = (typeof KNOWLEDGE_TABS)[number]['key'];
 export function KnowledgePage() {
   const [searchParams] = useSearchParams();
   const alias = searchParams.get('alias');
+  const targetId = searchParams.get('target');
   const { graphAvailable, graphStatusLoading, graphStatusError } = useOutletContext<{
     graphAvailable: boolean;
     graphStatusLoading: boolean;
@@ -107,6 +108,34 @@ export function KnowledgePage() {
   const [leftTab, setLeftTab] = useState<KnowledgeTab>('tables');
   // 左栏点了哪张表：主画布的大图把视野移过去。只在血缘标签下有意义
   const [lineageFocus, setLineageFocus] = useState<string | null>(null);
+
+  // Eval / Impact 从别页带 targetId 过来时，直接把人送到真正负责这个对象的位置。
+  useEffect(() => {
+    if (!targetId) return;
+    if (targetId.startsWith('table:')) {
+      selectNode(targetId.split(':').slice(2).join(':'));
+      setExplorerOpen(true);
+      setLeftTab('tables');
+      return;
+    }
+    if (targetId.startsWith('column:')) {
+      const qualified = targetId.split(':').slice(2).join(':');
+      const dot = qualified.lastIndexOf('.');
+      if (dot > 0) selectNode(qualified.slice(0, dot));
+      setExplorerOpen(true);
+      setLeftTab('tables');
+      return;
+    }
+    if (targetId.startsWith('lineage:')) {
+      setExplorerOpen(true);
+      setLeftTab('lineage');
+      return;
+    }
+    if (targetId.startsWith('relation:')) {
+      setExplorerOpen(true);
+      setLeftTab('tables');
+    }
+  }, [targetId, selectNode]);
 
   const handleSelectTable = useCallback(
     (schema: string, table: string) => selectNode(`${schema}.${table}`),

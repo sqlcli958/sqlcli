@@ -672,3 +672,8 @@
   align-items: center;
   gap: 3px;
 }
+
+
+.term-detail-links { display: flex; flex-wrap: wrap; gap: 5px 10px; }
+.term-detail-links a { color: var(--color-primary); text-decoration: none; }
+.term-detail-links a:hover { text-decoration: underline; }

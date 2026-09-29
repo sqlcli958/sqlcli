@@ -222,48 +222,41 @@ public class WorkspaceMutationService {
     }
 
     /**
-     * 落盘之后目标还是一条候选关系时，为它排一条待审批。
+     * 落盘之后目标仍是 candidate 时，为它排一条待审批。
      *
-     * <p>候选边是 agent 写进图谱、但标着「还不算数」的东西——它跟一次待批准的变更是同一类
-     * 事情（等着人决定），所以要进同一个队列。原来它只在图谱那边单开一个列表，
-     * 结果是一件等着我决定的事有两个入口，两边都得看一遍。
-     *
-     * <p>只在**没开图谱审批**的别名上会发生：开了的话写入本身就排了队，
-     * 批准时 {@code publishIfCandidate} 直接定级，压根不留候选态。
-     *
-     * <p>建之前查一次同 target 的待审批：agent 反复改同一条边（改 confidence、改 join
-     * 表达式）会一路走到这里，不查就是同一条边在队列里排好几遍。
+     * <p>candidate 是统一的“机器主张、尚未人工确认”状态，不应只对 relation 生效。
+     * term / metric / lineage 如果没有同样的出口，就会永久停在 candidate，状态字段本身
+     * 失去治理意义。开了图谱审批时写入本身已经排队，批准重放时
+     * {@link #publishIfCandidate} 会直接定级；这里只处理未开启图谱审批、但对象本身仍需要
+     * 发布评审的情况。
      */
     private MutationResult queueCandidateReview(String alias, GraphWorkspace workspace,
             GraphActor actor, MutationResult result) {
         String targetId = result.getTargetId();
-        if (!result.isSuccess() || result.getChangeId() == null || targetId == null
-                || !targetId.startsWith("relation:")) {
+        if (!result.isSuccess() || result.getChangeId() == null || targetId == null) {
             return result;
         }
-        if (!(GraphObjectPatch.read(workspace, targetId) instanceof RelationWorkspaceEdge relation)
-                || relation.getStatus() != GraphStatus.candidate) {
+        Object value = GraphObjectPatch.read(workspace, targetId);
+        if (!(value instanceof BaseGraphObject candidate)
+                || !isReviewableCandidate(value)
+                || candidate.getStatus() != GraphStatus.candidate) {
             return result;
         }
         if (runState.hasPendingApproval(alias, ApprovalGate.Kind.GRAPH.code(), targetId)) {
             return result;
         }
         long id = approvalGate.request(alias, ApprovalGate.Kind.GRAPH,
-                describeCandidate(relation), relation.getJoinExpression(), null, targetId,
+                describeCandidate(value), candidateEvidence(value), null, targetId,
                 GraphChangePayload.publish(targetId, actor == null ? null : actor.name(),
                         workspace.getManifest().getRevision()).toJson());
         return result.withPendingApproval(id);
     }
 
     /**
-     * 把图谱里已有的候选边补进待审批队列，返回补了几条。
+     * 把工作区里已有的 candidate 全部补进待审批队列，返回新补的条数。
      *
-     * <p>候选边改成排队评审之前写进去的那些，谁也没给它们建过审批行——不补的话
-     * 它们就永远躺在图谱里，既不在待审批里、也没有别的地方能处理（候选队列已经从
-     * 图谱页撤掉了）。{@code hasPendingApproval} 保证重复调用不会排两遍，
-     * 所以每次开 UI 都跑一遍就够了，不需要额外的「迁移完成」标记。
-     *
-     * <p>读不到图谱就返回 0：新数据源还没导入图谱是正常状态，不该让 UI 起不来。
+     * <p>relation / lineage / term / metric 使用同一套生命周期。升级前已经有人批准过、但因为
+     * 老逻辑漏定级而仍是 candidate 的对象，不重复排队，直接由 system 补定级。
      */
     public int syncCandidateApprovals(String alias) {
         GraphWorkspace workspace;
@@ -274,44 +267,31 @@ public class WorkspaceMutationService {
             return 0;
         }
         int queued = 0;
-        for (RelationWorkspaceEdge relation : workspace.getRelations()) {
-            if (relation.getStatus() != GraphStatus.candidate) continue;
-            if (runState.hasPendingApproval(alias, ApprovalGate.Kind.GRAPH.code(), relation.getId())) {
-                continue;
-            }
-            approvalGate.request(alias, ApprovalGate.Kind.GRAPH, describeCandidate(relation),
-                    relation.getJoinExpression(), null, relation.getId(),
-                    GraphChangePayload.publish(relation.getId(),
-                            relation.getUpdatedBy() == null ? null : relation.getUpdatedBy().name(),
-                            workspace.getManifest().getRevision()).toJson());
-            queued++;
-        }
-        // 候选血缘同一条路：不排的话它永远是候选（auto 别名上写的都在这）。
-        // 已经有人批准过的（批准即评审那步以前漏了血缘）不再排第二次，直接补定级——
-        // 那是记账，不是新的内容主张，走 system 不过审批。
         List<String> alreadyApproved = new ArrayList<>();
-        for (LineageRecord record : workspace.getLineage().values()) {
-            if (record.getStatus() != GraphStatus.candidate) continue;
-            if (runState.hasPendingApproval(alias, ApprovalGate.Kind.GRAPH.code(), record.getId())) {
-                continue;
-            }
-            if (runState.hasApprovedApproval(alias, ApprovalGate.Kind.GRAPH.code(), record.getId())) {
-                alreadyApproved.add(record.getId());
-                continue;
-            }
-            approvalGate.request(alias, ApprovalGate.Kind.GRAPH, describeCandidate(record),
-                    record.getExpression(), null, record.getId(),
-                    GraphChangePayload.publish(record.getId(),
-                            record.getUpdatedBy() == null ? null : record.getUpdatedBy().name(),
-                            workspace.getManifest().getRevision()).toJson());
-            queued++;
+
+        for (RelationWorkspaceEdge relation : workspace.getRelations()) {
+            queued += queueExistingCandidateApproval(alias, workspace, relation, alreadyApproved);
         }
+        for (LineageRecord record : workspace.getLineage().values()) {
+            queued += queueExistingCandidateApproval(alias, workspace, record, alreadyApproved);
+        }
+        for (TermWorkspaceNode term : workspace.getTerms().values()) {
+            queued += queueExistingCandidateApproval(alias, workspace, term, alreadyApproved);
+        }
+        for (MetricRecord metric : workspace.getMetrics().values()) {
+            queued += queueExistingCandidateApproval(alias, workspace, metric, alreadyApproved);
+        }
+
         if (!alreadyApproved.isEmpty()) {
             mutate(alias, workspace.getManifest().getRevision(), GraphActor.system,
-                    "候选血缘已在审批中批准，补定级", alreadyApproved.get(0), ApprovalMode.NEVER, current -> {
+                    "候选对象已在审批中批准，补定级", alreadyApproved.get(0), ApprovalMode.NEVER, current -> {
                         for (String id : alreadyApproved) {
-                            LineageRecord record = current.getLineage().get(id);
-                            if (record != null && record.getStatus() == GraphStatus.candidate) grade(record);
+                            Object value = GraphObjectPatch.read(current, id);
+                            if (value instanceof BaseGraphObject candidate
+                                    && isReviewableCandidate(value)
+                                    && candidate.getStatus() == GraphStatus.candidate) {
+                                grade(candidate);
+                            }
                         }
                         return new MutationOutcome(alreadyApproved.get(0), ChangeOperation.update,
                                 alreadyApproved.subList(1, alreadyApproved.size()));
@@ -320,20 +300,67 @@ public class WorkspaceMutationService {
         return queued;
     }
 
-    /** 血缘那一行：类别、目标列、几个源、代码位置——够决定要不要发布了。 */
-    private static String describeCandidate(LineageRecord record) {
-        String kind = record.getLineageKind() == null ? "" : record.getLineageKind() + " ";
-        return "发布候选血缘 " + kind + shortRef(record.getTarget()) + " ← "
-                + record.getSources().size() + " 个源"
-                + (record.getThrough() == null ? "" : "（" + record.getThrough() + "）");
+    private int queueExistingCandidateApproval(String alias, GraphWorkspace workspace,
+            BaseGraphObject candidate, List<String> alreadyApproved) {
+        if (candidate == null || candidate.getStatus() != GraphStatus.candidate
+                || !isReviewableCandidate(candidate)) {
+            return 0;
+        }
+        String targetId = candidate.getId();
+        if (runState.hasPendingApproval(alias, ApprovalGate.Kind.GRAPH.code(), targetId)) {
+            return 0;
+        }
+        if (runState.hasApprovedApproval(alias, ApprovalGate.Kind.GRAPH.code(), targetId)) {
+            alreadyApproved.add(targetId);
+            return 0;
+        }
+        approvalGate.request(alias, ApprovalGate.Kind.GRAPH, describeCandidate(candidate),
+                candidateEvidence(candidate), null, targetId,
+                GraphChangePayload.publish(targetId,
+                        candidate.getUpdatedBy() == null ? null : candidate.getUpdatedBy().name(),
+                        workspace.getManifest().getRevision()).toJson());
+        return 1;
     }
 
-    /** 审批列表里那一行摘要：类型、两个端点、置信度——够决定要不要发布了。 */
-    private static String describeCandidate(RelationWorkspaceEdge relation) {
-        String confidence = relation.getConfidence() == null ? ""
-                : "（置信度 " + Math.round(relation.getConfidence() * 100) + "%）";
-        return "发布候选关系 " + relation.getType() + "：" + shortRef(relation.getFrom())
-                + " → " + shortRef(relation.getTo()) + confidence;
+    private static boolean isReviewableCandidate(Object value) {
+        return value instanceof RelationWorkspaceEdge
+                || value instanceof LineageRecord
+                || value instanceof TermWorkspaceNode
+                || value instanceof MetricRecord;
+    }
+
+    /** 审批卡片的一行摘要。四类 candidate 在同一入口评审，不能再各自发明一套状态机。 */
+    private static String describeCandidate(Object value) {
+        if (value instanceof RelationWorkspaceEdge relation) {
+            String confidence = relation.getConfidence() == null ? ""
+                    : "（置信度 " + Math.round(relation.getConfidence() * 100) + "%）";
+            return "发布候选关系 " + relation.getType() + "：" + shortRef(relation.getFrom())
+                    + " → " + shortRef(relation.getTo()) + confidence;
+        }
+        if (value instanceof LineageRecord record) {
+            String kind = record.getLineageKind() == null ? "" : record.getLineageKind() + " ";
+            return "发布候选血缘 " + kind + shortRef(record.getTarget()) + " ← "
+                    + record.getSources().size() + " 个源"
+                    + (record.getThrough() == null ? "" : "（" + record.getThrough() + "）");
+        }
+        if (value instanceof TermWorkspaceNode term) {
+            String label = term.getDisplayName() == null || term.getDisplayName().isBlank()
+                    ? term.getName() : term.getDisplayName();
+            return "发布候选术语 " + label
+                    + (term.getPrimaryTarget() == null ? "" : " → " + shortRef(term.getPrimaryTarget()));
+        }
+        if (value instanceof MetricRecord metric) {
+            return "发布候选指标 " + metric.getName();
+        }
+        return "发布候选图谱对象";
+    }
+
+    private static String candidateEvidence(Object value) {
+        if (value instanceof RelationWorkspaceEdge relation) return relation.getJoinExpression();
+        if (value instanceof LineageRecord record) return record.getExpression();
+        if (value instanceof TermWorkspaceNode term) return term.getDescription();
+        if (value instanceof MetricRecord metric) return metric.getExpression();
+        return null;
     }
 
     /** `column:demo:APP.ORDERS.USER_ID` → `ORDERS.USER_ID`。 */
@@ -564,9 +591,14 @@ public class WorkspaceMutationService {
                         ? publishLineage(alias, payload.targetId(), ANY_REVISION, note)
                         : rejectLineage(alias, payload.targetId(), ANY_REVISION, note);
             }
+            if (payload.targetId().startsWith("relation:")) {
+                return approved
+                        ? publishRelation(alias, payload.targetId(), ANY_REVISION, note)
+                        : rejectRelation(alias, payload.targetId(), ANY_REVISION, note);
+            }
             return approved
-                    ? publishRelation(alias, payload.targetId(), ANY_REVISION, note)
-                    : rejectRelation(alias, payload.targetId(), ANY_REVISION, note);
+                    ? publishCandidate(alias, payload.targetId(), ANY_REVISION, note)
+                    : rejectCandidate(alias, payload.targetId(), ANY_REVISION, note);
         }
         if (!approved) {
             // 变更从来没进过图谱，拒绝不需要任何图谱侧动作
@@ -766,20 +798,18 @@ public class WorkspaceMutationService {
     }
 
     /**
-     * 批准即评审：候选关系 / 候选血缘落地时直接定级，不再要求人在图谱页点第二次「发布」。
+     * 批准即评审：所有可评审 candidate 落地时直接定级，不再要求人为同一个对象点第二次“发布”。
      *
-     * <p>血缘原来漏在这里：批准只重放了记录，状态还是 candidate，而 candidate 又没有别的出口——
-     * 17 条全挂着「待发布」，这个状态就没有意义了。判据与关系同一条：置信度 ≥ 0.9 算 verified。
+     * <p>relation / lineage / term / metric 共用这一条规则。漏掉任何一种都会制造永久 candidate。
      */
     private static void publishIfCandidate(GraphWorkspace workspace, String targetId) {
         Object object = GraphObjectPatch.read(workspace, targetId);
-        if (!(object instanceof BaseGraphObject candidate)) return;
-        if (!(object instanceof RelationWorkspaceEdge) && !(object instanceof LineageRecord)) return;
+        if (!(object instanceof BaseGraphObject candidate) || !isReviewableCandidate(object)) return;
         if (candidate.getStatus() != GraphStatus.candidate) return;
         grade(candidate);
     }
 
-    /** 候选定级：置信度 ≥ 0.9 升为 verified，否则 partial（保留，不再是候选）。关系和血缘同一份判据。 */
+    /** 候选定级：置信度 ≥ 0.9 升为 verified，否则 partial（保留，不再是候选）。 */
     private static void grade(BaseGraphObject candidate) {
         Double confidence = candidate.getConfidence();
         boolean verified = confidence != null && confidence >= RelationValidator.VERIFIED_MIN_CONFIDENCE;
@@ -997,6 +1027,53 @@ public class WorkspaceMutationService {
             return new MutationOutcome(lineageId, ChangeOperation.update);
         });
         return settleCandidateApproval(alias, lineageId, result, "approved", reason);
+    }
+
+    /**
+     * 发布 term / metric 候选。关系和血缘保留专用入口，是因为关系还有 foreign_key
+     * 的拒绝保护；其余 BaseGraphObject 走这条统一状态转换。
+     */
+    public MutationResult publishCandidate(String alias, String targetId,
+            long expectedRevision, String reason) {
+        MutationResult result = mutate(alias, expectedRevision, GraphActor.human, reason, targetId,
+                ApprovalMode.NEVER, workspace -> {
+            Object value = GraphObjectPatch.read(workspace, targetId);
+            if (!(value instanceof BaseGraphObject candidate) || !isReviewableCandidate(value)
+                    || value instanceof RelationWorkspaceEdge || value instanceof LineageRecord) {
+                throw new IllegalArgumentException("candidate not found or requires typed publisher: " + targetId);
+            }
+            if (candidate.getStatus() != GraphStatus.candidate) {
+                throw new IllegalArgumentException("object is not candidate: " + targetId);
+            }
+            grade(candidate);
+            candidate.getAttributes().remove(REJECTION_REASON_ATTR);
+            candidate.touch(GraphActor.human);
+            return new MutationOutcome(targetId, ChangeOperation.update);
+        });
+        return settleCandidateApproval(alias, targetId, result, "approved", reason);
+    }
+
+    /** 拒绝 term / metric 候选：保留对象与原因，状态转 ignored，避免同一建议反复出现。 */
+    public MutationResult rejectCandidate(String alias, String targetId,
+            long expectedRevision, String reason) {
+        MutationResult result = mutate(alias, expectedRevision, GraphActor.human, reason, targetId,
+                ApprovalMode.NEVER, workspace -> {
+            Object value = GraphObjectPatch.read(workspace, targetId);
+            if (!(value instanceof BaseGraphObject candidate) || !isReviewableCandidate(value)
+                    || value instanceof RelationWorkspaceEdge || value instanceof LineageRecord) {
+                throw new IllegalArgumentException("candidate not found or requires typed rejector: " + targetId);
+            }
+            if (candidate.getStatus() != GraphStatus.candidate) {
+                throw new IllegalArgumentException("object is not candidate: " + targetId);
+            }
+            candidate.setStatus(GraphStatus.ignored);
+            candidate.setVerified(false);
+            candidate.getAttributes().put(REJECTION_REASON_ATTR,
+                    reason == null || reason.isBlank() ? "拒绝候选对象" : reason);
+            candidate.touch(GraphActor.human);
+            return new MutationOutcome(targetId, ChangeOperation.update);
+        });
+        return settleCandidateApproval(alias, targetId, result, "rejected", reason);
     }
 
     /** 拒绝候选血缘：转 ignored 留痕，不物理删——同 {@link #rejectRelation} 的理由。 */

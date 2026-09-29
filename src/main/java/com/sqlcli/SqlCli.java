@@ -715,6 +715,7 @@ public class SqlCli {
         String aliasesCsv = null;
         String negativeAliasesCsv = null;
         String mappedRefsCsv = null;
+        String termMetricsCsv = null;
         String primaryTargetRef = null;
         java.util.List<String> termFilters = new java.util.ArrayList<>();
         String importSchema = null;
@@ -740,6 +741,7 @@ public class SqlCli {
         String dimensionsCsv = null;
         String joinPathCsv = null;
         String requestedGrain = null;
+        String metricTermRef = null;
         String timeFrom = null;
         String timeTo = null;
         boolean assumeYes = false;
@@ -892,6 +894,9 @@ public class SqlCli {
                 case "--map":
                     if (i + 1 < args.length) mappedRefsCsv = args[++i];
                     break;
+                case "--metrics":
+                    if (i + 1 < args.length) termMetricsCsv = args[++i];
+                    break;
                 case "--primary-target":
                     if (i + 1 < args.length) primaryTargetRef = args[++i];
                     break;
@@ -963,6 +968,9 @@ public class SqlCli {
                 case "--grain":
                     if (i + 1 < args.length) requestedGrain = args[++i];
                     break;
+                case "--term":
+                    if (i + 1 < args.length) metricTermRef = args[++i];
+                    break;
                 case "--time-from":
                     if (i + 1 < args.length) timeFrom = args[++i];
                     break;
@@ -1011,6 +1019,7 @@ public class SqlCli {
         cmd.setAliasesCsv(aliasesCsv);
         cmd.setNegativeAliasesCsv(negativeAliasesCsv);
         cmd.setMappedRefsCsv(mappedRefsCsv);
+        cmd.setTermMetricsCsv(termMetricsCsv);
         cmd.setPrimaryTargetRef(primaryTargetRef);
         cmd.setTermFilters(termFilters);
         cmd.setTargetRef(targetRef);
@@ -1029,6 +1038,7 @@ public class SqlCli {
         cmd.setDimensionsCsv(dimensionsCsv);
         cmd.setJoinPathCsv(joinPathCsv);
         cmd.setRequestedGrain(requestedGrain);
+        cmd.setMetricTermRef(metricTermRef);
         cmd.setTimeFrom(timeFrom);
         cmd.setTimeTo(timeTo);
         cmd.setImportSchema(importSchema);
@@ -1072,11 +1082,11 @@ public class SqlCli {
             "--add-tag", "--add-constraint", "--business-name", "--semantic-type", "--redundant-of",
             "--display-name", "--owner", "--type",
             "--from", "--to", "--join", "--confidence", "--aliases", "--negative-aliases", "--map",
-            "--primary-target", "--filter",
+            "--metrics", "--primary-target", "--filter",
             "--batch-size", "--limit", "--cases", "--answers", "--months",
             "--expression", "--filters", "--grain-column", "--grains", "--dimensions",
             "--target", "--source", "--through", "--kind", "--id",
-            "--join-path", "--grain", "--time-from", "--time-to");
+            "--join-path", "--grain", "--term", "--time-from", "--time-to");
 
     private static List<String> positionalArgs(String[] args, String action) {
         List<String> out = new java.util.ArrayList<>();

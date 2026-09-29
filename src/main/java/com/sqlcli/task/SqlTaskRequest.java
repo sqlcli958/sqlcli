@@ -3,6 +3,8 @@ package com.sqlcli.task;
 import com.sqlcli.config.DatabaseConfig;
 import com.sqlcli.connection.QueryExecutionOptions;
 
+import java.util.List;
+
 /**
  * 一次 SQL 任务的输入。CLI、Web UI 的历史重放、将来的 SQL 工作台都构造同一种请求，
  * 交给 {@link SqlTaskModule#execute} 处理——这是全项目唯一的 SQL 执行入口。
@@ -26,12 +28,35 @@ public record SqlTaskRequest(
         Integer maxRowsOverride,
         Integer timeoutSecondsOverride,
         boolean dryRun,
-        String cancelToken
+        String cancelToken,
+        SemanticContext semanticContext
 ) {
+    /** 旧 9 参形态：绝大多数调用方没有语义归因。 */
+    public SqlTaskRequest(DatabaseConfig config, String sql, QueryExecutionOptions options, Origin origin,
+                          Long rerunOf, Integer maxRowsOverride, Integer timeoutSecondsOverride,
+                          boolean dryRun, String cancelToken) {
+        this(config, sql, options, origin, rerunOf, maxRowsOverride, timeoutSecondsOverride,
+                dryRun, cancelToken, null);
+    }
+
     /** 旧 8 参形态：绝大多数调用方不需要中止令牌。 */
     public SqlTaskRequest(DatabaseConfig config, String sql, QueryExecutionOptions options, Origin origin,
                           Long rerunOf, Integer maxRowsOverride, Integer timeoutSecondsOverride, boolean dryRun) {
-        this(config, sql, options, origin, rerunOf, maxRowsOverride, timeoutSecondsOverride, dryRun, null);
+        this(config, sql, options, origin, rerunOf, maxRowsOverride, timeoutSecondsOverride, dryRun, null, null);
+    }
+
+    /**
+     * SQL 的业务语义来源。它不是执行参数，数据库完全不看它；
+     * 只用于把 sql_execution 归因回 metric / term 场景，形成可追溯 MetricRun。
+     */
+    public record SemanticContext(
+            String metricId,
+            Long metricRevision,
+            String termId,
+            String grain,
+            List<String> dimensions,
+            String timeFrom,
+            String timeTo) {
     }
 
     public enum Origin {

@@ -36,6 +36,8 @@ public class PolicyRuleProposals {
             "dangerous_dml_guard", "migration_safety_check", "dialect_sql_pattern");
     static final String STRUCTURE_FILE = "structure.yaml";
     static final String SQL_FILE = "sql-migration.yaml";
+    static final String RULE_SET_PREFIX = "policy-set:";
+    static final String BINDING_PREFIX = "policy-binding:";
 
     private final GraphWorkspaceStore workspaceStore;
     private final PolicyRuleSetManager manager;
@@ -100,8 +102,89 @@ public class PolicyRuleProposals {
         return new Proposal(id, true, fileName);
     }
 
-    /** 批准时落地：写进规则文件（同 id 覆盖、否则追加），版本 +1，并绑定到工作区。 */
+    /**
+     * Web 规则编辑保存的是整个固定分组，不是一条孤立规则。它必须和 agent 规则提议走同一条
+     * approval_request 管线，否则“Agent 要审批、Web 直接写文件”会形成治理旁路。
+     */
+    public Proposal proposeRuleSet(String alias, String fileName, RuleSet requested,
+            GraphActor actor, String reason, boolean manual) throws Exception {
+        RuleSet desired = GraphChangePayload.MAPPER.convertValue(requested, RuleSet.class);
+        PolicyRuleSetManager.RuleSetFile existing = findFile(alias, fileName);
+        desired.setVersion(existing == null ? "1"
+                : String.valueOf(parseVersion(existing.ruleSet().getVersion()) + 1));
+        loader.validate(desired);
+
+        JsonNode before = existing == null ? null : GraphChangePayload.MAPPER.valueToTree(existing.ruleSet());
+        JsonNode after = GraphChangePayload.MAPPER.valueToTree(desired);
+        String targetId = ruleSetTargetId(alias, fileName);
+        GraphChangePayload payload = new GraphChangePayload(targetId,
+                existing == null ? "create" : "update", actor == null ? null : actor.name(),
+                workspaceStore.load(alias).getManifest().getRevision(), before, after,
+                GraphChangePayload.ACTION_POLICY);
+        return submit(alias, targetId, "规则集 " + desired.getTitle(), reason, actor, manual, payload, fileName);
+    }
+
+    public Proposal proposeDeleteRuleSet(String alias, String fileName,
+            GraphActor actor, String reason, boolean manual) throws Exception {
+        PolicyRuleSetManager.RuleSetFile existing = findFile(alias, fileName);
+        if (existing == null) throw new IllegalArgumentException("rule set not found: " + fileName);
+        String targetId = ruleSetTargetId(alias, fileName);
+        GraphChangePayload payload = new GraphChangePayload(targetId, "delete",
+                actor == null ? null : actor.name(),
+                workspaceStore.load(alias).getManifest().getRevision(),
+                GraphChangePayload.MAPPER.valueToTree(existing.ruleSet()), null,
+                GraphChangePayload.ACTION_POLICY);
+        return submit(alias, targetId, "删除规则集 " + existing.ruleSet().getTitle(),
+                reason, actor, manual, payload, fileName);
+    }
+
+    public Proposal proposeBinding(String alias, String fileName, boolean enabled,
+            GraphActor actor, String reason, boolean manual) throws Exception {
+        PolicyRuleSetManager.RuleSetFile existing = findFile(alias, fileName);
+        if (existing == null) throw new IllegalArgumentException("rule set not found: " + fileName);
+        String targetId = bindingTargetId(alias, fileName);
+        JsonNode before = GraphChangePayload.MAPPER.valueToTree(existing.enabled());
+        JsonNode after = GraphChangePayload.MAPPER.valueToTree(enabled);
+        GraphChangePayload payload = new GraphChangePayload(targetId, "update",
+                actor == null ? null : actor.name(),
+                workspaceStore.load(alias).getManifest().getRevision(), before, after,
+                GraphChangePayload.ACTION_POLICY);
+        return submit(alias, targetId, (enabled ? "启用规则集 " : "停用规则集 ") + existing.ruleSet().getTitle(),
+                reason, actor, manual, payload, fileName);
+    }
+
+    private Proposal submit(String alias, String targetId, String summary, String reason,
+            GraphActor actor, boolean manual, GraphChangePayload payload, String fileName) throws Exception {
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("reason is required：规则变更必须留下原因");
+        }
+        if (com.sqlcli.session.SessionContext.batchId() != null) {
+            throw new IllegalArgumentException("规则变更不进批次，请结束当前 batch 后重试");
+        }
+        if (manual) {
+            if (runState.hasPendingApproval(alias, ApprovalGate.Kind.GRAPH.code(), targetId)) {
+                throw new IllegalStateException("这条规则变更已在待审批队列里：" + targetId);
+            }
+            long id = approvalGate.request(alias, ApprovalGate.Kind.GRAPH, summary, reason,
+                    null, targetId, payload.toJson());
+            return new Proposal(id, false, fileName);
+        }
+        apply(alias, payload);
+        long id = approvalGate.recordAutoApproved(alias, ApprovalGate.Kind.GRAPH, summary, reason,
+                targetId, payload.toJson());
+        return new Proposal(id, true, fileName);
+    }
+
+    /** 批准时落地。支持单条规则提议，以及 Web 的整规则集保存 / 删除 / 启停。 */
     public void apply(String alias, GraphChangePayload payload) throws Exception {
+        if (payload.targetId() != null && payload.targetId().startsWith(RULE_SET_PREFIX)) {
+            applyRuleSet(alias, payload);
+            return;
+        }
+        if (payload.targetId() != null && payload.targetId().startsWith(BINDING_PREFIX)) {
+            applyBinding(alias, payload);
+            return;
+        }
         if (payload.after() == null) {
             throw new IllegalStateException("规则审批没有内容可写入");
         }
@@ -122,6 +205,69 @@ public class PolicyRuleProposals {
             manager.update(alias, fileName, ruleSet);
         }
         manager.setBound(alias, fileName, true);
+    }
+
+    private void applyRuleSet(String alias, GraphChangePayload payload) throws Exception {
+        String fileName = parseScopedFileTarget(alias, payload.targetId(), RULE_SET_PREFIX);
+        PolicyRuleSetManager.RuleSetFile current = findFile(alias, fileName);
+        JsonNode currentNode = current == null ? null : GraphChangePayload.MAPPER.valueToTree(current.ruleSet());
+        if (!sameJson(currentNode, payload.before()) && !sameJson(currentNode, payload.after())) {
+            throw new IllegalStateException("规则集在提交审批后已经变化，请基于最新内容重新提交：" + fileName);
+        }
+        if (payload.after() == null || payload.after().isNull()) {
+            if (current != null) manager.delete(alias, fileName);
+            return;
+        }
+        RuleSet desired = GraphChangePayload.MAPPER.treeToValue(payload.after(), RuleSet.class);
+        loader.validate(desired);
+        if (current == null) manager.create(alias, fileName, desired);
+        else manager.update(alias, fileName, desired);
+    }
+
+    private void applyBinding(String alias, GraphChangePayload payload) throws Exception {
+        String fileName = parseScopedFileTarget(alias, payload.targetId(), BINDING_PREFIX);
+        PolicyRuleSetManager.RuleSetFile current = findFile(alias, fileName);
+        if (current == null) throw new IllegalStateException("规则集已不存在：" + fileName);
+        JsonNode currentNode = GraphChangePayload.MAPPER.valueToTree(current.enabled());
+        if (!sameJson(currentNode, payload.before()) && !sameJson(currentNode, payload.after())) {
+            throw new IllegalStateException("规则集启停状态在提交审批后已经变化，请重新提交：" + fileName);
+        }
+        if (payload.after() == null || !payload.after().isBoolean()) {
+            throw new IllegalStateException("规则集启停审批缺少 boolean after");
+        }
+        manager.setBound(alias, fileName, payload.after().asBoolean());
+    }
+
+    private PolicyRuleSetManager.RuleSetFile findFile(String alias, String fileName) throws Exception {
+        return manager.list(alias).stream()
+                .filter(item -> item.fileName().equals(fileName))
+                .findFirst().orElse(null);
+    }
+
+    private static boolean sameJson(JsonNode left, JsonNode right) {
+        boolean leftNull = left == null || left.isNull();
+        boolean rightNull = right == null || right.isNull();
+        return leftNull ? rightNull : !rightNull && left.equals(right);
+    }
+
+    static String ruleSetTargetId(String alias, String fileName) {
+        return RULE_SET_PREFIX + alias + ":" + fileName;
+    }
+
+    static String bindingTargetId(String alias, String fileName) {
+        return BINDING_PREFIX + alias + ":" + fileName;
+    }
+
+    private static String parseScopedFileTarget(String alias, String targetId, String prefix) {
+        String expected = prefix + alias + ":";
+        if (targetId == null || !targetId.startsWith(expected)) {
+            throw new IllegalStateException("不是当前数据源的规则变更 targetId: " + targetId);
+        }
+        String fileName = targetId.substring(expected.length());
+        if (fileName.isBlank() || fileName.contains("/") || fileName.contains("\\")) {
+            throw new IllegalStateException("非法规则文件 targetId: " + targetId);
+        }
+        return fileName;
     }
 
     // ---- required_business_columns 的 CLI 表达 ----

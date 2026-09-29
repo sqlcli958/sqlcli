@@ -6,6 +6,7 @@ import {
   selectSampleSql,
   stashWorkbenchSql,
   takeWorkbenchSql,
+  takeWorkbenchSemanticContext,
 } from './workbenchSql';
 
 describe('写语句判断', () => {
@@ -75,5 +76,22 @@ describe('跨页传递 SQL', () => {
     stashWorkbenchSql(selectSampleSql('public', 'orders'));
     expect(takeWorkbenchSql()).toBe('SELECT * FROM public.orders LIMIT 100');
     expect(takeWorkbenchSql()).toBeNull();
+    expect(takeWorkbenchSemanticContext()).toBeUndefined();
+  });
+
+  test('指标语义上下文和 SQL 一起跨页传递，也只消费一次', () => {
+    stashWorkbenchSql('SELECT gmv FROM x', {
+      metricId: 'metric:demo:gmv',
+      metricRevision: 7,
+      grain: 'day',
+    });
+
+    expect(takeWorkbenchSql()).toBe('SELECT gmv FROM x');
+    expect(takeWorkbenchSemanticContext()).toEqual({
+      metricId: 'metric:demo:gmv',
+      metricRevision: 7,
+      grain: 'day',
+    });
+    expect(takeWorkbenchSemanticContext()).toBeUndefined();
   });
 });

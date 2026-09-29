@@ -353,6 +353,34 @@ class RunStateStoreTest {
                 "demo", null, null, null, "qm_pct"));
     }
 
+    @Test
+    void recordsMetricRunWithExecutionAndSemanticRevision(@TempDir Path dir) {
+        RunStateStore store = store(dir);
+        long executionId = store.recordExecution("demo", "SELECT", "SELECT 1", "success",
+                null, null, 8, 1000);
+
+        String termId = "term:demo:已支付订单";
+        long runId = store.recordMetricRun(
+                "demo", "metric:demo:gmv_paid", 7L, termId, executionId, "success",
+                "day", List.of("column:demo:app.orders.channel"),
+                "2026-09-01", "2026-09-30", 30L, 8, null, 1000);
+        store.recordMetricRun(
+                "demo", "metric:demo:gmv_paid", 7L, "term:demo:全部订单", executionId, "failed",
+                "day", List.of(), "2026-09-01", "2026-09-30", 0L, 5, "timeout", 900);
+
+        assertTrue(runId > 0);
+        List<RunStateStore.MetricRunRow> runs =
+                store.listMetricRuns("demo", "metric:demo:gmv_paid", termId, 20);
+        assertEquals(1, runs.size(), "场景健康度不能混入同一指标在其他 Term 下的运行");
+        RunStateStore.MetricRunRow run = runs.get(0);
+        assertEquals(executionId, run.executionId());
+        assertEquals(7L, run.metricRevision());
+        assertEquals(termId, run.termId());
+        assertEquals("day", run.grain());
+        assertEquals(30L, run.rowCount());
+        assertEquals("success", run.status());
+    }
+
     // --------------------------------------------------------------- graph_read
 
     /**

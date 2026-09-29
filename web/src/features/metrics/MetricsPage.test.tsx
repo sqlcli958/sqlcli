@@ -4,13 +4,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { MetricsPage } from './MetricsPage';
-import type { AliasDirectoryDto, MetricDto } from '../../types/api';
+import type { AliasDirectoryDto, MetricDto, TermDto } from '../../types/api';
 
 vi.mock('../../api/metrics', async () => {
   const actual = await vi.importActual<typeof import('../../api/metrics')>('../../api/metrics');
   return {
     ...actual,
     getMetrics: vi.fn(),
+    getMetricRuns: vi.fn(),
     upsertMetric: vi.fn(),
     expandMetricSql: vi.fn(),
   };
@@ -23,10 +24,15 @@ vi.mock('../../api/workbench', async () => {
   const actual = await vi.importActual<typeof import('../../api/workbench')>('../../api/workbench');
   return { ...actual, executeWorkbenchSql: vi.fn() };
 });
+vi.mock('../../api/workspace', async () => {
+  const actual = await vi.importActual<typeof import('../../api/workspace')>('../../api/workspace');
+  return { ...actual, getTerms: vi.fn() };
+});
 
-const { getMetrics, upsertMetric, expandMetricSql } = await import('../../api/metrics');
+const { getMetrics, getMetricRuns, upsertMetric, expandMetricSql } = await import('../../api/metrics');
 const { getAliases } = await import('../../api/aliases');
 const { executeWorkbenchSql } = await import('../../api/workbench');
+const { getTerms } = await import('../../api/workspace');
 
 const gmv: MetricDto = {
   id: 'metric:demo:gmv_paid',
@@ -44,6 +50,31 @@ const gmv: MetricDto = {
   updatedBy: 'human',
 };
 
+const paidOrders: TermDto = {
+  id: 'term:demo:paid_orders',
+  name: 'paid_orders',
+  displayName: '已支付订单',
+  aliases: ['支付订单'],
+  negativeAliases: [],
+  description: '已支付且未取消',
+  status: 'verified',
+  confidence: 1,
+  mappedTargets: ['table:demo:app.orders'],
+  primaryTarget: 'table:demo:app.orders',
+  filters: ['tenant_id = 7'],
+  metricRefs: [gmv.id],
+  scenarioTables: ['app.orders'],
+  bridgeTables: [],
+};
+
+const tenantOrders: TermDto = {
+  ...paidOrders,
+  id: 'term:demo:tenant_orders',
+  name: 'tenant_orders',
+  displayName: '租户订单',
+  filters: ['tenant_id = :tenantId'],
+};
+
 const aliasDirectory: AliasDirectoryDto = {
   aliases: [{ name: 'demo', readOnly: false, graphAvailable: true, approveQuery: false, approveUpdate: false, approveGraph: false }],
 };
@@ -59,11 +90,18 @@ function Wrapper({ graphAvailable }: { graphAvailable: boolean }) {
   );
 }
 
-function renderPage({ graphAvailable = true, alias = 'demo' }: { graphAvailable?: boolean; alias?: string } = {}) {
+function renderPage({
+  graphAvailable = true,
+  alias = 'demo',
+  target,
+  term,
+}: { graphAvailable?: boolean; alias?: string; target?: string; term?: string } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[alias ? `/?alias=${alias}` : '/']}>
+      <MemoryRouter initialEntries={[alias
+        ? `/?alias=${alias}${target ? `&target=${encodeURIComponent(target)}` : ''}${term ? `&term=${encodeURIComponent(term)}` : ''}`
+        : '/']}>
         <Wrapper graphAvailable={graphAvailable} />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -74,7 +112,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   sessionStorage.clear();
   vi.mocked(getMetrics).mockResolvedValue({ metrics: [gmv], revision: 7 });
+  vi.mocked(getMetricRuns).mockResolvedValue({ metricId: gmv.id, runs: [] });
   vi.mocked(getAliases).mockResolvedValue(aliasDirectory);
+  vi.mocked(getTerms).mockResolvedValue({ terms: [paidOrders, tenantOrders], total: 2 });
 });
 
 test('列出口径：表达式、过滤、时间列与维度都显示成可读列名', async () => {
@@ -102,6 +142,43 @@ test('展开 SQL 后可以直接送去工作台执行', async () => {
 
   await userEvent.click(screen.getByRole('link', { name: '去工作台执行' }));
   expect(sessionStorage.getItem('sql-cli-workbench-pending-sql')).toBe('SELECT 1');
+});
+
+test('Term 场景只展示绑定指标，展开与工作台执行都保留 term 上下文', async () => {
+  vi.mocked(expandMetricSql).mockResolvedValue({
+    metric: 'gmv_paid',
+    metricId: gmv.id,
+    termId: paidOrders.id,
+    revision: 7,
+    sql: 'SELECT 1 WHERE tenant_id = 7',
+  });
+  renderPage({ term: paidOrders.id, target: gmv.id });
+
+  expect(await screen.findByText('场景：已支付订单')).toBeTruthy();
+  expect(screen.getByText('tenant_id = 7')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '新建指标' })).toBeNull();
+
+  await userEvent.click(screen.getByRole('button', { name: '展开 SQL' }));
+  await waitFor(() => expect(expandMetricSql).toHaveBeenCalledWith(
+    gmv.name,
+    expect.objectContaining({ term: paidOrders.id }),
+  ));
+  expect(getMetricRuns).toHaveBeenCalledWith(gmv.name, 10, expect.anything(), paidOrders.id);
+
+  await userEvent.click(await screen.findByRole('link', { name: '去工作台执行' }));
+  const context = JSON.parse(sessionStorage.getItem('sql-cli-workbench-pending-context') || '{}');
+  expect(context).toMatchObject({ metricId: gmv.id, metricRevision: 7, termId: paidOrders.id });
+});
+
+test('带未绑定运行时参数的 Term 场景不允许生成或执行指标 SQL', async () => {
+  renderPage({ term: tenantOrders.id, target: gmv.id });
+
+  expect(await screen.findByText('场景：租户订单')).toBeTruthy();
+  const expand = screen.getByRole('button', { name: '展开 SQL' });
+  expect(expand).toBeDisabled();
+  expect(expand.getAttribute('title')).toContain(':param');
+  expect(screen.queryByRole('button', { name: '出图' })).toBeNull();
+  expect(screen.getByText(/参数绑定能力补齐前/)).toBeTruthy();
 });
 
 test('新建指标带上当前 revision，列引用按 schema.table.column 原样提交', async () => {
@@ -194,10 +271,52 @@ test('出图：展开 SQL 走 executeWorkbenchSql，不另写执行路径，画�
 
   await userEvent.click(screen.getByRole('button', { name: '出图' }));
 
-  await waitFor(() => expect(executeWorkbenchSql).toHaveBeenCalledWith('SELECT grain_day, gmv_paid FROM x'));
+  await waitFor(() => expect(executeWorkbenchSql).toHaveBeenCalledWith(
+    'SELECT grain_day, gmv_paid FROM x',
+    false,
+    undefined,
+    undefined,
+    expect.objectContaining({ metricId: gmv.id, metricRevision: 7, grain: 'day' }),
+  ));
   // 展开时带上了默认粒度和一段时间窗——不是裸调用
   expect(vi.mocked(expandMetricSql).mock.calls[0][1]).toMatchObject({ grain: 'day' });
   expect(await screen.findByRole('img', { name: /已支付GMV 趋势/ })).toBeTruthy();
+});
+
+test('显示指标运行健康度、数据新鲜度和失败数，让定义与真实执行形成反馈', async () => {
+  vi.mocked(getMetricRuns).mockResolvedValue({
+    metricId: gmv.id,
+    runs: [
+      {
+        id: 3, executionId: 11, metricRevision: 7, status: 'success', grain: 'day',
+        rowCount: 30, elapsedMs: 12, startedAt: 1_700_000_000_000, timeTo: '2026-09-29',
+      },
+      {
+        id: 2, executionId: 10, metricRevision: 7, status: 'failed', grain: 'day',
+        rowCount: 0, elapsedMs: 5, startedAt: 1_699_000_000_000, errorSummary: 'timeout',
+      },
+      {
+        id: 1, executionId: 9, metricRevision: 6, status: 'success', grain: 'day',
+        rowCount: 30, elapsedMs: 10, startedAt: 1_698_000_000_000,
+      },
+    ],
+  });
+  renderPage();
+
+  expect(await screen.findByText(/最近运行：success · 12 ms · 30 行/)).toBeTruthy();
+  expect(screen.getByText(/数据截至 2026-09-29/)).toBeTruthy();
+  expect(screen.getByText(/近 3 次成功 2 次（67%） · 失败\/拒绝 1 次/)).toBeTruthy();
+});
+
+test('从 Eval 定位指标时滚到并高亮对应指标卡', async () => {
+  const scrollIntoView = vi.fn();
+  Element.prototype.scrollIntoView = scrollIntoView;
+  renderPage({ target: gmv.id });
+
+  expect(await screen.findByText('已支付GMV')).toBeTruthy();
+  const card = document.getElementById(`metric-target-${gmv.id}`);
+  expect(card?.classList.contains('is-targeted')).toBe(true);
+  await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
 });
 
 test('出图查询为空结果时不画空网格，说明没有数据', async () => {

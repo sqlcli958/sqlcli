@@ -8,6 +8,7 @@ import com.sqlcli.graph.ui.JsonHttpSupport;
 import com.sqlcli.graph.ui.dto.ApiError;
 import com.sqlcli.graph.ui.service.WorkspaceLockManager;
 import com.sqlcli.graph.ui.service.WorkspaceMutationService;
+import com.sqlcli.runstate.RunStateStore;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import org.slf4j.Logger;
@@ -68,6 +69,7 @@ public class WorkspaceMutationController implements HttpHandler {
     private final WorkspaceLockManager lockManager;
     private final RelationValidator relationValidator;
     private final PolicyService policyService;
+    private final RunStateStore runState;
 
     public WorkspaceMutationController(GraphWorkspace workspace, GraphUiSession session,
                                        JsonHttpSupport json, WorkspaceIndexStore indexStore,
@@ -83,6 +85,7 @@ public class WorkspaceMutationController implements HttpHandler {
                 workspaceStore, validator, lockManager);
         this.relationValidator = new RelationValidator();
         this.policyService = new PolicyService(workspaceStore);
+        this.runState = new RunStateStore();
     }
 
     @Override
@@ -140,6 +143,8 @@ public class WorkspaceMutationController implements HttpHandler {
                 }
             } else if (path.startsWith("/api/metrics/") && path.endsWith("/sql") && "GET".equals(method)) {
                 handleExpandMetric(exchange, path);
+            } else if (path.startsWith("/api/metrics/") && path.endsWith("/runs") && "GET".equals(method)) {
+                handleMetricRuns(exchange, path);
             } else if ("/api/validation/issues".equals(path)) {
                 if ("GET".equals(method)) {
                     handleGetValidationIssues(exchange);
@@ -357,7 +362,8 @@ public class WorkspaceMutationController implements HttpHandler {
     /**
      * 把一条指标展开成可执行 SQL。<b>纯离线只读</b>：方言取图谱自带的
      * {@code dataSource.dbType}（导入时记下的），不连库、不落库，与 CLI
-     * {@code expand-metric} 同一条路径。
+     * {@code expand-metric} 同一条路径。可选 {@code term=} 会把显式绑定的 Term 场景过滤
+     * 作为请求上下文叠加进 WHERE；未绑定的 metric/term 组合直接拒绝。
      *
      * <p>展开失败（粒度不在声明范围、库类型不支持时间截断、joinPath 断了）回 400
      * 并原样带出 {@code MetricExpansionException} 的话——那句话是写给定义指标的人看的，
@@ -369,6 +375,10 @@ public class WorkspaceMutationController implements HttpHandler {
         MetricRecord metric = workspace.getMetrics().get(GraphIds.metricId(session.getAlias(), name));
         if (metric == null) {
             json.writeNotFound(exchange, "Metric not found: " + name);
+            return;
+        }
+        if (metric.getStatus() == GraphStatus.ignored) {
+            json.writeJson(exchange, 400, ApiError.badRequest("Metric is ignored and cannot be executed: " + name));
             return;
         }
         Map<String, String> params = json.parseQueryParams(exchange);
@@ -384,6 +394,23 @@ public class WorkspaceMutationController implements HttpHandler {
                 }
             }
         }
+        TermWorkspaceNode term = null;
+        String termRef = json.getParam(params, "term", null);
+        if (termRef != null && !termRef.isBlank()) {
+            String termId = termRef.startsWith("term:")
+                    ? termRef : "term:" + session.getAlias() + ":" + termRef;
+            term = workspace.getTerms().get(termId);
+            if (term == null || term.getStatus() == GraphStatus.ignored) {
+                json.writeJson(exchange, 400, ApiError.badRequest("Term scenario not found or ignored: " + termRef));
+                return;
+            }
+            if (!term.getMetricRefs().contains(metric.getId())) {
+                json.writeJson(exchange, 400, ApiError.badRequest(
+                        "Metric is not bound to term scenario: " + term.getName() + " -> " + metric.getName()));
+                return;
+            }
+        }
+
         String dbType = workspace.getDataSource() != null ? workspace.getDataSource().getDbType() : null;
         String sql;
         try {
@@ -393,15 +420,67 @@ public class WorkspaceMutationController implements HttpHandler {
                             json.getParam(params, "grain", null),
                             json.getParam(params, "timeFrom", null),
                             json.getParam(params, "timeTo", null),
-                            dimensionIds));
+                            dimensionIds,
+                            term == null ? List.of() : term.getFilters()));
         } catch (com.sqlcli.metric.MetricExpansionException e) {
             json.writeJson(exchange, 400, ApiError.badRequest(e.getMessage()));
             return;
         }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("metric", metric.getName());
+        body.put("metricId", metric.getId());
+        body.put("termId", term == null ? null : term.getId());
+        body.put("revision", workspace.getManifest().getRevision());
         body.put("sql", sql);
         json.writeOk(exchange, body);
+    }
+
+    private void handleMetricRuns(HttpExchange exchange, String path) throws IOException {
+        String encoded = path.substring("/api/metrics/".length(), path.length() - "/runs".length());
+        String name = URLDecoder.decode(encoded, StandardCharsets.UTF_8);
+        String metricId = GraphIds.metricId(session.getAlias(), name);
+        if (!workspace.getMetrics().containsKey(metricId)) {
+            json.writeNotFound(exchange, "Metric not found: " + name);
+            return;
+        }
+        Map<String, String> params = json.parseQueryParams(exchange);
+        int limit = 20;
+        String rawLimit = json.getParam(params, "limit", null);
+        if (rawLimit != null) {
+            try {
+                limit = Math.max(1, Math.min(100, Integer.parseInt(rawLimit)));
+            } catch (NumberFormatException e) {
+                json.writeJson(exchange, 400, ApiError.badRequest("Invalid limit: " + rawLimit));
+                return;
+            }
+        }
+        String termId = json.getParam(params, "term", null);
+        if (termId != null && !termId.isBlank() && !termId.startsWith("term:")) {
+            termId = "term:" + session.getAlias() + ":" + termId;
+        }
+        List<Map<String, Object>> runs = runState.listMetricRuns(session.getAlias(), metricId,
+                termId == null || termId.isBlank() ? null : termId, limit).stream()
+                .map(row -> {
+                    Map<String, Object> item = new LinkedHashMap<String, Object>();
+                    item.put("id", row.id());
+                    item.put("executionId", row.executionId());
+                    item.put("metricRevision", row.metricRevision());
+                    item.put("termId", row.termId());
+                    item.put("status", row.status());
+                    item.put("grain", row.grain());
+                    item.put("timeFrom", row.timeFrom());
+                    item.put("timeTo", row.timeTo());
+                    item.put("rowCount", row.rowCount());
+                    item.put("elapsedMs", row.elapsedMs());
+                    item.put("errorSummary", row.errorSummary());
+                    item.put("startedAt", row.startedAt());
+                    return item;
+                })
+                .toList();
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("metricId", metricId);
+        response.put("runs", runs);
+        json.writeOk(exchange, response);
     }
 
     /** 列引用 -> 列 id；解析不出来抛 IllegalArgumentException，由调用方转 400。 */

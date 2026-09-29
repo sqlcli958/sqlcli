@@ -2,6 +2,7 @@ package com.sqlcli.metric;
 
 import com.sqlcli.graph.workspace.ColumnWorkspaceNode;
 import com.sqlcli.graph.workspace.GraphWorkspace;
+import com.sqlcli.graph.workspace.GraphStatus;
 import com.sqlcli.graph.workspace.MetricRecord;
 import com.sqlcli.graph.workspace.RelationWorkspaceEdge;
 import com.sqlcli.graph.workspace.TableWorkspaceNode;
@@ -51,6 +52,12 @@ public final class MetricSqlExpander {
 
     public static String expand(GraphWorkspace workspace, MetricRecord metric, DatabaseStrategy dialect,
             MetricSqlRequest request) {
+        if (metric == null) {
+            throw new MetricExpansionException("metric 不存在，无法展开 SQL");
+        }
+        if (metric.getStatus() == GraphStatus.ignored) {
+            throw new MetricExpansionException("metric 已被拒绝/忽略，不能继续生成 SQL: " + metric.getId());
+        }
         boolean ratio = metric.isRatio();
         if (!ratio && (metric.getExpression() == null || metric.getExpression().isBlank())) {
             throw new MetricExpansionException("metric 未声明 expression，无法生成 SELECT: " + metric.getId());
@@ -248,6 +255,7 @@ public final class MetricSqlExpander {
             // filters 同样不透明，原样拼，见类头注释。
             whereClauses.add("(" + metric.getFilters() + ")");
         }
+        addContextFilters(whereClauses, request);
         if (timeColumnRef != null && request.timeFrom() != null && !request.timeFrom().isBlank()) {
             whereClauses.add(timeColumnRef + " >= '" + escapeLiteral(request.timeFrom()) + "'");
         }
@@ -354,6 +362,9 @@ public final class MetricSqlExpander {
             // 只卡这一侧，不影响另一侧——这正是拆成两个子查询的意义。
             whereClauses.add("(" + component.getFilters() + ")");
         }
+        // 场景范围是“这次业务问题的全集”，必须同时约束分子和分母；
+        // 否则 ratio 的两侧会落在不同业务范围里，结果没有意义。
+        addContextFilters(whereClauses, request);
         if (timeColumnRef != null && request.timeFrom() != null && !request.timeFrom().isBlank()) {
             whereClauses.add(timeColumnRef + " >= '" + escapeLiteral(request.timeFrom()) + "'");
         }
@@ -367,6 +378,27 @@ public final class MetricSqlExpander {
             sql.append("  GROUP BY ").append(String.join(", ", groupByItems));
         }
         return sql.toString().stripTrailing();
+    }
+
+    private static final java.util.regex.Pattern CONTEXT_PARAM =
+            java.util.regex.Pattern.compile("(?<!:):([A-Za-z_][A-Za-z0-9_]*)");
+
+    /**
+     * TermScenario 的过滤作为请求级上下文叠加，不写回 metric 定义。
+     * 有运行时占位符时拒绝生成“看起来可执行”的 SQL：Workbench 当前没有 named parameter
+     * 绑定能力，把 :subjectId 原样发给数据库只会在最后一步失败，且容易让人误以为隔离条件已生效。
+     */
+    private static void addContextFilters(List<String> whereClauses, MetricSqlRequest request) {
+        for (String filter : request.contextFilters()) {
+            if (filter == null || filter.isBlank()) continue;
+            java.util.regex.Matcher matcher = CONTEXT_PARAM.matcher(filter);
+            if (matcher.find()) {
+                throw new MetricExpansionException("场景过滤包含未绑定运行时参数 :" + matcher.group(1)
+                        + "。当前 metric SQL 展开不接受未绑定参数；请先给场景补参数绑定能力，"
+                        + "不要绕过这条过滤直接执行。");
+            }
+            whereClauses.add("(" + filter + ")");
+        }
     }
 
     private static String indent(String sql) {

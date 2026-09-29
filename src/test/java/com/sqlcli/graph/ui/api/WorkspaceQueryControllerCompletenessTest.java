@@ -10,6 +10,8 @@ import com.sqlcli.graph.workspace.ColumnWorkspaceNode;
 import com.sqlcli.graph.workspace.GraphActor;
 import com.sqlcli.graph.workspace.GraphStatus;
 import com.sqlcli.graph.workspace.GraphWorkspace;
+import com.sqlcli.graph.workspace.LineageRecord;
+import com.sqlcli.graph.workspace.MetricRecord;
 import com.sqlcli.graph.workspace.RelationType;
 import com.sqlcli.graph.workspace.RelationWorkspaceEdge;
 import com.sqlcli.graph.workspace.SemanticType;
@@ -131,6 +133,26 @@ class WorkspaceQueryControllerCompletenessTest {
         TermWorkspaceNode term = TermWorkspaceNode.create(ALIAS, "订单", GraphActor.agent);
         workspace.getTerms().put(term.getId(), term);
 
+        MetricRecord candidateMetric = MetricRecord.create(ALIAS, "gmv", GraphActor.agent);
+        candidateMetric.setExpression("SUM(app.orders.id)");
+        workspace.getMetrics().put(candidateMetric.getId(), candidateMetric);
+        MetricRecord ignoredMetric = MetricRecord.create(ALIAS, "old_gmv", GraphActor.agent);
+        ignoredMetric.setExpression("SUM(app.orders.id)");
+        ignoredMetric.setStatus(GraphStatus.ignored);
+        workspace.getMetrics().put(ignoredMetric.getId(), ignoredMetric);
+
+        LineageRecord candidateLineage = LineageRecord.create(ALIAS,
+                "column:" + ALIAS + ":app.report.total",
+                java.util.List.of("column:" + ALIAS + ":app.orders.id"),
+                "orders.id", "etl.report", GraphActor.agent);
+        workspace.getLineage().put(candidateLineage.getId(), candidateLineage);
+        LineageRecord ignoredLineage = LineageRecord.create(ALIAS,
+                "column:" + ALIAS + ":app.customers.id",
+                java.util.List.of("column:" + ALIAS + ":app.orders.customer_id"),
+                "orders.customer_id", "etl.customer", GraphActor.agent);
+        ignoredLineage.setStatus(GraphStatus.ignored);
+        workspace.getLineage().put(ignoredLineage.getId(), ignoredLineage);
+
         workspace.getValidationIssues().add(ValidationIssueRecord.create(
                 ALIAS, ValidationSeverity.error, "missing_comment", "缺注释", orders.getId(), null));
         workspace.getValidationIssues().add(ValidationIssueRecord.create(
@@ -166,6 +188,10 @@ class WorkspaceQueryControllerCompletenessTest {
         assertEquals(1, backlog.get("candidateRelations").asInt());
         assertEquals(1, backlog.get("ignoredRelations").asInt());
         assertEquals(1, backlog.get("candidateTerms").asInt());
+        assertEquals(1, backlog.get("candidateMetrics").asInt());
+        assertEquals(1, backlog.get("ignoredMetrics").asInt());
+        assertEquals(1, backlog.get("candidateLineage").asInt());
+        assertEquals(1, backlog.get("ignoredLineage").asInt());
         assertEquals(1, backlog.get("ignoredIssues").asInt());
         assertEquals(1, backlog.get("openIssuesBySeverity").get("error").asInt());
         assertEquals(1, backlog.get("openIssuesBySeverity").get("warning").asInt());

@@ -109,3 +109,34 @@
 .rf-columns tfoot td { padding: 4px 6px; border-top: 1px solid var(--color-border); }
 .rf-columns .btn.is-danger { opacity: 0; color: var(--color-text-dim); border-color: transparent; }
 .rf-columns tr:hover .btn.is-danger, .rf-columns .btn.is-danger:focus-visible { opacity: 1; color: var(--color-error); }
+
+
+/* ── 规则运行态：定义 → 评估 → 违规 → 豁免/修复 → 复评 ── */
+.policy-runtime { margin: 20px 24px 0; padding: 16px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); }
+.policy-runtime-head { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.policy-runtime-head h2 { margin: 0; font-size: 15px; }
+.policy-runtime-head p { margin: 4px 0 0; color: var(--color-text-muted); line-height: 1.5; }
+.policy-runtime-kpis { display: grid; grid-template-columns: repeat(4, minmax(100px, 1fr)); gap: 8px; margin-top: 14px; }
+.policy-runtime-kpi { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-bg); }
+.policy-runtime-kpi strong { font-size: 18px; }
+.policy-runtime-kpi span { color: var(--color-text-muted); font-size: 12px; }
+.policy-runtime-kpi[data-tone='ok'] strong { color: var(--color-success); }
+.policy-runtime-kpi[data-tone='bad'] strong { color: var(--color-error); }
+.policy-runtime-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.policy-runtime-grid > section { min-width: 0; }
+.policy-runtime-grid h3 { margin: 0 0 8px; font-size: 13px; }
+.policy-runtime-list { list-style: none; display: grid; gap: 6px; margin: 0; padding: 0; }
+.policy-runtime-list li { display: flex; align-items: start; justify-content: space-between; gap: 12px; padding: 10px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-bg); }
+.policy-runtime-list li > div { min-width: 0; display: grid; gap: 3px; }
+.policy-runtime-list strong { font-size: 12px; }
+.policy-runtime-list p { margin: 0; color: var(--color-text); line-height: 1.45; }
+.policy-runtime-list code { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-muted); font-family: var(--font-mono); font-size: 11px; }
+.policy-runtime-list small { color: var(--color-text-muted); }
+.policy-runtime-badge { display: inline-flex; width: fit-content; padding: 1px 5px; border-radius: 4px; background: var(--color-surface-hover); color: var(--color-text-muted); font-size: 10px; }
+.policy-runtime-badge[data-tone='bad'] { color: var(--color-error); }
+.policy-runtime-badge[data-tone='warn'] { color: var(--color-warning); }
+
+@media (max-width: 900px) {
+  .policy-runtime-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .policy-runtime-grid { grid-template-columns: minmax(0, 1fr); }
+}

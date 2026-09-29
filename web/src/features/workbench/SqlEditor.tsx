@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { cancelWorkbenchSql, executeWorkbenchSql } from '../../api/workbench';
+import { cancelWorkbenchSql, executeWorkbenchSql, type WorkbenchSemanticContext } from '../../api/workbench';
 import { getTableDetail, getTables } from '../../api/workspace';
 import { navPath } from '../../app/navigation';
 import type { AliasSummaryDto, PrecheckDto, WorkbenchExecuteResultDto } from '../../types/api';
@@ -37,21 +37,31 @@ export function SqlEditor({
   sql,
   onSqlChange,
   textareaRef,
+  semanticContext,
 }: {
   alias: string;
   aliasInfo?: AliasSummaryDto;
   sql: string;
   onSqlChange: (sql: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
+  semanticContext?: WorkbenchSemanticContext;
 }) {
   // 每次真执行生成一个新令牌随请求带上，服务端把「怎么中止」注册在它名下；
   // 「中止」按钮拿同一个令牌去调 /workbench/cancel。dry-run 是一次快查，不给中止。
   const cancelTokenRef = useRef<string>();
   const [aborted, setAborted] = useState(false);
 
-  const dry = useMutation({ mutationFn: (text: string) => executeWorkbenchSql(text, true) });
+  const dry = useMutation({
+    mutationFn: (text: string) =>
+      semanticContext
+        ? executeWorkbenchSql(text, true, undefined, undefined, semanticContext)
+        : executeWorkbenchSql(text, true),
+  });
   const run = useMutation({
-    mutationFn: (text: string) => executeWorkbenchSql(text, false, cancelTokenRef.current),
+    mutationFn: (text: string) =>
+      semanticContext
+        ? executeWorkbenchSql(text, false, cancelTokenRef.current, undefined, semanticContext)
+        : executeWorkbenchSql(text, false, cancelTokenRef.current),
   });
 
   // 表名补全：图谱没导入时 getTables 会 404，query 静默失败即可——补全就是没有候选。

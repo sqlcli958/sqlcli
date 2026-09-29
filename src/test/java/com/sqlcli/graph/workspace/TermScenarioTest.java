@@ -88,6 +88,27 @@ class TermScenarioTest {
     }
 
     @Test
+    void ignoredTermAndIgnoredMappingsDoNotParticipateInScenario() {
+        GraphWorkspace workspace = seed();
+        TermWorkspaceNode term = term(workspace, "报事");
+        term.setPrimaryTarget(tableId("report"));
+
+        RelationWorkspaceEdge mapping = RelationWorkspaceEdge.create(
+                ALIAS, RelationType.term_mapping, term.getId(), tableId("assign"), GraphActor.agent);
+        mapping.setStatus(GraphStatus.ignored);
+        workspace.getRelations().add(mapping);
+
+        TermScenario scenario = TermScenario.of(workspace, term);
+        assertNotNull(scenario);
+        assertEquals(List.of("app.report"),
+                scenario.tables().stream().map(TermScenario.ScenarioTable::qualifiedName).toList(),
+                "被拒绝的映射不能继续扩展场景");
+
+        term.setStatus(GraphStatus.ignored);
+        assertNull(TermScenario.of(workspace, term), "被拒绝的术语本身不能继续作为业务场景");
+    }
+
+    @Test
     void filtersRideAlong() {
         GraphWorkspace workspace = seed();
         TermWorkspaceNode term = term(workspace, "报事");

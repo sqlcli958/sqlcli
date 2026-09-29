@@ -15,6 +15,23 @@ export interface MetricComponentDto {
 
 export type MetricAdditivity = 'additive' | 'semi_additive' | 'non_additive';
 
+export type MetricSqlExpansionDto = MetricSqlDto;
+
+export interface MetricRunDto {
+  id: number;
+  executionId?: number | null;
+  metricRevision?: number | null;
+  termId?: string | null;
+  status: string;
+  grain?: string | null;
+  timeFrom?: string | null;
+  timeTo?: string | null;
+  rowCount?: number | null;
+  elapsedMs: number;
+  errorSummary?: string | null;
+  startedAt: number;
+}
+
 export interface RatioMetricDto extends MetricDto {
   numerator?: MetricComponentDto | null;
   denominator?: MetricComponentDto | null;
@@ -46,10 +63,24 @@ export async function upsertMetric(
  */
 export async function expandMetricSql(
   name: string,
-  params: { grain?: string; dimensions?: string; timeFrom?: string; timeTo?: string },
+  params: { grain?: string; dimensions?: string; timeFrom?: string; timeTo?: string; term?: string },
   signal?: AbortSignal,
-): Promise<MetricSqlDto> {
-  return get<MetricSqlDto>(`/metrics/${encodeURIComponent(name)}/sql`, params, signal);
+): Promise<MetricSqlExpansionDto> {
+  return get<MetricSqlExpansionDto>(`/metrics/${encodeURIComponent(name)}/sql`, params, signal);
+}
+
+/** 最近的指标运行。它们都能回指对应 sql_execution。 */
+export async function getMetricRuns(
+  name: string,
+  limit = 20,
+  signal?: AbortSignal,
+  term?: string,
+): Promise<{ metricId: string; runs: MetricRunDto[] }> {
+  return get<{ metricId: string; runs: MetricRunDto[] }>(
+    `/metrics/${encodeURIComponent(name)}/runs`,
+    { limit: String(limit), term },
+    signal,
+  );
 }
 
 /**

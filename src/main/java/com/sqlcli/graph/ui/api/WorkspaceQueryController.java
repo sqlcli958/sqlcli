@@ -8,6 +8,7 @@ import com.sqlcli.graph.ui.GraphUiSession;
 import com.sqlcli.graph.ui.JsonHttpSupport;
 import com.sqlcli.graph.ui.dto.*;
 import com.sqlcli.graph.ui.service.GraphViewService;
+import com.sqlcli.graph.ui.service.ImpactAnalysisService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import org.slf4j.Logger;
@@ -30,6 +31,7 @@ import java.util.stream.Collectors;
  *   <li>GET /api/search - search</li>
  *   <li>GET /api/graph - graph view</li>
  *   <li>GET /api/lineage - single-column lineage, multi-hop</li>
+ *   <li>GET /api/impact?targetId=... - structured dependency impact before destructive changes</li>
  * </ul>
  */
 public class WorkspaceQueryController implements HttpHandler {
@@ -104,6 +106,8 @@ public class WorkspaceQueryController implements HttpHandler {
                 handleLineageNetworkGraph(exchange);
             } else if ("/api/lineage".equals(path)) {
                 handleLineage(exchange);
+            } else if ("/api/impact".equals(path)) {
+                handleImpact(exchange);
             } else if ("/api/workspace/completeness".equals(path)) {
                 handleWorkspaceCompleteness(exchange);
             } else {
@@ -142,6 +146,15 @@ public class WorkspaceQueryController implements HttpHandler {
         result.put("readOnly", session.isReadOnly());
         result.put("capabilities", List.of("read", "write"));
         json.writeOk(exchange, result);
+    }
+
+    private void handleImpact(HttpExchange exchange) throws IOException {
+        String targetId = json.getParam(json.parseQueryParams(exchange), "targetId", null);
+        if (targetId == null || targetId.isBlank()) {
+            json.writeJson(exchange, 400, ApiError.badRequest("targetId is required"));
+            return;
+        }
+        json.writeOk(exchange, new ImpactAnalysisService().analyze(workspace, targetId));
     }
 
     // --- GET /api/workspace ---
@@ -267,6 +280,20 @@ public class WorkspaceQueryController implements HttpHandler {
                 backlog.setIgnoredTerms(backlog.getIgnoredTerms() + 1);
             }
         }
+        for (LineageRecord record : workspace.getLineage().values()) {
+            if (record.getStatus() == GraphStatus.candidate) {
+                backlog.setCandidateLineage(backlog.getCandidateLineage() + 1);
+            } else if (record.getStatus() == GraphStatus.ignored) {
+                backlog.setIgnoredLineage(backlog.getIgnoredLineage() + 1);
+            }
+        }
+        for (MetricRecord metric : workspace.getMetrics().values()) {
+            if (metric.getStatus() == GraphStatus.candidate) {
+                backlog.setCandidateMetrics(backlog.getCandidateMetrics() + 1);
+            } else if (metric.getStatus() == GraphStatus.ignored) {
+                backlog.setIgnoredMetrics(backlog.getIgnoredMetrics() + 1);
+            }
+        }
 
         for (ValidationIssueRecord issue : workspace.getValidationIssues()) {
             if (issue.getStatus() == ValidationIssueStatus.ignored) {
@@ -312,6 +339,7 @@ public class WorkspaceQueryController implements HttpHandler {
         }
         List<Map<String, Object>> terms = new ArrayList<>();
         for (TermWorkspaceNode term : workspace.getTerms().values()) {
+            if (term.getStatus() == GraphStatus.ignored) continue;
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", term.getId());
             item.put("name", term.getName());
@@ -326,6 +354,7 @@ public class WorkspaceQueryController implements HttpHandler {
             // 表目录筛到这个场景——术语在界面上不是第二份目录，是图谱的一个筛选维度。
             item.put("primaryTarget", term.getPrimaryTarget());
             item.put("filters", term.getFilters());
+            item.put("metricRefs", term.getMetricRefs());
             TermScenario scenario = TermScenario.of(workspace, term);
             item.put("scenarioTables", scenario == null ? List.of()
                     : scenario.tables().stream().map(TermScenario.ScenarioTable::qualifiedName).toList());

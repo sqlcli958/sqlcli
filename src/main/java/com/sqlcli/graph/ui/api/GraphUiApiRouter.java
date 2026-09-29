@@ -212,6 +212,10 @@ public class GraphUiApiRouter implements HttpHandler {
             new PolicyRuleController(session, json, workspaceStore).handle(exchange);
             return;
         }
+        if (path.startsWith("/api/policy/runtime")) {
+            new PolicyRuntimeController(session, json, workspaceStore).handle(exchange);
+            return;
+        }
         WorkspaceMutationController mutation = new WorkspaceMutationController(
                 workspace, session, json, indexStore, workspaceStore);
         // 术语的 GET 在 query 控制器，只有 DELETE 走 mutation——

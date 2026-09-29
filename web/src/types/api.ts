@@ -243,13 +243,13 @@ export interface GraphChangePayloadDto {
   operation: string;
   actor?: string | null;
   baseRevision: number;
-  before?: Record<string, unknown> | null;
-  after?: Record<string, unknown> | null;
+  before?: unknown;
+  after?: unknown;
   /**
    * `apply`（缺省）= 变更还没进图谱，批准时才写；
    * `publish` = 候选边已经在图谱里，批准 = 发布，拒绝 = 转 ignored（没有 before/after）。
    */
-  action?: 'apply' | 'publish' | null;
+  action?: 'apply' | 'publish' | 'policy' | null;
 }
 
 /** 一次图谱更新的可追溯记录（graph_change_log）。 */
@@ -440,6 +440,8 @@ export interface TermDto {
   primaryTarget: string | null;
   /** 场景专属过滤，含 `:name` 占位符的是必填参数 */
   filters: string[];
+  /** 显式绑定的权威指标 id；不按名字自动猜。 */
+  metricRefs: string[];
   /** 子图里的表（qualifiedName）。UI 用它把表目录筛到这个场景；非场景术语为空 */
   scenarioTables: string[];
   /** 其中为了连通补进来的——术语并没有映射它们，要标出来 */
@@ -484,6 +486,9 @@ export interface MetricsResponseDto {
 
 export interface MetricSqlDto {
   metric: string;
+  metricId?: string;
+  termId?: string | null;
+  revision?: number;
   sql: string;
 }
 
@@ -747,9 +752,13 @@ export interface WorkspaceCompletenessDto {
     candidateTables: number;
     candidateRelations: number;
     candidateTerms: number;
+    candidateLineage: number;
+    candidateMetrics: number;
     ignoredTables: number;
     ignoredRelations: number;
     ignoredTerms: number;
+    ignoredLineage: number;
+    ignoredMetrics: number;
     /** key 是 ValidationSeverity 原值：error / warning / info。 */
     openIssuesBySeverity: Record<string, number>;
     ignoredIssues: number;

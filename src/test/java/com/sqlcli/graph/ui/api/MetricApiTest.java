@@ -12,6 +12,8 @@ import com.sqlcli.graph.workspace.GraphWorkspace;
 import com.sqlcli.graph.workspace.GraphWorkspaceStore;
 import com.sqlcli.graph.workspace.MetricRecord;
 import com.sqlcli.graph.workspace.TableWorkspaceNode;
+import com.sqlcli.graph.workspace.TermWorkspaceNode;
+import com.sqlcli.runstate.RunStateStore;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,9 +22,11 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Map;
 
@@ -61,7 +65,27 @@ class MetricApiTest {
         orders.getColumns().add(ColumnWorkspaceNode.create("amount"));
         orders.getColumns().add(ColumnWorkspaceNode.create("channel"));
         orders.getColumns().add(ColumnWorkspaceNode.create("created_at"));
+        orders.getColumns().add(ColumnWorkspaceNode.create("tenant_id"));
         workspace.getTables().put(orders.getId(), orders);
+
+        TermWorkspaceNode paidOrders = TermWorkspaceNode.create(ALIAS, "paid_orders", GraphActor.agent);
+        paidOrders.setPrimaryTarget(orders.getId());
+        paidOrders.setFilters(new java.util.ArrayList<>(java.util.List.of("tenant_id = 7")));
+        paidOrders.setMetricRefs(new java.util.ArrayList<>(
+                java.util.List.of(GraphIds.metricId(ALIAS, "gmv_paid"))));
+        workspace.getTerms().put(paidOrders.getId(), paidOrders);
+
+        TermWorkspaceNode parameterized = TermWorkspaceNode.create(ALIAS, "tenant_orders", GraphActor.agent);
+        parameterized.setPrimaryTarget(orders.getId());
+        parameterized.setFilters(new java.util.ArrayList<>(java.util.List.of("tenant_id = :tenantId")));
+        parameterized.setMetricRefs(new java.util.ArrayList<>(
+                java.util.List.of(GraphIds.metricId(ALIAS, "gmv_paid"))));
+        workspace.getTerms().put(parameterized.getId(), parameterized);
+
+        TermWorkspaceNode unbound = TermWorkspaceNode.create(ALIAS, "all_orders", GraphActor.agent);
+        unbound.setPrimaryTarget(orders.getId());
+        workspace.getTerms().put(unbound.getId(), unbound);
+
         store.save(workspace);
 
         session = new GraphUiSession(ALIAS, false);
@@ -104,13 +128,56 @@ class MetricApiTest {
         assertEquals(1, listed.get("metrics").size());
         assertEquals("gmv_paid", listed.get("metrics").get(0).get("name").asText());
 
-        String sql = get("/api/metrics/gmv_paid/sql?grain=day", 200).get("sql").asText();
+        JsonNode expanded = get("/api/metrics/gmv_paid/sql?grain=day", 200);
+        assertEquals(GraphIds.metricId(ALIAS, "gmv_paid"), expanded.get("metricId").asText());
+        assertEquals(store.load(ALIAS).getManifest().getRevision(), expanded.get("revision").asLong());
+        String sql = expanded.get("sql").asText();
         // expression 原样进 SELECT，展开层不改写它（MetricRecord#expression 的类注释写明了
         // 「是否可执行由消费方解析」）——被引号包起来的只有展开层自己拼的表名与时间列
         assertTrue(sql.contains("SUM(app.orders.amount)"), sql);
         assertTrue(sql.contains("DATE(`app`.`orders`.`created_at`)"), sql);
         assertTrue(sql.contains("status IN (2,3)"), sql);
         assertTrue(sql.toUpperCase(java.util.Locale.ROOT).contains("GROUP BY"), sql);
+    }
+
+    @Test
+    void expandsBoundMetricInsideTermScenarioAndRejectsUnsafeOrUnboundContexts() throws Exception {
+        post(gmvBody(revision()), 200);
+        String paidTerm = GraphIds.termId(ALIAS, "paid_orders");
+
+        JsonNode expanded = get("/api/metrics/gmv_paid/sql?term=" + enc(paidTerm), 200);
+        assertEquals(paidTerm, expanded.get("termId").asText());
+        assertTrue(expanded.get("sql").asText().contains("(tenant_id = 7)"), expanded.toString());
+
+        JsonNode unbound = get("/api/metrics/gmv_paid/sql?term="
+                + enc(GraphIds.termId(ALIAS, "all_orders")), 400);
+        assertTrue(unbound.get("message").asText().contains("not bound"), unbound.toString());
+
+        JsonNode parameterized = get("/api/metrics/gmv_paid/sql?term="
+                + enc(GraphIds.termId(ALIAS, "tenant_orders")), 400);
+        assertTrue(parameterized.get("message").asText().contains(":tenantId"), parameterized.toString());
+    }
+
+    @Test
+    void exposesRecentMetricRuns() throws Exception {
+        post(gmvBody(revision()), 200);
+        String metricId = GraphIds.metricId(ALIAS, "gmv_paid");
+        RunStateStore runState = new RunStateStore();
+        long executionId = runState.recordExecution(ALIAS, "SELECT", "SELECT 1", "success",
+                null, null, 6, 1000);
+        String paidTerm = GraphIds.termId(ALIAS, "paid_orders");
+        runState.recordMetricRun(ALIAS, metricId, revision(), paidTerm, executionId, "success",
+                "day", java.util.List.of(), "2026-09-01", "2026-09-30", 30L, 6, null, 1000);
+        runState.recordMetricRun(ALIAS, metricId, revision(), GraphIds.termId(ALIAS, "tenant_orders"),
+                executionId, "failed", "day", java.util.List.of(),
+                "2026-09-01", "2026-09-30", 0L, 4, "timeout", 900);
+
+        JsonNode history = get("/api/metrics/gmv_paid/runs?term=" + enc(paidTerm), 200);
+        assertEquals(metricId, history.get("metricId").asText());
+        assertEquals(1, history.get("runs").size());
+        assertEquals(executionId, history.get("runs").get(0).get("executionId").asLong());
+        assertEquals(paidTerm, history.get("runs").get(0).get("termId").asText());
+        assertEquals("success", history.get("runs").get(0).get("status").asText());
     }
 
     /**
@@ -187,6 +254,10 @@ class MetricApiTest {
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(expectedStatus, response.statusCode(), response.body());
         return MAPPER.readTree(response.body());
+    }
+
+    private static String enc(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private JsonNode get(String path, int expectedStatus) throws Exception {

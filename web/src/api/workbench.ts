@@ -1,6 +1,16 @@
 import { post } from './client';
 import type { WorkbenchExecuteResultDto } from '../types/api';
 
+export interface WorkbenchSemanticContext {
+  metricId: string;
+  metricRevision?: number;
+  termId?: string;
+  grain?: string;
+  dimensions?: string[];
+  timeFrom?: string;
+  timeTo?: string;
+}
+
 /**
  * 工作台执行。alias 由 client 自动带上（沿用地址栏的 ?alias=）。
  *
@@ -15,8 +25,9 @@ export async function executeWorkbenchSql(
   dryRun = false,
   cancelToken?: string,
   signal?: AbortSignal,
+  semanticContext?: WorkbenchSemanticContext,
 ): Promise<WorkbenchExecuteResultDto> {
-  return post('/workbench/execute', { sql, dryRun, cancelToken }, signal);
+  return post('/workbench/execute', { sql, dryRun, cancelToken, semanticContext }, signal);
 }
 
 /**
