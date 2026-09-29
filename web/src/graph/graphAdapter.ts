@@ -144,9 +144,8 @@ function initializeGroupedPositions(graph: Graph, components: string[][], isolat
   });
 
   // Layout each connected component independently, then pack measured bounds.
-  // This follows the same broad strategy used by mature graph layout engines for
-  // disconnected graphs: preserve each component's shape first, then solve the
-  // global space-allocation problem.
+  // Mature graph engines use the same two-stage idea for disconnected graphs:
+  // preserve each component's internal shape first, then allocate global space.
   const targetWidth = Math.max(
     0,
     ...groups.map((group) => group.width),
@@ -174,9 +173,8 @@ function initializeGroupedPositions(graph: Graph, components: string[][], isolat
   }
   const connectedHeight = groups.length > 0 ? y + rowHeight : 0;
 
-  // Keep the relationship structure visually centered. The previous layout
-  // started at (0, 0), so a large isolated-node block shifted the whole graph's
-  // visual mass even though the camera focused on related tables.
+  // Center the relationship structure so it remains the visual anchor instead
+  // of inheriting the top-left origin of the packing pass.
   if (connectedWidth > 0 && connectedHeight > 0) {
     graph.forEachNode((node, attrs) => {
       if (graph.degree(node) === 0) return;
@@ -189,38 +187,34 @@ function initializeGroupedPositions(graph: Graph, components: string[][], isolat
 
   if (isolated.length === 0) return;
 
-  // Isolated tables are singleton components. Do not put them in a prominent
-  // row above the relationship graph: pack them into a compact, staggered
-  // secondary shelf below it. The stagger avoids the rigid spreadsheet look
-  // while using space more efficiently than a large outer ring.
-  const isolatedSpacing = 88;
+  // Isolated tables are singleton components. Treat them as secondary context
+  // rather than a second "main graph": pack them into a compact staggered shelf
+  // to the right of the related components. This avoids a prominent band above
+  // or below the relationship structure and wastes much less space than rings.
+  const isolatedSpacing = 78;
   const isolatedRowSpacing = isolatedSpacing * 0.86;
   const isolatedGap = 220;
-  const balancedColumns = Math.ceil(Math.sqrt(isolated.length * 1.8));
-  const widthBoundColumns = Math.max(
-    8,
-    Math.floor(Math.max(1_200, connectedWidth * 2.2) / isolatedSpacing),
-  );
   const columns = Math.min(
     isolated.length,
-    Math.max(1, Math.min(balancedColumns, widthBoundColumns)),
+    Math.max(1, Math.ceil(Math.sqrt(isolated.length * 1.55))),
   );
   const rows = Math.ceil(isolated.length / columns);
-  const firstRowY = connectedHeight > 0
-    ? -connectedHeight / 2 - isolatedGap
-    : ((rows - 1) * isolatedRowSpacing) / 2;
+  const fullRowWidth = Math.max(0, (columns - 1) * isolatedSpacing);
+  const isolatedHeight = Math.max(0, (rows - 1) * isolatedRowSpacing);
+  const panelLeft = connectedWidth > 0
+    ? connectedWidth / 2 + isolatedGap
+    : -fullRowWidth / 2;
 
   isolated.forEach((node, index) => {
     const row = Math.floor(index / columns);
     const column = index % columns;
     const rowCount = Math.min(columns, isolated.length - row * columns);
     const rowWidth = Math.max(0, (rowCount - 1) * isolatedSpacing);
-    const stagger = rowCount > 1 ? (row % 2 === 0 ? -0.22 : 0.22) * isolatedSpacing : 0;
+    const rowInset = (fullRowWidth - rowWidth) / 2;
+    const stagger = rowCount > 1 ? (row % 2 === 0 ? -0.18 : 0.18) * isolatedSpacing : 0;
     graph.mergeNodeAttributes(node, {
-      x: -rowWidth / 2 + column * isolatedSpacing + stagger,
-      // Sigma's graph coordinate system renders lower y values lower on screen
-      // in this layout, so walk downward by subtracting row spacing.
-      y: firstRowY - row * isolatedRowSpacing,
+      x: panelLeft + rowInset + column * isolatedSpacing + stagger,
+      y: -isolatedHeight / 2 + row * isolatedRowSpacing,
     });
   });
 }
