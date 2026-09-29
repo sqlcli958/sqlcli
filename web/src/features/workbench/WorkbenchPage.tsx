@@ -310,9 +310,17 @@ export function CompletenessSection({ alias, data }: { alias: string; data?: Wor
   const backlog = data?.backlog;
   const relations = data?.relations;
   const candidateTotal =
-    (backlog?.candidateTables ?? 0) + (backlog?.candidateRelations ?? 0) + (backlog?.candidateTerms ?? 0);
+    (backlog?.candidateTables ?? 0)
+    + (backlog?.candidateRelations ?? 0)
+    + (backlog?.candidateTerms ?? 0)
+    + (backlog?.candidateLineage ?? 0)
+    + (backlog?.candidateMetrics ?? 0);
   const ignoredTotal =
-    (backlog?.ignoredTables ?? 0) + (backlog?.ignoredRelations ?? 0) + (backlog?.ignoredTerms ?? 0);
+    (backlog?.ignoredTables ?? 0)
+    + (backlog?.ignoredRelations ?? 0)
+    + (backlog?.ignoredTerms ?? 0)
+    + (backlog?.ignoredLineage ?? 0)
+    + (backlog?.ignoredMetrics ?? 0);
   const isolatedTables = relations?.isolatedTables ?? 0;
   const fkOnlyTables = relations?.fkOnlyTables ?? 0;
 
@@ -331,6 +339,8 @@ export function CompletenessSection({ alias, data }: { alias: string; data?: Wor
 
       <div className="wb-metrics">
         <Metric label="候选待评审" value={data && candidateTotal} />
+        <Metric label="候选指标" value={data && (backlog?.candidateMetrics ?? 0)} />
+        <Metric label="候选血缘" value={data && (backlog?.candidateLineage ?? 0)} />
         <Metric label="字段语义待确认" value={data && (backlog?.unverifiedColumnSemantics ?? 0)} />
         <Metric label="已忽略" value={data && ignoredTotal} />
         <Metric label="校验-错误" value={data && (backlog?.openIssuesBySeverity.error ?? 0)} />
