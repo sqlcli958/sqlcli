@@ -153,6 +153,7 @@ public class SchemaActionCommand implements Runnable {
     private String dimensionsCsv;
     private String joinPathCsv;
     private String requestedGrain;
+    private String metricTermRef;
     private String timeFrom;
     private String timeTo;
 
@@ -851,6 +852,8 @@ public class SchemaActionCommand implements Runnable {
                                            不传则不按时间分桶。
                       --dimensions REF,... 要切的维度，必须是该指标声明的 dimensions 子集；
                                            不传则不按维度拆分。
+                      --term NAME|ID        在显式绑定的业务术语/场景下展开；场景 filters 会追加到
+                                           WHERE。未绑定组合拒绝，含未绑定 :param 的场景也拒绝执行。
                       --time-from D        时间下界（含），拼进 WHERE；需要该指标声明了
                                            grain.timeColumn 才生效。
                       --time-to D          时间上界（不含）。
@@ -859,7 +862,7 @@ public class SchemaActionCommand implements Runnable {
                     示例:
                       sql-cli %s schema expand-metric gmv_paid --grain month --dimensions app.orders.channel \\
                         --time-from 2026-01-01 --time-to 2026-02-01
-                    """.formatted(a, a);
+                    """.formatted(a, a, a);
             case "search-eval" -> """
                     用途: 用评估集度量 schema search 的命中率（Top1/Top5/MRR），列出未命中 case。
                           全部 case 有命中退出码 0，存在完全未命中的 case 退出码 1（方便 CI）。
@@ -3134,7 +3137,7 @@ public class SchemaActionCommand implements Runnable {
         if (metricName == null || metricName.isBlank()) {
             return usageError("Usage: sql-cli " + alias
                     + " schema expand-metric <name> [--grain G] [--dimensions <ref>,...]"
-                    + " [--time-from D] [--time-to D] [--json]");
+                    + " [--term NAME|ID] [--time-from D] [--time-to D] [--json]");
         }
         MetricRecord metric = workspace.getMetrics().get(GraphIds.metricId(alias, metricName));
         if (metric == null) {
@@ -3148,6 +3151,20 @@ public class SchemaActionCommand implements Runnable {
             }
             dimensionColumnIds.add(columnId);
         }
+        TermWorkspaceNode term = null;
+        if (metricTermRef != null && !metricTermRef.isBlank()) {
+            String termId = metricTermRef.startsWith("term:")
+                    ? metricTermRef : "term:" + alias + ":" + metricTermRef;
+            term = workspace.getTerms().get(termId);
+            if (term == null || term.getStatus() == GraphStatus.ignored) {
+                return commandFailure("Term scenario not found or ignored: " + metricTermRef);
+            }
+            if (!term.getMetricRefs().contains(metric.getId())) {
+                return commandFailure("Metric is not bound to term scenario: "
+                        + term.getName() + " -> " + metric.getName());
+            }
+        }
+
         // 方言类型直接读图谱自带的 dataSource.dbType（导入时记下的），不用再连一次库或
         // 依赖本机是否配了这个别名的连接信息——SQL 展开本来就该是纯离线操作。
         String dbType = workspace.getDataSource() != null ? workspace.getDataSource().getDbType() : null;
@@ -3155,12 +3172,17 @@ public class SchemaActionCommand implements Runnable {
         String sql;
         try {
             sql = MetricSqlExpander.expand(workspace, metric, dialect,
-                    new MetricSqlRequest(requestedGrain, timeFrom, timeTo, dimensionColumnIds));
+                    new MetricSqlRequest(requestedGrain, timeFrom, timeTo, dimensionColumnIds,
+                            term == null ? List.of() : term.getFilters()));
         } catch (MetricExpansionException e) {
             return commandFailure(e.getMessage());
         }
         if (jsonOutput) {
-            CliJson.printSuccess(Map.of("metric", metric.getName(), "sql", sql));
+            Map<String, Object> output = new LinkedHashMap<>();
+            output.put("metric", metric.getName());
+            output.put("termId", term == null ? null : term.getId());
+            output.put("sql", sql);
+            CliJson.printSuccess(output);
             return 0;
         }
         System.out.println(sql);
@@ -4988,6 +5010,10 @@ public class SchemaActionCommand implements Runnable {
 
     public void setRequestedGrain(String requestedGrain) {
         this.requestedGrain = requestedGrain;
+    }
+
+    public void setMetricTermRef(String metricTermRef) {
+        this.metricTermRef = metricTermRef;
     }
 
     public void setTimeFrom(String timeFrom) {
