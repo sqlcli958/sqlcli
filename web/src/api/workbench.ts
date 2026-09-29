@@ -4,6 +4,7 @@ import type { WorkbenchExecuteResultDto } from '../types/api';
 export interface WorkbenchSemanticContext {
   metricId: string;
   metricRevision?: number;
+  termId?: string;
   grain?: string;
   dimensions?: string[];
   timeFrom?: string;
