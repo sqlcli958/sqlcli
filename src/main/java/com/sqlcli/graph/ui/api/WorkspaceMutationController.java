@@ -459,6 +459,7 @@ public class WorkspaceMutationController implements HttpHandler {
                     item.put("id", row.id());
                     item.put("executionId", row.executionId());
                     item.put("metricRevision", row.metricRevision());
+                    item.put("termId", row.termId());
                     item.put("status", row.status());
                     item.put("grain", row.grain());
                     item.put("timeFrom", row.timeFrom());
