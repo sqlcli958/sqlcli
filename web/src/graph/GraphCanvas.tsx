@@ -373,7 +373,7 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
 
     // Sparse schema graphs are dominated by isolated tables. Running a global
     // force layout would push those tables far away and make Sigma shrink the
-    // related component into a dot. Keep the deterministic ring layout in that
+    // related component into a dot. Keep the deterministic grouped layout in that
     // case; use ForceAtlas2 only when most nodes actually participate in edges.
     let fa2: FA2Layout | null = null;
     let stopTimer: ReturnType<typeof setTimeout> | null = null;
@@ -732,7 +732,7 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
       )}
       {!isLoading && graphData && graphData.nodes.length > 500 && (
         <div className="graph-canvas-hint">
-          关联结构优先 · 无关系表右侧收纳 · 悬停或放大查看表名
+          关联结构优先 · 无关系表环绕分布 · 悬停或放大查看表名
         </div>
       )}
       {!isLoading && !graphData && (

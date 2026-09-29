@@ -89,6 +89,139 @@ function getConnectedComponents(graph: Graph): string[][] {
   return components.sort((left, right) => right.length - left.length || left[0]!.localeCompare(right[0]!));
 }
 
+interface LayoutPoint {
+  node: string;
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+}
+
+function distributeIsolatedNodes(
+  graph: Graph,
+  isolated: string[],
+  connectedWidth: number,
+  connectedHeight: number,
+): void {
+  if (isolated.length === 0) return;
+
+  // Vogel / golden-angle seeding distributes points in every direction without
+  // creating the rigid concentric rings of a classic radial layout.
+  const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+  const MIN_SPACING = 82;
+  const CONNECTED_GAP = 180;
+  const hasConnectedRegion = connectedWidth > 0 && connectedHeight > 0;
+  const innerRadiusX = Math.max(180, connectedWidth / 2 + CONNECTED_GAP);
+  const innerRadiusY = Math.max(180, connectedHeight / 2 + CONNECTED_GAP);
+  const targetAreaPerNode = MIN_SPACING * MIN_SPACING * 1.22;
+  const innerEllipseArea = Math.PI * innerRadiusX * innerRadiusY;
+
+  const points: LayoutPoint[] = isolated.map((node, index) => {
+    const angle = (index + 0.5) * GOLDEN_ANGLE - Math.PI / 2;
+    let targetX: number;
+    let targetY: number;
+
+    if (hasConnectedRegion) {
+      // Fill an annulus around the connected graph by area, not by fixed rings.
+      // As nodes are added, the ellipse expands continuously and keeps density
+      // approximately constant in every direction.
+      const scale = Math.sqrt(
+        1 + ((index + 0.75) * targetAreaPerNode) / innerEllipseArea,
+      );
+      targetX = Math.cos(angle) * innerRadiusX * scale;
+      targetY = Math.sin(angle) * innerRadiusY * scale;
+    } else {
+      // With no related tables at all, use a regular sunflower disk from center.
+      const radius = (MIN_SPACING / Math.sqrt(Math.PI)) * Math.sqrt(index + 0.75);
+      targetX = Math.cos(angle) * radius;
+      targetY = Math.sin(angle) * radius;
+    }
+
+    return { node, x: targetX, y: targetY, targetX, targetY };
+  });
+
+  // Light deterministic relaxation: collision repulsion removes local overlaps,
+  // while a weak spring back to each golden-angle target preserves the overall
+  // 360-degree distribution. A spatial hash avoids O(n²) work on large schemas.
+  const iterations = 14;
+  const cellSize = MIN_SPACING;
+  for (let iteration = 0; iteration < iterations; iteration++) {
+    const grid = new Map<string, number[]>();
+    points.forEach((point, pointIndex) => {
+      const cellX = Math.floor(point.x / cellSize);
+      const cellY = Math.floor(point.y / cellSize);
+      const key = `${cellX}:${cellY}`;
+      const bucket = grid.get(key);
+      if (bucket) bucket.push(pointIndex);
+      else grid.set(key, [pointIndex]);
+    });
+
+    const deltaX = new Array<number>(points.length).fill(0);
+    const deltaY = new Array<number>(points.length).fill(0);
+    const springStrength = 0.08;
+
+    points.forEach((point, pointIndex) => {
+      deltaX[pointIndex] += (point.targetX - point.x) * springStrength;
+      deltaY[pointIndex] += (point.targetY - point.y) * springStrength;
+
+      const cellX = Math.floor(point.x / cellSize);
+      const cellY = Math.floor(point.y / cellSize);
+      for (let xOffset = -1; xOffset <= 1; xOffset++) {
+        for (let yOffset = -1; yOffset <= 1; yOffset++) {
+          const neighbors = grid.get(`${cellX + xOffset}:${cellY + yOffset}`);
+          if (!neighbors) continue;
+
+          for (const neighborIndex of neighbors) {
+            if (neighborIndex <= pointIndex) continue;
+            const neighbor = points[neighborIndex]!;
+            let dx = neighbor.x - point.x;
+            let dy = neighbor.y - point.y;
+            let distance = Math.hypot(dx, dy);
+            if (distance >= MIN_SPACING) continue;
+
+            if (distance < 0.001) {
+              const fallbackAngle = ((pointIndex + neighborIndex + 1) * GOLDEN_ANGLE) % (Math.PI * 2);
+              dx = Math.cos(fallbackAngle);
+              dy = Math.sin(fallbackAngle);
+              distance = 1;
+            }
+
+            const push = (MIN_SPACING - distance) * 0.38;
+            const unitX = dx / distance;
+            const unitY = dy / distance;
+            deltaX[pointIndex] -= unitX * push;
+            deltaY[pointIndex] -= unitY * push;
+            deltaX[neighborIndex] += unitX * push;
+            deltaY[neighborIndex] += unitY * push;
+          }
+        }
+      }
+    });
+
+    points.forEach((point, pointIndex) => {
+      point.x += deltaX[pointIndex]! * 0.72;
+      point.y += deltaY[pointIndex]! * 0.72;
+
+      if (!hasConnectedRegion) return;
+
+      // Never let an isolated table drift into the relationship graph's core.
+      const normalized =
+        (point.x * point.x) / (innerRadiusX * innerRadiusX) +
+        (point.y * point.y) / (innerRadiusY * innerRadiusY);
+      const minScale = 1.035;
+      if (normalized < minScale * minScale) {
+        const projection = minScale / Math.sqrt(Math.max(normalized, 0.000001));
+        point.x *= projection;
+        point.y *= projection;
+      }
+    });
+  }
+
+  points.forEach((point) => {
+    graph.mergeNodeAttributes(point.node, { x: point.x, y: point.y });
+  });
+}
+
 function initializeGroupedPositions(graph: Graph, components: string[][], isolated: string[]): void {
   const componentPadding = 110;
   const groups = components.map((nodes) => {
@@ -185,38 +318,8 @@ function initializeGroupedPositions(graph: Graph, components: string[][], isolat
     });
   }
 
-  if (isolated.length === 0) return;
+  distributeIsolatedNodes(graph, isolated, connectedWidth, connectedHeight);
 
-  // Isolated tables are singleton components. Treat them as secondary context
-  // rather than a second "main graph": pack them into a compact staggered shelf
-  // to the right of the related components. This avoids a prominent band above
-  // or below the relationship structure and wastes much less space than rings.
-  const isolatedSpacing = 78;
-  const isolatedRowSpacing = isolatedSpacing * 0.86;
-  const isolatedGap = 220;
-  const columns = Math.min(
-    isolated.length,
-    Math.max(1, Math.ceil(Math.sqrt(isolated.length * 1.55))),
-  );
-  const rows = Math.ceil(isolated.length / columns);
-  const fullRowWidth = Math.max(0, (columns - 1) * isolatedSpacing);
-  const isolatedHeight = Math.max(0, (rows - 1) * isolatedRowSpacing);
-  const panelLeft = connectedWidth > 0
-    ? connectedWidth / 2 + isolatedGap
-    : -fullRowWidth / 2;
-
-  isolated.forEach((node, index) => {
-    const row = Math.floor(index / columns);
-    const column = index % columns;
-    const rowCount = Math.min(columns, isolated.length - row * columns);
-    const rowWidth = Math.max(0, (rowCount - 1) * isolatedSpacing);
-    const rowInset = (fullRowWidth - rowWidth) / 2;
-    const stagger = rowCount > 1 ? (row % 2 === 0 ? -0.18 : 0.18) * isolatedSpacing : 0;
-    graph.mergeNodeAttributes(node, {
-      x: panelLeft + rowInset + column * isolatedSpacing + stagger,
-      y: -isolatedHeight / 2 + row * isolatedRowSpacing,
-    });
-  });
 }
 
 /** Convert API graph DTO to Graphology graph */
