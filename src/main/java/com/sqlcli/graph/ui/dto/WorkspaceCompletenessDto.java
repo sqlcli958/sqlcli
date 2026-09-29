@@ -39,14 +39,18 @@ public class WorkspaceCompletenessDto {
     @Data
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Backlog {
-        /** 候选待评审：agent/extractor 写入、还没人发布的表/关系/术语。 */
+        /** 候选待评审：agent/extractor 写入、还没人发布的图谱/语义对象。 */
         private int candidateTables;
         private int candidateRelations;
         private int candidateTerms;
-        /** 已被人明确拒绝（status=ignored），保留审计不再参与展示/检索。 */
+        private int candidateLineage;
+        private int candidateMetrics;
+        /** 已被人明确拒绝（status=ignored），保留审计、不再进入消费面。 */
         private int ignoredTables;
         private int ignoredRelations;
         private int ignoredTerms;
+        private int ignoredLineage;
+        private int ignoredMetrics;
         /** 未处理校验问题（status=open）按 severity 分布，key 是 ValidationSeverity 原值。 */
         private Map<String, Integer> openIssuesBySeverity = new LinkedHashMap<>();
         /** 已忽略的校验问题数（status=ignored），区别于上面 open 的分布。 */
