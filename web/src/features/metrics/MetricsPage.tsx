@@ -6,6 +6,7 @@ import type { MetricAdditivity, RatioMetricDto } from '../../api/metrics';
 import { executeWorkbenchSql } from '../../api/workbench';
 import { getAliases } from '../../api/aliases';
 import { queryClient } from '../../api/queryClient';
+import { getTerms } from '../../api/workspace';
 import { navPath } from '../../app/navigation';
 import { useSessionStore } from '../../state/sessionStore';
 import { stashWorkbenchSql } from '../workbench/workbenchSql';
@@ -13,7 +14,7 @@ import { Button, buttonClass } from '../../ui/Button';
 import { Chart } from '../../ui/Chart';
 import { Select } from '../../ui/Select';
 import { buildMetricTrendOption, extractMetricSeries, grainColumnName } from './charts';
-import type { WorkbenchExecuteResultDto } from '../../types/api';
+import type { TermDto, WorkbenchExecuteResultDto } from '../../types/api';
 import '../knowledge/knowledge.css';
 import './metrics.css';
 
@@ -35,6 +36,7 @@ export function MetricsPage() {
   const [searchParams] = useSearchParams();
   const alias = searchParams.get('alias');
   const targetId = searchParams.get('target');
+  const termId = searchParams.get('term');
   const { graphAvailable, graphStatusLoading, graphStatusError } = useOutletContext<{
     graphAvailable: boolean;
     graphStatusLoading: boolean;
@@ -54,6 +56,12 @@ export function MetricsPage() {
     queryFn: ({ signal }) => getMetrics(signal),
     staleTime: 30_000,
     enabled: graphAvailable,
+  });
+  const terms = useQuery({
+    queryKey: ['terms', 'metrics-context', revision],
+    queryFn: ({ signal }) => getTerms(signal),
+    staleTime: 30_000,
+    enabled: graphAvailable && Boolean(termId),
   });
 
   if (!alias) {
@@ -114,14 +122,18 @@ export function MetricsPage() {
   // MetricDto 是 types/api.ts 定义的旧形状，numerator/denominator/additivity 是这次加的
   // 字段，服务端已经在返回，类型跟着断言一下（详见 api/metrics.ts 里 RatioMetricDto 的注释）。
   const metrics = (list.data?.metrics ?? []) as RatioMetricDto[];
+  const term = termId ? terms.data?.terms.find((item) => item.id === termId) ?? null : null;
+  const visibleMetrics = term
+    ? metrics.filter((metric) => term.metricRefs.includes(metric.id))
+    : termId && terms.isSuccess ? [] : metrics;
 
   useEffect(() => {
-    if (!targetId || !metrics.some((metric) => metric.id === targetId)) return;
+    if (!targetId || !visibleMetrics.some((metric) => metric.id === targetId)) return;
     requestAnimationFrame(() => {
       document.getElementById(`metric-target-${targetId}`)
         ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     });
-  }, [targetId, metrics]);
+  }, [targetId, visibleMetrics]);
 
   return (
     <div className="page metrics-page">
@@ -131,6 +143,25 @@ export function MetricsPage() {
           {editing === 'new' ? '收起' : '新建指标'}
         </Button>
       </header>
+
+      {termId && terms.isLoading && (
+        <p className="term-list-hint" role="status">正在读取场景上下文…</p>
+      )}
+      {termId && terms.isError && (
+        <p className="metric-error" role="alert">场景上下文加载失败：{terms.error.message}</p>
+      )}
+      {termId && terms.isSuccess && !term && (
+        <p className="metric-error" role="alert">场景不存在、已忽略，或当前没有可消费的术语定义。</p>
+      )}
+      {term && (
+        <section className="metric-scenario-context" aria-label="当前业务场景">
+          <div>
+            <strong>场景：{term.displayName || term.name}</strong>
+            <span>只展示这条术语显式绑定的指标</span>
+          </div>
+          {term.filters.length > 0 && <code>{term.filters.join(' AND ')}</code>}
+        </section>
+      )}
 
       {editing === 'new' && (
         <MetricForm
@@ -142,7 +173,7 @@ export function MetricsPage() {
         />
       )}
 
-      {metrics.length === 0 && editing !== 'new' && (
+      {visibleMetrics.length === 0 && editing !== 'new' && !term && !termId && (
         <div className="term-list-hint">
           <p>
             还没有指标。指标声明的是口径——算不算取消单、按哪个时间列、能按什么切。
@@ -158,12 +189,17 @@ export function MetricsPage() {
         </div>
       )}
 
+      {term && visibleMetrics.length === 0 && (
+        <p className="term-list-hint">这个场景还没有绑定可用指标；用 <code>schema add-term --metrics</code> 明确绑定。</p>
+      )}
+
       <ul className="term-list">
-        {metrics.map((metric) => (
+        {visibleMetrics.map((metric) => (
           <MetricItem
             key={metric.id}
             metric={metric}
             alias={alias}
+            term={term}
             targeted={metric.id === targetId}
             aliasInfo={aliasInfo}
             editing={editing !== 'new' && editing?.id === metric.id}
@@ -183,6 +219,7 @@ export function MetricsPage() {
 function MetricItem({
   metric,
   alias,
+  term,
   aliasInfo,
   targeted,
   editing,
@@ -191,7 +228,9 @@ function MetricItem({
   onDone,
 }: {
   metric: RatioMetricDto;
+  term: TermDto | null;
   alias: string | null;
+  term: TermDto | null;
   aliasInfo?: { approveQuery: boolean };
   targeted: boolean;
   editing: boolean;
@@ -200,12 +239,16 @@ function MetricItem({
   onDone: () => void;
 }) {
   const [grain, setGrain] = useState('');
+  const hasRuntimeParams = term?.filters.some((filter) => /(^|[^:]):[A-Za-z_][A-Za-z0-9_]*/.test(filter)) ?? false;
   const expand = useMutation({
-    mutationFn: () => expandMetricSql(metric.name, { grain: grain || undefined }),
+    mutationFn: () => expandMetricSql(metric.name, {
+      grain: grain || undefined,
+      term: term?.id,
+    }),
   });
   const runs = useQuery({
-    queryKey: ['metric-runs', metric.id],
-    queryFn: ({ signal }) => getMetricRuns(metric.name, 10, signal),
+    queryKey: ['metric-runs', metric.id, term?.id ?? null],
+    queryFn: ({ signal }) => getMetricRuns(metric.name, 10, signal, term?.id),
     staleTime: 15_000,
   });
   const recentRuns = runs.data?.runs ?? [];
@@ -301,8 +344,14 @@ function MetricItem({
         <Button
           size="sm"
           onClick={() => expand.mutate()}
-          disabled={expand.isPending || metric.status === 'ignored'}
-          title={metric.status === 'ignored' ? '已忽略指标不能展开或执行' : undefined}
+          disabled={expand.isPending || metric.status === 'ignored' || hasRuntimeParams}
+          title={
+            metric.status === 'ignored'
+              ? '已忽略指标不能展开或执行'
+              : hasRuntimeParams
+                ? '当前场景包含 :param 运行时参数，尚未绑定参数前不能生成可执行 SQL'
+                : undefined
+          }
         >
           {expand.isPending ? '展开中…' : '展开 SQL'}
         </Button>
@@ -333,7 +382,7 @@ function MetricItem({
         </div>
       )}
 
-      <MetricChartSection metric={metric} alias={alias} aliasInfo={aliasInfo} revision={revision} />
+      <MetricChartSection metric={metric} term={term} alias={alias} aliasInfo={aliasInfo} revision={revision} />
 
       {editing && <MetricForm metric={metric} revision={revision} onDone={onDone} />}
     </li>
@@ -354,6 +403,7 @@ const RANGE_PRESETS = [
  */
 function MetricChartSection({
   metric,
+  term,
   alias,
   aliasInfo,
   revision,
@@ -377,11 +427,13 @@ function MetricChartSection({
         grain,
         timeFrom,
         timeTo,
+        term: term?.id,
       });
       // 铁律：执行走 executeWorkbenchSql，不另写一条执行路径；额外带语义上下文只做审计归因。
       return executeWorkbenchSql(sql, false, undefined, undefined, {
         metricId: metric.id,
         metricRevision: expandedRevision ?? revision,
+        termId: term?.id,
         grain,
         timeFrom,
         timeTo,
@@ -392,6 +444,15 @@ function MetricChartSection({
 
   if (metric.status === 'ignored') {
     return <p className="term-list-hint">这条指标已被忽略，保留历史但不允许继续执行。</p>;
+  }
+
+  if (term?.filters.some((filter) => /(^|[^:]):[A-Za-z_][A-Za-z0-9_]*/.test(filter))) {
+    return (
+      <p className="term-list-hint">
+        当前场景包含运行时参数（例如 <code>:subjectId</code>）。参数绑定能力补齐前，
+        不生成可直接执行的指标 SQL，避免漏掉隔离条件。
+      </p>
+    );
   }
 
   if (!metric.grain?.timeColumn || grains.length === 0) {
