@@ -41,6 +41,14 @@ public class TermWorkspaceNode extends BaseGraphObject {
      */
     private List<String> filters = new ArrayList<>();
 
+    /**
+     * 这条业务术语/场景明确绑定的权威指标（存 metric id，不存名字副本）。
+     *
+     * <p>这是 Term → Metric 的显式桥。名字相似不等于业务口径相同，系统不自动猜绑定；
+     * Agent/人通过 add-term --metrics 明确声明后，查询上下文才能把场景 filters 叠加进指标 SQL。
+     */
+    private List<String> metricRefs = new ArrayList<>();
+
     public static TermWorkspaceNode create(String sourceAlias, String name, GraphActor actor) {
         TermWorkspaceNode node = new TermWorkspaceNode();
         node.init(GraphObjectKind.term, "term:" + sourceAlias + ":" + name, actor);
