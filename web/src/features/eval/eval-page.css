@@ -232,3 +232,12 @@
 .eval-bars.is-bare li {
   grid-template-columns: auto auto 1fr;
 }
+
+.eval-target-link {
+  display: inline-block;
+  margin-top: 4px;
+  color: var(--color-primary);
+  font-size: 12px;
+  text-decoration: none;
+}
+.eval-target-link:hover { text-decoration: underline; }
