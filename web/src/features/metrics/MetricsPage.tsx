@@ -196,7 +196,11 @@ function MetricItem({
     queryFn: ({ signal }) => getMetricRuns(metric.name, 10, signal),
     staleTime: 15_000,
   });
-  const latestRun = runs.data?.runs[0];
+  const recentRuns = runs.data?.runs ?? [];
+  const latestRun = recentRuns[0];
+  const successfulRuns = recentRuns.filter((item) => item.status === 'success').length;
+  const failedRuns = recentRuns.filter((item) => item.status === 'failed' || item.status === 'rejected').length;
+  const successRate = recentRuns.length > 0 ? Math.round(successfulRuns * 100 / recentRuns.length) : null;
   const grains = metric.grain?.grains ?? [];
   const isRatio = !!(metric.numerator && metric.denominator);
   // 比率结构由展开器强制推定成 non_additive，不看 metric.additivity 填的是什么；
@@ -242,12 +246,23 @@ function MetricItem({
         </p>
       )}
       {latestRun ? (
-        <p className="term-list-line">
-          最近运行：{latestRun.status} · {latestRun.elapsedMs} ms
-          {latestRun.rowCount != null && ` · ${latestRun.rowCount} 行`}
-          {' · '}{new Date(latestRun.startedAt).toLocaleString()}
-          {latestRun.metricRevision != null && ` · revision ${latestRun.metricRevision}`}
-        </p>
+        <>
+          <p className="term-list-line">
+            最近运行：{latestRun.status} · {latestRun.elapsedMs} ms
+            {latestRun.rowCount != null && ` · ${latestRun.rowCount} 行`}
+            {' · '}{new Date(latestRun.startedAt).toLocaleString()}
+            {latestRun.metricRevision != null && ` · revision ${latestRun.metricRevision}`}
+            {latestRun.timeTo && ` · 数据截至 ${latestRun.timeTo}`}
+          </p>
+          <p className="term-list-line">
+            运行健康：近 {recentRuns.length} 次成功 {successfulRuns} 次
+            {successRate != null && `（${successRate}%）`}
+            {failedRuns > 0 && ` · 失败/拒绝 ${failedRuns} 次`}
+          </p>
+          {latestRun.errorSummary && (
+            <p className="metric-error" role="alert">最近失败：{latestRun.errorSummary}</p>
+          )}
+        </>
       ) : runs.isSuccess ? (
         <p className="term-list-line">最近运行：尚无记录</p>
       ) : null}
