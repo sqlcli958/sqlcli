@@ -78,7 +78,8 @@ public class WorkbenchExecuteController {
 
             SqlTaskResult result = taskModule.execute(new SqlTaskRequest(config, sql,
                     QueryExecutionOptions.forAlias(config, "json", Set.of(), false),
-                    SqlTaskRequest.Origin.ui_workbench, null, null, null, dryRun, request.cancelToken));
+                    SqlTaskRequest.Origin.ui_workbench, null, null, null, dryRun,
+                    request.cancelToken, request.semanticContext));
             Map<String, Object> body = toBody(result);
             body.put("columnMeta", columnMeta(alias, sql, result));
             json.writeOk(exchange, body);
@@ -184,6 +185,8 @@ public class WorkbenchExecuteController {
         public Boolean dryRun;
         /** 客户端生成的中止令牌；带了才可被 POST /api/workbench/cancel 中止。 */
         public String cancelToken;
+        /** 可选业务语义来源；目前用于把指标查询归因成 MetricRun。 */
+        public SqlTaskRequest.SemanticContext semanticContext;
     }
 
     public static final class CancelRequest {
