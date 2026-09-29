@@ -715,6 +715,7 @@ public class SqlCli {
         String aliasesCsv = null;
         String negativeAliasesCsv = null;
         String mappedRefsCsv = null;
+        String termMetricsCsv = null;
         String primaryTargetRef = null;
         java.util.List<String> termFilters = new java.util.ArrayList<>();
         String importSchema = null;
@@ -892,6 +893,9 @@ public class SqlCli {
                 case "--map":
                     if (i + 1 < args.length) mappedRefsCsv = args[++i];
                     break;
+                case "--metrics":
+                    if (i + 1 < args.length) termMetricsCsv = args[++i];
+                    break;
                 case "--primary-target":
                     if (i + 1 < args.length) primaryTargetRef = args[++i];
                     break;
@@ -1011,6 +1015,7 @@ public class SqlCli {
         cmd.setAliasesCsv(aliasesCsv);
         cmd.setNegativeAliasesCsv(negativeAliasesCsv);
         cmd.setMappedRefsCsv(mappedRefsCsv);
+        cmd.setTermMetricsCsv(termMetricsCsv);
         cmd.setPrimaryTargetRef(primaryTargetRef);
         cmd.setTermFilters(termFilters);
         cmd.setTargetRef(targetRef);
@@ -1072,7 +1077,7 @@ public class SqlCli {
             "--add-tag", "--add-constraint", "--business-name", "--semantic-type", "--redundant-of",
             "--display-name", "--owner", "--type",
             "--from", "--to", "--join", "--confidence", "--aliases", "--negative-aliases", "--map",
-            "--primary-target", "--filter",
+            "--metrics", "--primary-target", "--filter",
             "--batch-size", "--limit", "--cases", "--answers", "--months",
             "--expression", "--filters", "--grain-column", "--grains", "--dimensions",
             "--target", "--source", "--through", "--kind", "--id",
