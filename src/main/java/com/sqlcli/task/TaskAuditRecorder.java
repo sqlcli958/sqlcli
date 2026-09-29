@@ -92,6 +92,24 @@ final class TaskAuditRecorder {
         if (result.recoveryId() != null) {
             runState.attachRecoveryArtifact(result.recoveryId(), executionId);
         }
+        SqlTaskRequest.SemanticContext semantic = ctx.request.semanticContext();
+        if (!ctx.request.dryRun() && semantic != null
+                && semantic.metricId() != null && !semantic.metricId().isBlank()) {
+            runState.recordMetricRun(
+                    ctx.config.getAliasName(),
+                    semantic.metricId(),
+                    semantic.metricRevision(),
+                    executionId,
+                    status,
+                    semantic.grain(),
+                    semantic.dimensions(),
+                    semantic.timeFrom(),
+                    semantic.timeTo(),
+                    result.rows() == null ? null : (long) result.rows().size(),
+                    ctx.elapsedMs(),
+                    result.errorSummary(),
+                    ctx.startedAtMillis);
+        }
         if (ctx.taskRunId > 0) {
             runState.finishTaskRun(ctx.taskRunId, status);
         }
