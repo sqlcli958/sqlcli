@@ -90,7 +90,7 @@ function getConnectedComponents(graph: Graph): string[][] {
 }
 
 function initializeGroupedPositions(graph: Graph, components: string[][], isolated: string[]): void {
-  const padding = 100;
+  const componentPadding = 110;
   const groups = components.map((nodes) => {
     const component = new Graph({ type: 'directed', multi: true });
     const nodeSet = new Set(nodes);
@@ -134,12 +134,23 @@ function initializeGroupedPositions(graph: Graph, components: string[][], isolat
       maxY = Math.max(maxY, Number(attrs.y));
     });
 
-    return { component, minX, minY, width: maxX - minX + padding, height: maxY - minY + padding };
+    return {
+      component,
+      minX,
+      minY,
+      width: maxX - minX + componentPadding,
+      height: maxY - minY + componentPadding,
+    };
   });
 
-  // Pack measured component bounds into rows; a fixed cell used to squeeze large groups.
-  const targetWidth = Math.max(0, ...groups.map((group) => group.width),
-    Math.sqrt(groups.reduce((area, group) => area + group.width * group.height, 0)) * 1.3);
+  // Layout each connected component independently, then pack measured bounds.
+  // Mature graph engines use the same two-stage idea for disconnected graphs:
+  // preserve each component's internal shape first, then allocate global space.
+  const targetWidth = Math.max(
+    0,
+    ...groups.map((group) => group.width),
+    Math.sqrt(groups.reduce((area, group) => area + group.width * group.height, 0)) * 1.3,
+  );
   let x = 0;
   let y = 0;
   let rowHeight = 0;
@@ -152,29 +163,58 @@ function initializeGroupedPositions(graph: Graph, components: string[][], isolat
     }
     group.component.forEachNode((node, attrs) => {
       graph.mergeNodeAttributes(node, {
-        x: x + Number(attrs.x) - group.minX + padding / 2,
-        y: y + Number(attrs.y) - group.minY + padding / 2,
+        x: x + Number(attrs.x) - group.minX + componentPadding / 2,
+        y: y + Number(attrs.y) - group.minY + componentPadding / 2,
       });
     });
     x += group.width;
     connectedWidth = Math.max(connectedWidth, x);
     rowHeight = Math.max(rowHeight, group.height);
   }
+  const connectedHeight = groups.length > 0 ? y + rowHeight : 0;
 
-  const isolatedSpacing = 120;
-  const columns = Math.ceil(Math.sqrt(isolated.length));
-  const isolatedWidth = Math.max(0, (columns - 1) * isolatedSpacing);
-  const connectedOffset = Math.max(0, (isolatedWidth - connectedWidth) / 2);
-  if (connectedOffset > 0) {
+  // Center the relationship structure so it remains the visual anchor instead
+  // of inheriting the top-left origin of the packing pass.
+  if (connectedWidth > 0 && connectedHeight > 0) {
     graph.forEachNode((node, attrs) => {
-      if (graph.degree(node) > 0) graph.setNodeAttribute(node, 'x', Number(attrs.x) + connectedOffset);
+      if (graph.degree(node) === 0) return;
+      graph.mergeNodeAttributes(node, {
+        x: Number(attrs.x) - connectedWidth / 2,
+        y: Number(attrs.y) - connectedHeight / 2,
+      });
     });
   }
-  const isolatedOffset = Math.max(0, (connectedWidth - isolatedWidth) / 2);
+
+  if (isolated.length === 0) return;
+
+  // Isolated tables are singleton components. Treat them as secondary context
+  // rather than a second "main graph": pack them into a compact staggered shelf
+  // to the right of the related components. This avoids a prominent band above
+  // or below the relationship structure and wastes much less space than rings.
+  const isolatedSpacing = 78;
+  const isolatedRowSpacing = isolatedSpacing * 0.86;
+  const isolatedGap = 220;
+  const columns = Math.min(
+    isolated.length,
+    Math.max(1, Math.ceil(Math.sqrt(isolated.length * 1.55))),
+  );
+  const rows = Math.ceil(isolated.length / columns);
+  const fullRowWidth = Math.max(0, (columns - 1) * isolatedSpacing);
+  const isolatedHeight = Math.max(0, (rows - 1) * isolatedRowSpacing);
+  const panelLeft = connectedWidth > 0
+    ? connectedWidth / 2 + isolatedGap
+    : -fullRowWidth / 2;
+
   isolated.forEach((node, index) => {
+    const row = Math.floor(index / columns);
+    const column = index % columns;
+    const rowCount = Math.min(columns, isolated.length - row * columns);
+    const rowWidth = Math.max(0, (rowCount - 1) * isolatedSpacing);
+    const rowInset = (fullRowWidth - rowWidth) / 2;
+    const stagger = rowCount > 1 ? (row % 2 === 0 ? -0.18 : 0.18) * isolatedSpacing : 0;
     graph.mergeNodeAttributes(node, {
-      x: isolatedOffset + (index % columns) * isolatedSpacing,
-      y: y + rowHeight + 160 + Math.floor(index / columns) * isolatedSpacing,
+      x: panelLeft + rowInset + column * isolatedSpacing + stagger,
+      y: -isolatedHeight / 2 + row * isolatedRowSpacing,
     });
   });
 }

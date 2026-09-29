@@ -1,45 +1,61 @@
-import { expect, test } from 'vitest';
-import type { GraphViewDto } from '../types/api';
+import { describe, expect, it } from 'vitest';
+import type { GraphNodeDto, GraphViewDto } from '../types/api';
 import { adaptGraph } from './graphAdapter';
 
-test('large sparse graphs pack relation groups by their bounds and isolate tables on a grid', () => {
-  const related = Array.from({ length: 12 }, (_, index) => `table:large:${index}`);
-  const pair = ['table:small:0', 'table:small:1'];
-  const isolated = Array.from({ length: 510 }, (_, index) => `table:isolated:${String(index).padStart(3, '0')}`);
-  const edges = [
-    ...related.slice(1).map((target, index) => ({
-      id: `edge:large:${index}`, source: related[0]!, target, type: 'foreign_key',
-    })),
-    { id: 'edge:small', source: pair[0]!, target: pair[1]!, type: 'foreign_key' },
-  ];
-  const dto: GraphViewDto = {
-    revision: 1, truncated: false,
-    stats: { totalNodes: 524, returnedNodes: 524, totalEdges: edges.length, returnedEdges: edges.length },
-    nodes: [...related, ...pair, ...isolated].map((id) => ({
-      id, kind: 'table', label: id, schema: 'test', description: '',
-      relationCount: 0, validationSeverity: '',
-    })),
-    edges,
+function tableNode(id: string, relationCount = 0): GraphNodeDto {
+  return {
+    id,
+    kind: 'table',
+    label: id,
+    schema: 'public',
+    description: '',
+    relationCount,
+    columnCount: 8,
+    validationSeverity: 'info',
   };
-  const graph = adaptGraph(dto);
-  const bounds = (nodes: string[]) => {
-    const points = nodes.map((node) => graph.getNodeAttributes(node));
-    return {
-      left: Math.min(...points.map((point) => Number(point.x))),
-      right: Math.max(...points.map((point) => Number(point.x))),
-      top: Math.min(...points.map((point) => Number(point.y))),
-      bottom: Math.max(...points.map((point) => Number(point.y))),
-    };
-  };
-  const large = bounds(related);
-  const small = bounds(pair);
-  const free = bounds(isolated);
+}
 
-  expect(large.right < small.left || small.right < large.left ||
-    large.bottom < small.top || small.bottom < large.top).toBe(true);
-  expect(free.top).toBeGreaterThan(Math.max(large.bottom, small.bottom));
-  expect(Number(graph.getNodeAttribute(isolated[1]!, 'x')) -
-    Number(graph.getNodeAttribute(isolated[0]!, 'x'))).toBe(120);
-  expect(Number(graph.getNodeAttribute(isolated[23]!, 'y')) -
-    Number(graph.getNodeAttribute(isolated[0]!, 'y'))).toBe(120);
+describe('graphAdapter grouped layout', () => {
+  it('keeps related components centered and packs isolated tables to the side', () => {
+    const connected = ['table:a', 'table:b', 'table:c', 'table:d'];
+    const isolated = Array.from({ length: 80 }, (_, index) => `table:isolated_${index}`);
+    const dto: GraphViewDto = {
+      revision: 1,
+      truncated: false,
+      stats: {
+        totalNodes: connected.length + isolated.length,
+        totalEdges: 3,
+        returnedNodes: connected.length + isolated.length,
+        returnedEdges: 3,
+      },
+      nodes: [
+        tableNode(connected[0]!, 1),
+        tableNode(connected[1]!, 2),
+        tableNode(connected[2]!, 2),
+        tableNode(connected[3]!, 1),
+        ...isolated.map((id) => tableNode(id)),
+      ],
+      edges: [
+        { id: 'e1', source: connected[0]!, target: connected[1]!, type: 'foreign_key' },
+        { id: 'e2', source: connected[1]!, target: connected[2]!, type: 'foreign_key' },
+        { id: 'e3', source: connected[2]!, target: connected[3]!, type: 'foreign_key' },
+      ],
+    };
+
+    const graph = adaptGraph(dto);
+    expect(graph.getAttribute('layout')).toBe('grouped');
+
+    const connectedXs = connected.map((id) => Number(graph.getNodeAttribute(id, 'x')));
+    const connectedYs = connected.map((id) => Number(graph.getNodeAttribute(id, 'y')));
+    const isolatedXs = isolated.map((id) => Number(graph.getNodeAttribute(id, 'x')));
+
+    const connectedMinX = Math.min(...connectedXs);
+    const connectedMaxX = Math.max(...connectedXs);
+    const connectedMinY = Math.min(...connectedYs);
+    const connectedMaxY = Math.max(...connectedYs);
+
+    expect((connectedMinX + connectedMaxX) / 2).toBeCloseTo(0, 6);
+    expect((connectedMinY + connectedMaxY) / 2).toBeCloseTo(0, 6);
+    expect(Math.min(...isolatedXs)).toBeGreaterThan(connectedMaxX + 100);
+  });
 });
