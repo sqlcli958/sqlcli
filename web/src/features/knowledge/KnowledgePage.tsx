@@ -190,6 +190,7 @@ export function KnowledgePage() {
             {graphAvailable ? (
               <div
                 id="knowledge-sidebar-panel"
+                className="knowledge-sidebar-panel"
                 role="tabpanel"
                 aria-labelledby={`knowledge-sidebar-panel-tab-${leftTab}`}
                 tabIndex={0}
