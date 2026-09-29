@@ -52,11 +52,16 @@ export function SqlEditor({
   const [aborted, setAborted] = useState(false);
 
   const dry = useMutation({
-    mutationFn: (text: string) => executeWorkbenchSql(text, true, undefined, undefined, semanticContext),
+    mutationFn: (text: string) =>
+      semanticContext
+        ? executeWorkbenchSql(text, true, undefined, undefined, semanticContext)
+        : executeWorkbenchSql(text, true),
   });
   const run = useMutation({
     mutationFn: (text: string) =>
-      executeWorkbenchSql(text, false, cancelTokenRef.current, undefined, semanticContext),
+      semanticContext
+        ? executeWorkbenchSql(text, false, cancelTokenRef.current, undefined, semanticContext)
+        : executeWorkbenchSql(text, false, cancelTokenRef.current),
   });
 
   // 表名补全：图谱没导入时 getTables 会 404，query 静默失败即可——补全就是没有候选。
