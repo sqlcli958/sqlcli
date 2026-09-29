@@ -339,6 +339,7 @@ public class WorkspaceQueryController implements HttpHandler {
         }
         List<Map<String, Object>> terms = new ArrayList<>();
         for (TermWorkspaceNode term : workspace.getTerms().values()) {
+            if (term.getStatus() == GraphStatus.ignored) continue;
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", term.getId());
             item.put("name", term.getName());
@@ -353,6 +354,7 @@ public class WorkspaceQueryController implements HttpHandler {
             // 表目录筛到这个场景——术语在界面上不是第二份目录，是图谱的一个筛选维度。
             item.put("primaryTarget", term.getPrimaryTarget());
             item.put("filters", term.getFilters());
+            item.put("metricRefs", term.getMetricRefs());
             TermScenario scenario = TermScenario.of(workspace, term);
             item.put("scenarioTables", scenario == null ? List.of()
                     : scenario.tables().stream().map(TermScenario.ScenarioTable::qualifiedName).toList());
