@@ -17,8 +17,8 @@ import java.util.List;
  * 图谱变更前的依赖影响分析。
  *
  * <p>它回答的是“这个对象如果被删除 / 拒绝，谁会立刻失去语义前提”，不是泛泛的邻居列表。
- * 第一阶段只收系统里已经存在的<strong>结构化引用</strong>：metric grain/dimension/joinPath、
- * term primaryTarget/mapping、lineage sources/target、relation endpoints。自由文本 expression /
+ * 只收系统里已经存在的<strong>结构化引用</strong>：metric grain/dimension/joinPath、
+ * term primaryTarget/mapping/metricRefs、lineage sources/target、relation endpoints。自由文本 expression /
  * policy when 不猜引用，宁可少报也不能编一个影响。
  */
 public final class ImpactAnalysisService {
@@ -83,6 +83,9 @@ public final class ImpactAnalysisService {
             if (term.getStatus() == GraphStatus.ignored || term.getId().equals(targetId)) continue;
             if (references(term.getPrimaryTarget(), targetId)) {
                 add(out, "term", term.getId(), termLabel(term), "primaryTarget", term.getStatus(), true);
+            }
+            if (term.getMetricRefs().contains(targetId)) {
+                add(out, "term", term.getId(), termLabel(term), "metricRefs", term.getStatus(), true);
             }
             for (RelationWorkspaceEdge edge : workspace.getRelations()) {
                 if (edge.getStatus() == GraphStatus.ignored || edge.getType() != RelationType.term_mapping) continue;
