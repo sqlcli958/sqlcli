@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { deleteTerm, getTerms } from '../../api/workspace';
+import { navPath } from '../../app/navigation';
 import { onMutationSuccess } from '../../api/mutationHelpers';
 import { useSessionStore } from '../../state/sessionStore';
 import { ActionIcon } from '../../ui/ActionIcon';
@@ -24,6 +25,7 @@ import type { TermDto } from '../../types/api';
 export function TermList({ onPick }: { onPick?: () => void }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTermId = searchParams.get('term');
+  const alias = searchParams.get('alias');
   const [confirming, setConfirming] = useState<string | null>(null);
   const [detail, setDetail] = useState<TermDto | null>(null);
   const queryClient = useQueryClient();
@@ -72,6 +74,9 @@ export function TermList({ onPick }: { onPick?: () => void }) {
             )}
             {term.scenarioTables.length > 0 && (
               <span className="term-list-badge">{term.scenarioTables.length} 表</span>
+            )}
+            {term.metricRefs.length > 0 && (
+              <span className="term-list-badge">{term.metricRefs.length} 指标</span>
             )}
             {/* 状态用灯不用文字：每行都写一遍 candidate 是把同一个信息复述 N 遍，
                 而三态一眼可辨（CLAUDE.md「状态色」「图标优先」） */}
@@ -122,7 +127,7 @@ export function TermList({ onPick }: { onPick?: () => void }) {
         </li>
       ))}
     </ul>
-    {detail && <TermDetailDialog term={detail} onClose={() => setDetail(null)} />}
+    {detail && <TermDetailDialog term={detail} alias={alias} onClose={() => setDetail(null)} />}
     </>
   );
 }
@@ -133,7 +138,15 @@ export function TermList({ onPick }: { onPick?: () => void }) {
  * 用 `<Dialog>` 而不是行内展开：这些字段一条术语能有二十几个值（映射尤其），
  * 在两百像素宽的侧栏里展开等于把列表挤没。
  */
-function TermDetailDialog({ term, onClose }: { term: TermDto; onClose: () => void }) {
+function TermDetailDialog({
+  term,
+  alias,
+  onClose,
+}: {
+  term: TermDto;
+  alias: string | null;
+  onClose: () => void;
+}) {
   const rows: [string, React.ReactNode][] = [];
   if (term.status) rows.push(['状态', term.status === 'verified' ? '已确认' : '候选，未经人确认']);
   if (term.description) rows.push(['说明', term.description]);
@@ -150,6 +163,22 @@ function TermDetailDialog({ term, onClose }: { term: TermDto; onClose: () => voi
   }
   if (term.filters.length > 0) {
     rows.push(['过滤', <span className="term-detail-mono">{term.filters.join(' AND ')}</span>]);
+  }
+  if (term.metricRefs.length > 0) {
+    rows.push([
+      '指标',
+      <span className="term-detail-links">
+        {term.metricRefs.map((metricId) => (
+          <Link
+            key={metricId}
+            to={metricScenarioPath(alias, term.id, metricId)}
+            onClick={onClose}
+          >
+            {metricName(metricId)}
+          </Link>
+        ))}
+      </span>,
+    ]);
   }
   if (term.scenarioTables.length > 0) {
     rows.push([
@@ -179,6 +208,17 @@ function TermDetailDialog({ term, onClose }: { term: TermDto; onClose: () => voi
  * → `erp_prop_report_score.satisfaction`。侧栏只有两百来像素宽，
  * 裸 id 占三行还会被截断，而被截掉的恰恰是表名和列名——信息量全在末尾。
  */
+function metricName(id: string): string {
+  const parts = id.split(':');
+  return parts.length > 2 ? parts.slice(2).join(':') : id;
+}
+
+function metricScenarioPath(alias: string | null, termId: string, metricId: string): string {
+  const base = navPath('metrics', alias);
+  const sep = base.includes('?') ? '&' : '?';
+  return `${base}${sep}term=${encodeURIComponent(termId)}&target=${encodeURIComponent(metricId)}`;
+}
+
 function shortRef(id: string): string {
   const qualified = id.split(':').slice(2).join(':') || id;
   const parts = qualified.split('.');

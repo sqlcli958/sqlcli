@@ -26,6 +26,7 @@ function term(overrides: Partial<TermDto>): TermDto {
     mappedTargets: [],
     primaryTarget: null,
     filters: [],
+    metricRefs: [],
     scenarioTables: [],
     bridgeTables: [],
     ...overrides,
@@ -39,6 +40,7 @@ const 报事 = term({
   aliases: ['工单'],
   primaryTarget: 'table:demo:app.report',
   filters: ['state IN (0,1,6)', 'subject_id = :subjectId'],
+  metricRefs: ['metric:demo:ticket_count'],
   scenarioTables: ['app.report', 'app.assign'],
 });
 
@@ -98,6 +100,16 @@ test('没有入口表的术语不可点，也不显示过滤', async () => {
   // 展不开子图的术语点了也没东西可筛，做成可点是骗人
   expect(screen.queryByRole('button', { name: '顺序巡检' })).toBeNull();
   expect(screen.getByText('顺序巡检')).toBeTruthy();
+});
+
+test('详情里的绑定指标能直接进入同一场景的指标页', async () => {
+  renderList();
+  await userEvent.click((await screen.findAllByRole('button', { name: '术语详情' }))[0]);
+
+  const link = await screen.findByRole('link', { name: 'ticket_count' });
+  expect(link.getAttribute('href')).toContain('/workspaces/local/metrics?alias=demo');
+  expect(link.getAttribute('href')).toContain(`term=${encodeURIComponent('term:demo:报事')}`);
+  expect(link.getAttribute('href')).toContain(`target=${encodeURIComponent('metric:demo:ticket_count')}`);
 });
 
 test('场景过滤在详情里，一次点击就能看全', async () => {

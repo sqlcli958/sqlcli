@@ -22,6 +22,7 @@ public class WorkspaceValidator {
         collectNodeIds(workspace, nodeIds, runId);
         validateRelations(workspace, nodeIds, relationIds, runId);
         validateMetrics(workspace, runId);
+        validateTermMetricRefs(workspace, runId);
         validateRedundantColumns(workspace, runId);
         validateConfidence(workspace, runId);
 
@@ -147,6 +148,26 @@ public class WorkspaceValidator {
                     addIssue(workspace, runId, ValidationSeverity.error, "metric_joinpath_relation_ignored",
                             "metric join path references a relation that has been rejected",
                             metric.getId(), "joinPath.relationId");
+                }
+            }
+        }
+    }
+
+    /**
+     * Term → Metric 是显式结构化引用，必须和 metric 的 grain/dimension/joinPath 一样做死引用校验。
+     * ignored metric 不是“找不到”，而是被人明确否掉过，单独报错便于修绑定而不是重建指标。
+     */
+    private void validateTermMetricRefs(GraphWorkspace workspace, String runId) {
+        for (TermWorkspaceNode term : workspace.getTerms().values()) {
+            if (term.getStatus() == GraphStatus.ignored) continue;
+            for (String metricId : term.getMetricRefs()) {
+                MetricRecord metric = workspace.getMetrics().get(metricId);
+                if (metric == null) {
+                    addIssue(workspace, runId, ValidationSeverity.error, "dangling_term_metric",
+                            "term references a metric that does not exist", term.getId(), "metricRefs");
+                } else if (metric.getStatus() == GraphStatus.ignored) {
+                    addIssue(workspace, runId, ValidationSeverity.error, "term_metric_ignored",
+                            "term references a metric that has been rejected", term.getId(), "metricRefs");
                 }
             }
         }

@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>只拒两条，判据都低到无可争议——这是 breaking change，门槛高一点就会挡住正当写入：
  * <ul>
- *   <li>同义词、映射**两样全空**：即使给了 {@code --description}，这种术语也跟
+ *   <li>同义词、映射、指标绑定三样全空：即使给了 {@code --description}，这种术语也跟
  *       businessName 完全重叠——搜不出任何独有的东西，却占着检索的最高权重档。
  *       真库上就躺着一条（`顺序巡检`）</li>
  *   <li>{@code --primary-target} 指向不存在的对象：死引用之后每次展开子图都静默展不开，
@@ -78,6 +78,45 @@ class SchemaAddTermGateTest {
         TermWorkspaceNode term = store.load(ALIAS).getTerms().get("term:" + ALIAS + ":报事");
         assertEquals(GraphIds.tableId(ALIAS, "app", "report"), term.getPrimaryTarget());
         assertEquals(List.of("state IN (0,1,6)", "subject_id = :subjectId"), term.getFilters());
+    }
+
+    @Test
+    void metricBindingMakesTermSemanticallyUsefulWithoutAliasesOrMappings() throws Exception {
+        GraphWorkspaceStore store = seed();
+        GraphWorkspace workspace = store.load(ALIAS);
+        MetricRecord metric = MetricRecord.create(ALIAS, "gmv_paid", GraphActor.human);
+        metric.setExpression("SUM(app.report.id)");
+        workspace.getMetrics().put(metric.getId(), metric);
+        store.save(workspace);
+
+        SchemaActionCommand cmd = addTerm(store, "已支付订单");
+        cmd.setTermMetricsCsv("gmv_paid");
+
+        assertEquals(0, cmd.executeCommand());
+        TermWorkspaceNode saved = store.load(ALIAS).getTerms().get(GraphIds.termId(ALIAS, "已支付订单"));
+        assertEquals(List.of(GraphIds.metricId(ALIAS, "gmv_paid")), saved.getMetricRefs());
+    }
+
+    @Test
+    void missingOrIgnoredMetricBindingIsRejected() throws Exception {
+        GraphWorkspaceStore store = seed();
+
+        SchemaActionCommand missing = addTerm(store, "坏术语");
+        missing.setTermMetricsCsv("does_not_exist");
+        assertNotEquals(0, missing.executeCommand());
+        assertNull(store.load(ALIAS).getTerms().get(GraphIds.termId(ALIAS, "坏术语")));
+
+        GraphWorkspace workspace = store.load(ALIAS);
+        MetricRecord ignored = MetricRecord.create(ALIAS, "old_metric", GraphActor.agent);
+        ignored.setExpression("COUNT(*)");
+        ignored.setStatus(GraphStatus.ignored);
+        workspace.getMetrics().put(ignored.getId(), ignored);
+        store.save(workspace);
+
+        SchemaActionCommand rejected = addTerm(store, "旧口径");
+        rejected.setTermMetricsCsv("old_metric");
+        assertNotEquals(0, rejected.executeCommand());
+        assertNull(store.load(ALIAS).getTerms().get(GraphIds.termId(ALIAS, "旧口径")));
     }
 
     @Test

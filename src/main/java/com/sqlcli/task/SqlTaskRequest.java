@@ -46,12 +46,13 @@ public record SqlTaskRequest(
     }
 
     /**
-     * SQL 的业务语义来源。第一阶段只接 metric：它不是执行参数，数据库完全不看它，
-     * 只用于把 sql_execution 归因回指标，形成 MetricRun。
+     * SQL 的业务语义来源。它不是执行参数，数据库完全不看它；
+     * 只用于把 sql_execution 归因回 metric / term 场景，形成可追溯 MetricRun。
      */
     public record SemanticContext(
             String metricId,
             Long metricRevision,
+            String termId,
             String grain,
             List<String> dimensions,
             String timeFrom,
