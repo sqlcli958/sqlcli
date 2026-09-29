@@ -55,13 +55,14 @@ public record TermScenario(
      * 把一条术语展开成场景；不是场景（{@code primaryTarget} 为空或指向列）返回 null。
      */
     public static TermScenario of(GraphWorkspace workspace, TermWorkspaceNode term) {
-        if (workspace == null || term == null) return null;
+        if (workspace == null || term == null || term.getStatus() == GraphStatus.ignored) return null;
         String entryTableId = tableIdOf(workspace, term.getPrimaryTarget());
         if (entryTableId == null) return null;
 
         Map<String, Role> roles = new LinkedHashMap<>();
         roles.put(entryTableId, Role.primary);
         for (RelationWorkspaceEdge edge : workspace.getRelations()) {
+            if (edge.getStatus() == GraphStatus.ignored) continue;
             if (edge.getType() != RelationType.term_mapping) continue;
             if (!term.getId().equals(edge.getFrom())) continue;
             String tableId = RelationAdjacency.tableIdForNode(edge.getTo());
