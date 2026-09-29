@@ -2,6 +2,7 @@ package com.sqlcli.metric;
 
 import com.sqlcli.graph.workspace.ColumnWorkspaceNode;
 import com.sqlcli.graph.workspace.GraphWorkspace;
+import com.sqlcli.graph.workspace.GraphStatus;
 import com.sqlcli.graph.workspace.MetricRecord;
 import com.sqlcli.graph.workspace.RelationWorkspaceEdge;
 import com.sqlcli.graph.workspace.TableWorkspaceNode;
@@ -51,6 +52,12 @@ public final class MetricSqlExpander {
 
     public static String expand(GraphWorkspace workspace, MetricRecord metric, DatabaseStrategy dialect,
             MetricSqlRequest request) {
+        if (metric == null) {
+            throw new MetricExpansionException("metric 不存在，无法展开 SQL");
+        }
+        if (metric.getStatus() == GraphStatus.ignored) {
+            throw new MetricExpansionException("metric 已被拒绝/忽略，不能继续生成 SQL: " + metric.getId());
+        }
         boolean ratio = metric.isRatio();
         if (!ratio && (metric.getExpression() == null || metric.getExpression().isBlank())) {
             throw new MetricExpansionException("metric 未声明 expression，无法生成 SELECT: " + metric.getId());
