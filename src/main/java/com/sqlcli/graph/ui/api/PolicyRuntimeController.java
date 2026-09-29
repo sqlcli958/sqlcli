@@ -2,6 +2,7 @@ package com.sqlcli.graph.ui.api;
 
 import com.sqlcli.graph.policy.PolicyCheckResult;
 import com.sqlcli.graph.policy.PolicyService;
+import com.sqlcli.graph.policy.PolicyRuleSetManager;
 import com.sqlcli.graph.policy.PolicyViolation;
 import com.sqlcli.graph.policy.PolicyViolationStatus;
 import com.sqlcli.graph.policy.RuleEvaluation;
@@ -36,12 +37,16 @@ public final class PolicyRuntimeController implements HttpHandler {
     private final GraphUiSession session;
     private final JsonHttpSupport json;
     private final PolicyService service;
+    private final GraphWorkspaceStore workspaceStore;
+    private final PolicyRuleSetManager ruleSets;
 
     public PolicyRuntimeController(GraphUiSession session, JsonHttpSupport json,
             GraphWorkspaceStore workspaceStore) {
         this.session = session;
         this.json = json;
+        this.workspaceStore = workspaceStore;
         this.service = new PolicyService(workspaceStore);
+        this.ruleSets = new PolicyRuleSetManager(workspaceStore);
     }
 
     @Override
@@ -59,8 +64,18 @@ public final class PolicyRuntimeController implements HttpHandler {
                 return;
             }
             if ((ROOT + "/run").equals(path) && "POST".equals(method)) {
-                List<PolicyCheckResult> results =
-                        service.checkBound(session.getAlias(), GraphActor.human, Map.of());
+                List<PolicyCheckResult> results = new ArrayList<>();
+                for (PolicyRuleSetManager.RuleSetFile file : ruleSets.list(session.getAlias())) {
+                    // SQL / migration 规则必须拿到真实 SQL 输入。这里是“按当前图谱复评”，
+                    // 空跑它们只会制造 missing input 假错误，所以只跑结构规则。
+                    if (!file.enabled() || !"structure.yaml".equals(file.fileName())) continue;
+                    results.add(service.check(
+                            session.getAlias(),
+                            workspaceStore.workspacePath(session.getAlias())
+                                    .resolve("policy").resolve("rules").resolve(file.fileName()),
+                            GraphActor.human,
+                            Map.of("reviewType", "web_manual")));
+                }
                 Map<String, Object> body = snapshot();
                 body.put("runEvaluations", results.stream().map(PolicyCheckResult::evaluation).toList());
                 json.writeOk(exchange, body);
