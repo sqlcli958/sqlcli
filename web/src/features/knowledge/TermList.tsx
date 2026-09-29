@@ -82,8 +82,8 @@ export function TermList({ onPick }: { onPick?: () => void }) {
                 而三态一眼可辨（CLAUDE.md「状态色」「图标优先」） */}
             {term.status && (
               <StatusDot
-                tone={term.status === 'verified' ? 'ok' : 'warn'}
-                label={term.status === 'verified' ? '已确认' : '候选，未经人确认'}
+                tone={termStatus(term.status).tone}
+                label={termStatus(term.status).label}
               />
             )}
             <span className="term-list-actions">
@@ -148,7 +148,7 @@ function TermDetailDialog({
   onClose: () => void;
 }) {
   const rows: [string, React.ReactNode][] = [];
-  if (term.status) rows.push(['状态', term.status === 'verified' ? '已确认' : '候选，未经人确认']);
+  if (term.status) rows.push(['状态', termStatus(term.status).label]);
   if (term.description) rows.push(['说明', term.description]);
   if (term.aliases.length > 0) rows.push(['同义词', term.aliases.join(' · ')]);
   if (term.negativeAliases.length > 0) rows.push(['排除词', term.negativeAliases.join(' · ')]);
@@ -208,6 +208,21 @@ function TermDetailDialog({
  * → `erp_prop_report_score.satisfaction`。侧栏只有两百来像素宽，
  * 裸 id 占三行还会被截断，而被截掉的恰恰是表名和列名——信息量全在末尾。
  */
+function termStatus(status: string): { tone: 'ok' | 'warn' | 'bad'; label: string } {
+  switch (status) {
+    case 'verified':
+      return { tone: 'ok', label: '已确认' };
+    case 'candidate':
+      return { tone: 'warn', label: '候选，未经人确认' };
+    case 'partial':
+      return { tone: 'warn', label: '部分确认' };
+    case 'ignored':
+      return { tone: 'bad', label: '已忽略' };
+    default:
+      return { tone: 'warn', label: status };
+  }
+}
+
 function metricName(id: string): string {
   const parts = id.split(':');
   return parts.length > 2 ? parts.slice(2).join(':') : id;
