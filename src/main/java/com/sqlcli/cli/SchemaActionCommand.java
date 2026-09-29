@@ -632,6 +632,7 @@ public class SchemaActionCommand implements Runnable {
                                            （比如「扫码」挂着巡检域点位，但「扫码打卡」
                                            在别的域另有所指，负向词让它别抢那条查询）。
                       --map REF,...        逗号分隔的映射目标；支持 schema.table 或 schema.table.column。
+                      --metrics M,...       逗号分隔的权威指标名；显式绑定 Term → Metric，不按名字自动猜。
                       --primary-target REF 入口对象。**指向一张表这条术语就是一个场景**，
                                            搜索命中时展开成子图（入口表 + 映射的表 + 它们之间的关系）；
                                            指向列或不给，就退化成同义词路由。
@@ -640,6 +641,7 @@ public class SchemaActionCommand implements Runnable {
 
                     说明:
                       --map 会创建 type=term_mapping 的关系，from 为术语，to 为表或字段。
+                      --metrics 引用不存在或已 ignored 的指标会拒绝写入；不给则保留原绑定。
 
                       --filter 只放**换个场景就不成立**的条件:
                         进  state IN (0,1,6)         未完结的报事；回访场景要的是 IN (6,7)
@@ -650,16 +652,17 @@ public class SchemaActionCommand implements Runnable {
                       --filter 是整体替换不是追加：一组条件要共同成立，追加会把上次写错的
                       永久留下。不给 --filter 就不动原有的。
 
-                      同义词、映射**两样全空**的术语会被拒收——只有 --description 没有
-                      --map / --aliases 跟 businessName 完全重叠，而且多一个对象要维护，
+                      同义词、映射、指标绑定**三样全空**的术语会被拒收——只有 --description 没有
+                      --map / --aliases / --metrics 跟 businessName 完全重叠，而且多一个对象要维护，
                       还占着检索最高权重档。报错会给出改用 schema edit --business-name
                       的具体命令。
 
                     示例:
                       sql-cli %s schema add-term buyer --display-name "买家" --description "下单用户" --aliases "购买人,客户" --map qm_pct.orders.buyer_id
+                      sql-cli %s schema add-term 已支付订单 --aliases "支付订单" --map app.orders --primary-target app.orders --filter "status IN (2,3)" --metrics gmv_paid
                       sql-cli %s schema add-term 报事 --aliases "工单,报修" --map app.report,app.report_assign \
                           --primary-target app.report --filter "state IN (0,1,6)" --filter "subject_id = :subjectId"
-                    """.formatted(a, a, a);
+                    """.formatted(a, a, a, a);
             case "add-relation" -> """
                     用途: 新增或更新两个图谱节点之间的关系。
                     用法: sql-cli %s schema add-relation --type TYPE --from REF --to REF [options]
