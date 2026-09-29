@@ -13,9 +13,10 @@
  */
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { getEvaluations, getFindings, runEval, type EvaluationDto, type FindingDto } from '../../api/eval';
 import { queryClient } from '../../api/queryClient';
+import { navPath } from '../../app/navigation';
 import { Button } from '../../ui/Button';
 import { FilterBar } from '../../ui/FilterBar';
 import { Pagination } from '../../ui/Pagination';
@@ -51,6 +52,28 @@ function runLabel(run: EvaluationDto): string {
 }
 
 const COPY_ICON = 'M9 3h9a2 2 0 012 2v10h-2V5H9V3zM5 7h9a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2z';
+
+function targetPath(alias: string, targetId: string | null): string | null {
+  if (!targetId) return null;
+  const encoded = encodeURIComponent(targetId);
+  if (targetId.startsWith('term:')) {
+    return `${navPath('knowledge', alias)}&term=${encoded}`;
+  }
+  if (targetId.startsWith('metric:')) {
+    return `${navPath('metrics', alias)}&target=${encoded}`;
+  }
+  if (targetId.startsWith('policy:') || targetId.startsWith('policy-')) {
+    return navPath('rules', alias);
+  }
+  if (targetId.startsWith('table:')
+      || targetId.startsWith('column:')
+      || targetId.startsWith('relation:')
+      || targetId.startsWith('lineage:')) {
+    return `${navPath('knowledge', alias)}&target=${encoded}`;
+  }
+  return null;
+}
+
 
 export function EvalPage() {
   const [params] = useSearchParams();
@@ -113,7 +136,7 @@ export function EvalPage() {
       <header className="eval-head">
         <h1>评估</h1>
         <Button size="sm" onClick={() => run.mutate()} disabled={run.isPending}>
-          {run.isPending ? '评估中…' : '跑一次评估'}
+          {run.isPending ? '评估中…' : '修复后复评'}
         </Button>
       </header>
       <p className="eval-empty">
@@ -235,7 +258,7 @@ export function EvalPage() {
       <section className="eval-block">
         <h2>工作队列</h2>
         <FilterBar>
-          <span className="eval-meta">硬错误在前，改完重跑一次评估复评</span>
+          <span className="eval-meta">硬错误在前；定位并修复后，用顶部“复评”确认问题是否消失</span>
           <Pagination
             page={page}
             pageSize={pageSize}
@@ -265,7 +288,12 @@ export function EvalPage() {
                         label={finding.severity === 'error' ? '硬错误' : '改进项'} />
                       <code>{finding.probe}</code>
                     </td>
-                    <td><code className="eval-target">{finding.targetId ?? '—'}</code></td>
+                    <td>
+                      <code className="eval-target">{finding.targetId ?? '—'}</code>
+                      {targetPath(alias, finding.targetId) && (
+                        <Link className="eval-target-link" to={targetPath(alias, finding.targetId)!}>定位</Link>
+                      )}
+                    </td>
                     <td>{finding.message}</td>
                     <td>
                       {finding.remediation ? <span className="eval-fix">
