@@ -59,6 +59,27 @@ class ImpactAnalysisServiceTest {
     }
 
     @Test
+    void metricImpactFindsTermsThatExplicitlyDependOnIt() {
+        GraphWorkspace workspace = seed();
+        MetricRecord metric = MetricRecord.create(ALIAS, "gmv_paid", GraphActor.human);
+        metric.setExpression("SUM(orders.amount)");
+        workspace.getMetrics().put(metric.getId(), metric);
+
+        TermWorkspaceNode term = TermWorkspaceNode.create(ALIAS, "已支付订单", GraphActor.human);
+        term.setMetricRefs(new java.util.ArrayList<>(List.of(metric.getId())));
+        workspace.getTerms().put(term.getId(), term);
+
+        ImpactAnalysisService.ImpactReport report =
+                new ImpactAnalysisService().analyze(workspace, metric.getId());
+
+        assertEquals(1, report.breaking());
+        assertTrue(report.impacts().stream().anyMatch(item ->
+                item.kind().equals("term")
+                        && item.id().equals(term.getId())
+                        && item.dependency().equals("metricRefs")));
+    }
+
+    @Test
     void columnImpactTraversesMetricLineageAndRelations() {
         GraphWorkspace workspace = seed();
         String amount = column("orders", "amount");
