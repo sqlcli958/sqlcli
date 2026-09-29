@@ -139,9 +139,11 @@ export function MetricsPage() {
     <div className="page metrics-page">
       <header className="metrics-head">
         <h1>指标</h1>
-        <Button size="sm" onClick={() => setEditing(editing === 'new' ? null : 'new')}>
-          {editing === 'new' ? '收起' : '新建指标'}
-        </Button>
+        {!termId && (
+          <Button size="sm" onClick={() => setEditing(editing === 'new' ? null : 'new')}>
+            {editing === 'new' ? '收起' : '新建指标'}
+          </Button>
+        )}
       </header>
 
       {termId && terms.isLoading && (
@@ -230,7 +232,6 @@ function MetricItem({
   metric: RatioMetricDto;
   term: TermDto | null;
   alias: string | null;
-  term: TermDto | null;
   aliasInfo?: { approveQuery: boolean };
   targeted: boolean;
   editing: boolean;
@@ -409,6 +410,7 @@ function MetricChartSection({
   revision,
 }: {
   metric: RatioMetricDto;
+  term: TermDto | null;
   alias: string | null;
   aliasInfo?: { approveQuery: boolean };
   revision: number;
