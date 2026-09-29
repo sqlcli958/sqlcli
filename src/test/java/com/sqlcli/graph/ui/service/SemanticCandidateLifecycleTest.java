@@ -82,9 +82,33 @@ class SemanticCandidateLifecycleTest {
         assertTrue(result.isSuccess(), result.getErrors().toString());
         TermWorkspaceNode saved = store.load(ALIAS).getTerms().get(termId);
         assertNotNull(saved);
-        assertEquals(GraphStatus.partial, saved.getStatus(),
-                "默认置信度 0.8 应离开 candidate 并定级为 partial");
-        assertEquals(Boolean.FALSE, saved.getVerified());
+        assertEquals(GraphStatus.verified, saved.getStatus(),
+                "人已经批准业务术语，Agent 初始 confidence=0.8 不能把它继续降成 partial");
+        assertEquals(Boolean.TRUE, saved.getVerified());
+    }
+
+    @Test
+    void syncRepairsPreviouslyApprovedPartialTerm() throws Exception {
+        service.syncCandidateApprovals(ALIAS);
+        String termId = "term:" + ALIAS + ":已支付订单";
+        GraphWorkspace before = store.load(ALIAS);
+
+        WorkspaceMutationService.MutationResult published = service.publishCandidate(
+                ALIAS, termId, before.getManifest().getRevision(), "人工已审批");
+        assertTrue(published.isSuccess(), published.getErrors().toString());
+
+        // 模拟旧版本已经批准、却因为默认 confidence=0.8 被落成 partial 的存量数据。
+        GraphWorkspace legacy = store.load(ALIAS);
+        TermWorkspaceNode term = legacy.getTerms().get(termId);
+        term.setStatus(GraphStatus.partial);
+        term.setVerified(false);
+        store.save(legacy);
+
+        assertEquals(0, service.syncCandidateApprovals(ALIAS),
+                "已有 approved 记录的 partial Term 不应该重新排审批");
+        TermWorkspaceNode repaired = store.load(ALIAS).getTerms().get(termId);
+        assertEquals(GraphStatus.verified, repaired.getStatus());
+        assertEquals(Boolean.TRUE, repaired.getVerified());
     }
 
     @Test

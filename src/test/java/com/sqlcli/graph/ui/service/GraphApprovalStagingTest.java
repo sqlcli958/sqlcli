@@ -182,6 +182,34 @@ class GraphApprovalStagingTest {
     }
 
     @Test
+    void approvingCandidateTermMarksItHumanVerified() throws Exception {
+        approveGraph(true);
+        seedTable();
+        String termId = GraphIds.termId(ALIAS, "已支付订单");
+
+        var staged = service.mutate(ALIAS, revision(), GraphActor.agent, "Agent 提议业务术语",
+                termId, workspace -> {
+                    TermWorkspaceNode term = TermWorkspaceNode.create(ALIAS, "已支付订单", GraphActor.agent);
+                    term.setDescription("已完成支付且未取消的订单");
+                    workspace.getTerms().put(term.getId(), term);
+                    return new WorkspaceMutationService.MutationOutcome(term.getId(), ChangeOperation.upsert);
+                });
+        long approvalId = staged.getPendingApprovalId();
+        assertNotNull(approvalId);
+        assertNull(store.load(ALIAS).getTerms().get(termId), "批准前不能提前落图谱");
+
+        var applied = service.applyApproved(ALIAS, approvalId,
+                GraphChangePayload.fromJson(runState.findApproval(approvalId).payload()));
+
+        assertTrue(applied.isSuccess(), applied.getErrors().toString());
+        TermWorkspaceNode saved = store.load(ALIAS).getTerms().get(termId);
+        assertNotNull(saved);
+        assertEquals(GraphStatus.verified, saved.getStatus(),
+                "人工批准就是对 Term 业务定义的确认，不能受 Agent 初始 confidence=0.8 限制");
+        assertEquals(Boolean.TRUE, saved.getVerified());
+    }
+
+    @Test
     void approvingACandidateRelationAlsoPublishesIt() throws Exception {
         approveGraph(true);
         seedTable();

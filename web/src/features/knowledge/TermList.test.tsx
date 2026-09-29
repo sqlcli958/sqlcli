@@ -70,6 +70,30 @@ beforeEach(() => {
   vi.mocked(deleteTerm).mockResolvedValue({ newRevision: 8, changeId: 'c8' });
 });
 
+test('partial 状态不再被误显示成“候选，未经人确认”', async () => {
+  vi.mocked(getTerms).mockResolvedValue({
+    terms: [term({ id: 'term:demo:partial', name: '部分术语', displayName: '部分术语', status: 'partial' })],
+    total: 1,
+  });
+  renderList();
+  await screen.findByText('部分术语');
+
+  const dot = document.querySelector('.cell-dot');
+  expect(dot?.getAttribute('title')).toBe('部分确认');
+});
+
+test('verified 状态显示已确认', async () => {
+  vi.mocked(getTerms).mockResolvedValue({
+    terms: [term({ id: 'term:demo:verified', name: '已确认术语', displayName: '已确认术语', status: 'verified' })],
+    total: 1,
+  });
+  renderList();
+  await screen.findByText('已确认术语');
+
+  const dot = document.querySelector('.cell-dot');
+  expect(dot?.getAttribute('title')).toBe('已确认');
+});
+
 test('场景术语可点，点了把 term 写进 URL 并切回表目录', async () => {
   const onPick = renderList();
   const button = await screen.findByRole('button', { name: '报事' });
