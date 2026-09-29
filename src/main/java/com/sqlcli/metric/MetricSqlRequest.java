@@ -14,8 +14,19 @@ import java.util.List;
  *       不是原始 ref 字符串），空列表表示不按维度拆分，只出总量/时间序列。</li>
  * </ul>
  */
-public record MetricSqlRequest(String grain, String timeFrom, String timeTo, List<String> dimensionColumnIds) {
+public record MetricSqlRequest(
+        String grain,
+        String timeFrom,
+        String timeTo,
+        List<String> dimensionColumnIds,
+        List<String> contextFilters) {
     public MetricSqlRequest {
         dimensionColumnIds = dimensionColumnIds == null ? List.of() : List.copyOf(dimensionColumnIds);
+        contextFilters = contextFilters == null ? List.of() : List.copyOf(contextFilters);
+    }
+
+    /** 旧调用方没有业务场景过滤；保持四参构造兼容。 */
+    public MetricSqlRequest(String grain, String timeFrom, String timeTo, List<String> dimensionColumnIds) {
+        this(grain, timeFrom, timeTo, dimensionColumnIds, List.of());
     }
 }
