@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
 import { columnRef, expandMetricSql, getMetricRuns, getMetrics, upsertMetric } from '../../api/metrics';
@@ -34,6 +34,7 @@ export function MetricsPage() {
   const revision = useSessionStore((s) => s.revision);
   const [searchParams] = useSearchParams();
   const alias = searchParams.get('alias');
+  const targetId = searchParams.get('target');
   const { graphAvailable, graphStatusLoading, graphStatusError } = useOutletContext<{
     graphAvailable: boolean;
     graphStatusLoading: boolean;
@@ -114,6 +115,14 @@ export function MetricsPage() {
   // 字段，服务端已经在返回，类型跟着断言一下（详见 api/metrics.ts 里 RatioMetricDto 的注释）。
   const metrics = (list.data?.metrics ?? []) as RatioMetricDto[];
 
+  useEffect(() => {
+    if (!targetId || !metrics.some((metric) => metric.id === targetId)) return;
+    requestAnimationFrame(() => {
+      document.getElementById(`metric-target-${targetId}`)
+        ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+  }, [targetId, metrics]);
+
   return (
     <div className="page metrics-page">
       <header className="metrics-head">
@@ -155,6 +164,7 @@ export function MetricsPage() {
             key={metric.id}
             metric={metric}
             alias={alias}
+            targeted={metric.id === targetId}
             aliasInfo={aliasInfo}
             editing={editing !== 'new' && editing?.id === metric.id}
             onToggleEdit={() => setEditing(editing !== 'new' && editing?.id === metric.id ? null : metric)}
@@ -174,6 +184,7 @@ function MetricItem({
   metric,
   alias,
   aliasInfo,
+  targeted,
   editing,
   onToggleEdit,
   revision,
@@ -182,6 +193,7 @@ function MetricItem({
   metric: RatioMetricDto;
   alias: string | null;
   aliasInfo?: { approveQuery: boolean };
+  targeted: boolean;
   editing: boolean;
   onToggleEdit: () => void;
   revision: number;
@@ -208,7 +220,10 @@ function MetricItem({
   const additivity = isRatio ? 'non_additive' : metric.additivity;
 
   return (
-    <li className="term-list-item">
+    <li
+      id={`metric-target-${metric.id}`}
+      className={`term-list-item${targeted ? ' is-targeted' : ''}`}
+    >
       <div className="term-list-head">
         <span className="term-list-name">{metric.businessName || metric.name}</span>
         {metric.status && <span className="term-list-status">{metric.status}</span>}
