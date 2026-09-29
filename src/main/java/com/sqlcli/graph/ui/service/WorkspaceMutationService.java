@@ -276,7 +276,15 @@ public class WorkspaceMutationService {
             queued += queueExistingCandidateApproval(alias, workspace, record, alreadyApproved);
         }
         for (TermWorkspaceNode term : workspace.getTerms().values()) {
-            queued += queueExistingCandidateApproval(alias, workspace, term, alreadyApproved);
+            // P0 旧逻辑把默认 confidence=0.8 的已批准 Term 定级成 partial。
+            // 只有运行库里确实存在 approved 审批的 partial Term 才补成 verified；
+            // 普通 partial（例如人工创建但尚未走审批）不做猜测。
+            if (term.getStatus() == GraphStatus.partial
+                    && runState.hasApprovedApproval(alias, ApprovalGate.Kind.GRAPH.code(), term.getId())) {
+                alreadyApproved.add(term.getId());
+            } else {
+                queued += queueExistingCandidateApproval(alias, workspace, term, alreadyApproved);
+            }
         }
         for (MetricRecord metric : workspace.getMetrics().values()) {
             queued += queueExistingCandidateApproval(alias, workspace, metric, alreadyApproved);
@@ -287,7 +295,10 @@ public class WorkspaceMutationService {
                     "候选对象已在审批中批准，补定级", alreadyApproved.get(0), ApprovalMode.NEVER, current -> {
                         for (String id : alreadyApproved) {
                             Object value = GraphObjectPatch.read(current, id);
-                            if (value instanceof BaseGraphObject candidate
+                            if (value instanceof TermWorkspaceNode term
+                                    && term.getStatus() == GraphStatus.partial) {
+                                grade(term);
+                            } else if (value instanceof BaseGraphObject candidate
                                     && isReviewableCandidate(value)
                                     && candidate.getStatus() == GraphStatus.candidate) {
                                 grade(candidate);
