@@ -199,7 +199,7 @@ html[data-theme='light'] .settings-table th { background: var(--color-surface-al
 html[data-theme='light'] .rules-page .btn,
 html[data-theme='light'] .rule-catalog .btn { background: #fff !important; }
 html[data-theme='light'] .rules-page pre,
-html[data-theme='light'] .rules-page code { color: var(--color-text); background: var(--color-surface-alt) !important; }
+html[data-theme='light'] .catalog code { color: var(--color-text); background: var(--color-surface-alt) !important; }
 html[data-theme='light'] .settings-type-badge,
 html[data-theme='light'] .settings-type-badge * { color: var(--color-text-muted); background: var(--color-surface-alt) !important; }
 
@@ -818,7 +818,7 @@ html[data-theme='light'] .metric-sql,
 html[data-theme='light'] .eval-cmd,
 html[data-theme='light'] .settings-gap code,
 html[data-theme='light'] .rules-page pre,
-html[data-theme='light'] .rules-page code,
+html[data-theme='light'] .catalog code,
 html[data-theme='light'] .catalog-rule pre {
   color: var(--color-text) !important;
   border-color: var(--border-soft) !important;
@@ -1125,7 +1125,7 @@ html[data-theme='light'] :is(
   .metric-sql pre,
   .eval-cmd,
   .rules-page pre,
-  .rules-page code,
+  .catalog code,
   .catalog-rule pre
 ) {
   color: var(--color-text) !important;

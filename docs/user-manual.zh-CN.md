@@ -371,12 +371,16 @@ MySQL 的 `onUpdate` 来自 `information_schema.COLUMNS.EXTRA`。升级后应重
 
 ### DDL 与 Migration 审查
 
+设计新表前，先用 `schema design context --json` 读取数据库类型、版本和适用的已启用规则。
+按规则设计候选 DDL，并用 `design review` 迭代检查；未配置适用规则时不能确认符合系统要求。
+
 `schema policy check` 仍只评估正式工作区。需要候选 DDL、危险 DML 或 Migration 配套文件时，使用下方两个唯一入口：
 
 ```bash
+sql-cli app-dev schema design context --json
+
 sql-cli app-dev schema design review \
   --ddl schema.sql \
-  --rules design-rules.yaml \
   --json
 
 sql-cli app-dev schema migration lint \
@@ -388,7 +392,9 @@ sql-cli app-dev schema migration lint \
   --json
 ```
 
-设计审查投影 CREATE/ALTER/INDEX 变更；Migration lint 额外检查 UPDATE/DELETE 的 WHERE 和 verification SQL。`--precheck`、`--postcheck` 只能包含只读 SQL。两者均输出 evaluation、violations、diagnostics 和 changes；语法/投影失败返回状态码 2。
+设计审查默认使用 alias 已绑定规则；`--rules` 可指定一次性评审文件。设计审查投影 CREATE/ALTER/INDEX/DROP 变更，也可附回退、预检查和后检查 SQL；Migration lint 额外检查 UPDATE/DELETE 的 WHERE 和 verification SQL。`--precheck`、`--postcheck` 只能包含只读 SQL。两者均输出 evaluations、violations、diagnostics 和 changes（单规则集保留 evaluation）；语法/投影/评估失败或没有适用规则返回状态码 2，强制规则违规返回 1，通过返回 0。
+
+单条和批次 DDL 执行前复用同一规则检查。存在适用的已启用规则时，解析或评估失败拒绝执行；批次先审查整批候选结构，检查通过后才连接数据库。评审与执行检查不会将候选表写入正式图谱，也不能代替业务语义确认或线上锁表成本评估。
 
 #### 四种数据库方言规则
 

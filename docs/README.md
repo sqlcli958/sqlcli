@@ -33,6 +33,7 @@
 
 ## SQL 执行、规则与审批
 
+- [规则模块使用与设计指南（HTML）](rules-module-guide.zh-CN.html) — 人与 Agent 的流程、规则定义、输入输出、执行约束与当前边界，可离线打开
 - [SQL Task 模块设计](sql-task-module-design.zh-CN.md)
 - [SQL Pipeline 优化研究](sql-pipeline-optimization-research.zh-CN.md)
 - [数据库生命周期 Policy 规则研究](database-lifecycle-policy-rules-research.zh-CN.md)

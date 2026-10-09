@@ -288,7 +288,7 @@ class SchemaPolicyCommandTest {
         SchemaActionCommand design = command(store, "design", List.of(
                 "design", "review", "--ddl", ddl.toString(), "--rules", rules.toString(), "--json"));
         design.setJsonOutput(true);
-        assertEquals(2, design.executeCommand(), "input-only rules require their own review input");
+        assertEquals(0, design.executeCommand(), "DDL 评审跳过不适用的 DML 规则");
 
         Path designRules = temp.resolve("design-rules.yaml");
         Files.writeString(designRules, Files.readString(rules).replaceAll("(?s)\\n  - id: dml.*", ""));
@@ -658,5 +658,109 @@ class SchemaPolicyCommandTest {
         command.setAction(action);
         command.setCommandArgs(args);
         return command;
+    }
+
+    @Test
+    void designContextAndReviewConsumeBoundRequirementsWithoutChangingTheWorkspace() throws Exception {
+        GraphWorkspaceStore store = new GraphWorkspaceStore(temp);
+        store.save(GraphWorkspace.create("commands", "mysql"));
+        Path policy = temp.resolve("commands/policy");
+        Files.writeString(policy.resolve("rules/structure.yaml"), """
+                kind: PolicyRuleSet
+                id: structure
+                title: 系统结构要求
+                version: "1"
+                rules:
+                  - id: pk
+                    title: 主键
+                    category: primary_key_required
+                    severity: error
+                    enforcement: required
+                    remediation: 增加稳定主键
+                """);
+        Files.writeString(policy.resolve("rules/dialect.yaml"), """
+                kind: PolicyRuleSet
+                id: dialect
+                title: 系统类型要求
+                version: "1"
+                rules:
+                  - id: no-double
+                    title: 禁用 DOUBLE
+                    category: dialect_sql_pattern
+                    severity: error
+                    enforcement: required
+                    statement:
+                      matchRegex: '(?i)\\bDOUBLE\\b'
+                      message: 禁用 DOUBLE
+                    remediation: 使用 DECIMAL
+                """);
+        Files.writeString(policy.resolve("bindings.yaml"),
+                "ruleSets:\n  - rules/structure.yaml\n  - rules/dialect.yaml\n");
+        long revision = store.load("commands").getManifest().getRevision();
+        PrintStream original = System.out;
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        try (PrintStream out = new PrintStream(stdout, true, StandardCharsets.UTF_8)) {
+            System.setOut(out);
+            SchemaActionCommand context = command(store, "design", List.of("design", "context", "--json"));
+            context.setJsonOutput(true);
+            assertEquals(0, context.executeCommand());
+            JsonNode data = new ObjectMapper().readTree(stdout.toString(StandardCharsets.UTF_8)).get("data");
+            assertEquals("mysql", data.get("dbType").asText());
+            assertTrue(data.get("configured").asBoolean());
+            assertEquals(2, data.get("ruleSets").size());
+            assertEquals("required", data.get("ruleSets").get(0).get("rules").get(0).get("enforcement").asText());
+
+            Path ddl = temp.resolve("new-table.sql");
+            Files.writeString(ddl, "CREATE TABLE app.invoice (amount DOUBLE)");
+            stdout.reset();
+            SchemaActionCommand review = command(store, "design", List.of(
+                    "design", "review", "--ddl", ddl.toString(), "--json"));
+            review.setJsonOutput(true);
+            assertEquals(1, review.executeCommand());
+            data = new ObjectMapper().readTree(stdout.toString(StandardCharsets.UTF_8)).get("data");
+            assertEquals(2, data.get("evaluations").size());
+            assertEquals(2, data.get("violations").size());
+            assertTrue(data.get("violations").toString().contains("使用 DECIMAL"));
+            assertTrue(data.get("violations").get(0).get("sourceRef").asText().endsWith(":1"));
+            assertEquals(1, data.get("changes").size());
+
+            Files.writeString(ddl, "CREATE TABLE app.invoice (id BIGINT PRIMARY KEY, amount DECIMAL(10,2))");
+            stdout.reset();
+            assertEquals(0, review.executeCommand());
+            data = new ObjectMapper().readTree(stdout.toString(StandardCharsets.UTF_8)).get("data");
+            assertEquals(0, data.get("violations").size());
+            Files.writeString(ddl, "-- empty candidate");
+            stdout.reset();
+            assertEquals(2, review.executeCommand());
+        } finally {
+            System.setOut(original);
+        }
+        assertEquals(revision, store.load("commands").getManifest().getRevision());
+        assertTrue(store.load("commands").getTables().isEmpty());
+    }
+
+    @Test
+    void designReviewWithoutRequirementsDoesNotClaimCompliance() throws Exception {
+        GraphWorkspaceStore store = new GraphWorkspaceStore(temp);
+        store.save(GraphWorkspace.create("commands", "mysql"));
+        Path ddl = temp.resolve("new-table.sql");
+        Files.writeString(ddl, "CREATE TABLE app.invoice (id BIGINT PRIMARY KEY)");
+        assertEquals(2, command(store, "design", List.of(
+                "design", "review", "--ddl", ddl.toString())).executeCommand());
+        Files.writeString(temp.resolve("commands/policy/rules/query.yaml"), """
+                kind: PolicyRuleSet
+                id: query
+                title: 查询规则
+                version: "1"
+                rules:
+                  - id: dml
+                    title: DML
+                    category: dangerous_dml_guard
+                    severity: error
+                    enforcement: required
+                """);
+        Files.writeString(temp.resolve("commands/policy/bindings.yaml"), "ruleSets:\n  - rules/query.yaml\n");
+        assertEquals(2, command(store, "design", List.of(
+                "design", "review", "--ddl", ddl.toString())).executeCommand());
     }
 }

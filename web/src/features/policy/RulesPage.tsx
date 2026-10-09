@@ -235,9 +235,10 @@ export function RulesPage() {
         {rules.isError && <p className="rules-error" role="alert">无法读取规则：{rules.error.message}</p>}
 
         {GROUPS.map((group) => {
-          const active = group.fileName === activeFile;
+          const selected = group.fileName === activeFile;
+          const active = view !== 'catalog' && selected;
           const file = stored(group);
-          const shown = active && draft ? draft : (file?.ruleSet ?? emptySet(group));
+          const shown = selected && draft ? draft : (file?.ruleSet ?? emptySet(group));
           const enabled = file?.enabled ?? false;
           const state = !file ? '还没有规则' : enabled ? '已启用校验' : '未启用，policy check 不会执行';
           return <div className="rules-set" key={group.fileName}>
@@ -257,7 +258,7 @@ export function RulesPage() {
                   <button type="button"
                     className={active && view === 'rule' && ruleIndex === index ? 'is-active' : ''}
                     onClick={() => {
-                      if (active) { setRuleIndex(index); setView('rule'); } else select(group, index);
+                      if (selected) { setRuleIndex(index); setView('rule'); } else select(group, index);
                     }}>
                     <code>{rule.category}</code>
                     <small>{rule.title}</small>

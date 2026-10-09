@@ -309,7 +309,7 @@ public class SchemaActionCommand implements Runnable {
         System.out.println("  index                         管理搜索索引");
         System.out.println("  diagram                       生成开发者关联图");
         System.out.println("  policy                        执行和查询结构规则审计");
-        System.out.println("  design review                 审查候选 DDL，不修改图谱");
+        System.out.println("  design context|review         读取设计要求、审查候选 DDL，不修改图谱");
         System.out.println("  migration lint                审查 Migration，不执行 SQL");
         System.out.println();
         System.out.println("查看某个 action 的详细参数:");
@@ -352,7 +352,8 @@ public class SchemaActionCommand implements Runnable {
         System.out.println("  sql-cli " + a + " schema index rebuild");
         System.out.println("  sql-cli " + a + " schema index status");
         System.out.println("  sql-cli " + a + " schema diagram [--output <dir>]");
-        System.out.println("  sql-cli " + a + " schema design review --ddl <file> --rules <ruleset.yaml> [--json]");
+        System.out.println("  sql-cli " + a + " schema design context [--json]");
+        System.out.println("  sql-cli " + a + " schema design review --ddl <file> [--rules <ruleset.yaml>] [--json]");
         System.out.println("  sql-cli " + a + " schema migration lint --file <migration.sql> --rules <ruleset.yaml> [--json]");
         System.out.println();
     }
@@ -1062,9 +1063,18 @@ public class SchemaActionCommand implements Runnable {
                         --column "updated_at datetime notnull comment=更新时间"
                     """.formatted(a, a);
             case "design" -> """
-                    用途: 将候选 DDL 投影到内存副本并执行结构规则审查；不会修改正式图谱。
-                    用法: sql-cli %s schema design review --ddl <file> --rules <ruleset.yaml> [--json]
-                    """.formatted(a);
+                    用途: 先读取系统设计要求，再审查候选 DDL；不执行 SQL，不修改当前图谱。
+                    用法: sql-cli %s schema design context [--json]
+                          sql-cli %s schema design review --ddl <file> [--rules <ruleset.yaml>] [--json]
+
+                    变更安全规则需要计划时，可附 --rollback <file> --precheck <file> --postcheck <file>。
+
+                    context 返回数据库类型、版本、工作区版本及当前适用的已启用规则。
+                    review 默认使用已启用规则；--rules 指定一次性评审文件。
+                    DDL 中表名须带 schema。检查只覆盖本次变更，返回违规位置与修法。
+                    未配置适用规则、解析失败或评估失败时不会报告通过。
+                    退出码: 0=通过（可能有提示），1=强制规则违规，2=检查未完成。
+                    """.formatted(a, a);
             case "migration" -> """
                     用途: 审查 Migration 的结构变更和危险 DML；不会执行任何 SQL。
                     用法: sql-cli %s schema migration lint --file <migration.sql> --rules <ruleset.yaml>
@@ -4091,25 +4101,61 @@ public class SchemaActionCommand implements Runnable {
                     violation.getRemediation() == null ? "" : " | " + violation.getRemediation());
         }
         if (result.skippedRules() > 0) {
-            System.out.printf("  跳过 %d 条只对新 DDL 生效的规则（design review / migration lint 里照跑；"
-                    + "存量图谱上要跑加 --all，或在规则里写 scope: all）%n", result.skippedRules());
+            System.out.printf("  跳过 %d 条不适用于本次检查的规则（存量命名检查可用 --all，或 scope: all）%n",
+                    result.skippedRules());
         }
         if (result.evaluation().getErrorMessage() != null) {
             System.err.println(result.evaluation().getErrorMessage());
         }
     }
 
+    private int designContext(GraphWorkspace workspace) throws Exception {
+        List<RuleSet> ruleSets = policyService.boundDesignRules(alias, workspace);
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("alias", alias);
+        output.put("dbType", workspace.getDataSource().getDbType());
+        output.put("productVersion", workspace.getDataSource().getProductVersion());
+        output.put("workspaceRevision", workspace.getManifest().getRevision());
+        output.put("configured", !ruleSets.isEmpty());
+        output.put("ruleSets", ruleSets);
+        output.put("notice", ruleSets.isEmpty()
+                ? "未配置适用的已启用规则，不能确认符合系统要求。"
+                : "按 when 条件和 statement 设计；required/blocking 是强制要求，advisory 是提示。"
+                        + "涉及语义、字典或关联的要求还需图谱事实，DDL 本身不能证明业务正确性。");
+        if (jsonOutput) {
+            CliJson.printSuccess(output);
+        } else {
+            System.out.println("Database: " + output.get("dbType") + " " + output.get("productVersion"));
+            for (RuleSet rules : ruleSets) {
+                System.out.println("RuleSet: " + rules.getId() + " v" + rules.getVersion());
+                for (PolicyRule rule : rules.getRules()) {
+                    System.out.printf("  [%s] %s: %s | when=%s | statement=%s | %s%n",
+                            rule.getEnforcement(), rule.getId(), rule.getTitle(), rule.getWhen(),
+                            rule.getStatement(), rule.getRemediation());
+                }
+            }
+            System.out.println(output.get("notice"));
+        }
+        return 0;
+    }
+
     private int reviewDesign(GraphWorkspace workspace) throws Exception {
         if (workspace == null) return missingWorkspace();
+        if ("context".equals(positional(commandArgs, 1))) return designContext(workspace);
         if (!"review".equals(positional(commandArgs, 1))) {
-            return usageError("Usage: schema design review --ddl <file> --rules <ruleset.yaml>");
+            return usageError("Usage: schema design context | review --ddl <file> [--rules <ruleset.yaml>]");
         }
         Path ddl = requiredFile("--ddl");
-        Path rules = requiredFile("--rules");
+        Path rules = option(commandArgs, "--rules") == null ? null : requiredFile("--rules");
         CandidateDdlProjector.ProjectionResult projection = ddlProjector.projectFile(workspace, ddl);
         Map<String, Object> input = reviewInput("design", "ddl", ddl, projection.changes());
         input.put("ddlSql", Files.readString(ddl, StandardCharsets.UTF_8));
+        input.put("sql", input.get("ddlSql"));
+        input.put("sqlStatements", List.of());
         input.put("ddlRef", ddl.toString());
+        putOptionalReviewFile(input, "rollback", "--rollback", false);
+        putOptionalReviewFile(input, "precheck", "--precheck", true);
+        putOptionalReviewFile(input, "postcheck", "--postcheck", true);
         input.put("similarObjects", similarObjects(workspace, projection.changes()));
         return finishReview(projection, rules, input);
     }
@@ -4144,23 +4190,32 @@ public class SchemaActionCommand implements Runnable {
     }
 
     private int finishReview(CandidateDdlProjector.ProjectionResult projection, Path rules,
-            Map<String, Object> input) {
+            Map<String, Object> input) throws Exception {
         if (!projection.diagnostics().isEmpty()) {
             printReviewFailure(projection);
             return 2;
         }
-        PolicyCheckResult result = policyService.checkCandidate(alias, rules, GraphActor.human,
-                projection.workspace(), input);
+        List<PolicyCheckResult> results = rules == null
+                ? policyService.checkBoundCandidate(alias, GraphActor.human, projection.workspace(), input)
+                : List.of(policyService.checkCandidate(alias, rules, GraphActor.human, projection.workspace(), input));
+        if (results.isEmpty() || results.stream().allMatch(result ->
+                result.evaluation().getStatus() == PolicyEvaluationStatus.skipped
+                        || (result.exitCode() != 2 && result.evaluation().getEvaluatedRules() == 0))) {
+            if (jsonOutput) CliJson.printFailure("NO_DESIGN_RULES", "未配置适用的已启用规则，无法确认符合系统要求。");
+            else System.err.println("未配置适用的已启用规则，无法确认符合系统要求。");
+            return 2;
+        }
         Map<String, Object> output = new LinkedHashMap<>();
-        output.put("evaluation", result.evaluation());
-        output.put("violations", result.violations());
+        output.put("evaluation", results.size() == 1 ? results.get(0).evaluation() : null);
+        output.put("evaluations", results.stream().map(PolicyCheckResult::evaluation).toList());
+        output.put("violations", results.stream().flatMap(result -> result.violations().stream()).toList());
         output.put("diagnostics", projection.diagnostics());
         output.put("similarObjects", input.getOrDefault("similarObjects", List.of()));
         output.put("changes", projection.changes());
         if (jsonOutput) {
             CliJson.printSuccess(output);
         } else {
-            printPolicyResult(result);
+            results.forEach(this::printPolicyResult);
             if (input.get("similarObjects") instanceof Collection<?> similar && !similar.isEmpty()) {
                 System.out.println("Similar objects:");
                 similar.forEach(item -> System.out.println("  " + item));
@@ -4168,7 +4223,7 @@ public class SchemaActionCommand implements Runnable {
             projection.changes().forEach(change -> System.out.printf("  %s %s %s%n",
                     change.changeType(), change.objectType(), change.sourceRef()));
         }
-        return result.exitCode();
+        return results.stream().mapToInt(PolicyCheckResult::exitCode).max().orElse(2);
     }
 
     private Map<String, Object> reviewInput(String reviewType, String inputType, Path inputPath,

@@ -28,6 +28,12 @@ import java.util.regex.Pattern;
 
 public class PolicyEvaluator {
 
+    /** DDL 不消费 DML 保护或查询提示；它们也不能计入设计检查覆盖率。 */
+    public static boolean isDdlRule(PolicyRule rule) {
+        return !"dangerous_dml_guard".equals(rule.getCategory())
+                && !QueryConventions.CATEGORY.equals(rule.getCategory());
+    }
+
     public List<PolicyViolation> evaluate(GraphWorkspace workspace, RuleSet ruleSet, List<RuleWaiver> waivers,
             String evaluationId) {
         return evaluate(workspace, ruleSet, waivers, evaluationId, Map.of());
@@ -117,9 +123,10 @@ public class PolicyEvaluator {
     /**
      * 全量检查（没有变更集）里跳过 {@link PolicyScope#change} 的规则；
      * {@code input.scope=all}（CLI 的 {@code --all}）是一次性的显式打开。
-     * design review / migration lint 有变更集，所有规则照跑。
+     * 有变更集时会检查 change 规则；DDL 评审仍需排除 DML 和查询提示。
      */
     private boolean runs(PolicyRule rule, Set<String> changedTables, Map<String, ?> input) {
+        if ("ddl".equals(input.get("inputType")) && !isDdlRule(rule)) return false;
         return changedTables != null || rule.getScope() != PolicyScope.change
                 || "all".equals(input.get("scope"));
     }

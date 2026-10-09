@@ -108,6 +108,9 @@ public class CandidateDdlProjector {
                 diagnostics.add(new ProjectionDiagnostic(sourceRef, "error", safeMessage(e)));
             }
         }
+        if (changes.isEmpty() && diagnostics.isEmpty()) {
+            diagnostics.add(new ProjectionDiagnostic(sourceName + ":1", "error", "DDL input is empty"));
+        }
         return new ProjectionResult(candidate, List.copyOf(changes), List.copyOf(diagnostics));
     }
 

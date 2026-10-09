@@ -343,8 +343,8 @@ sql-cli demo schema policy rule add --category required_business_columns \
 - 走别名的 `graphApproval`：`manual` 进评审页待审批，批准才写入并启用；`auto` 当场生效并留底
 - 目前只有 `required_business_columns` 能从 CLI 提议，其余类别在规则页配置
 
-提议之后**不要自己去绑定或改规则文件**，也不用在建表前先跑评审：规则启用后
-`CREATE / ALTER / DROP` 经过 `sql-cli` 执行时自动检查，被拒的错误里带修法，照改再执行。
+提议之后**不要自己去绑定或改规则文件**。规则批准后，用 `schema design context --json`
+读取设计要求，再按主技能的 DDL 设计流程评审候选表。执行前的自动检查是兜底，不能替代评审。
 
 **什么时候跑**：重构、下线字段、清理旧表之前跑一次；日常查数不用跑。
 它不改图谱（只提议 `schema edit` 命令，要你自己判断后执行），结果落

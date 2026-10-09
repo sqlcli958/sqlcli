@@ -411,4 +411,58 @@ class SqlTaskModuleTest {
         assertEquals(SqlTaskResult.Status.SUCCEEDED, result.status(), result.errorSummary());
         assertTrue(result.notices().isEmpty());
     }
+
+    @Test
+    void enabledRulesCannotBeBypassedByBrokenBindingsOrUnsupportedDdl() throws Exception {
+        GraphWorkspaceStore store = workspaceWithRequiredColumns("required");
+        ConnectionManager manager = mock(ConnectionManager.class);
+        SqlTaskResult view = module(manager, store).execute(
+                dryRun("CREATE VIEW app.order_view AS SELECT id FROM app.orders"));
+        assertEquals(SqlTaskResult.Status.REJECTED, view.status());
+        assertTrue(view.errorSummary().contains("规则检查"), view.errorSummary());
+        assertEquals(SqlTaskResult.Status.REJECTED,
+                module(manager, store).execute(dryRun("TRUNCATE TABLE app.orders")).status());
+
+        Files.writeString(temp.resolve("graphs/safety-test/policy/rules/structure.yaml"), "invalid: [");
+        SqlTaskResult invalid = module(manager, store).execute(
+                dryRun("CREATE TABLE app.orders (id BIGINT PRIMARY KEY)"));
+        assertEquals(SqlTaskResult.Status.REJECTED, invalid.status());
+        assertTrue(invalid.errorSummary().contains("规则检查未完成"), invalid.errorSummary());
+
+        Files.writeString(temp.resolve("graphs/safety-test/policy/bindings.yaml"),
+                "ruleSets:\n  - rules/missing.yaml\n");
+        SqlTaskResult broken = module(manager, store).execute(
+                dryRun("CREATE TABLE app.orders (id BIGINT PRIMARY KEY)"));
+        assertEquals(SqlTaskResult.Status.REJECTED, broken.status());
+        verify(manager, never()).getConnection(any());
+    }
+
+    @Test
+    void ddlGateSuppliesBeforeAndAfterFactsToMigrationSafetyRules() throws Exception {
+        GraphWorkspaceStore store = workspaceWithRequiredColumns("required");
+        GraphWorkspace current = store.load("safety-test");
+        GraphWorkspace candidate = new com.sqlcli.graph.review.CandidateDdlProjector().projectText(
+                current, "CREATE TABLE app.orders (id BIGINT PRIMARY KEY, created_at DATETIME NULL)", "setup")
+                .workspace();
+        store.save(candidate);
+        Files.writeString(temp.resolve("graphs/safety-test/policy/rules/structure.yaml"), """
+                kind: PolicyRuleSet
+                id: structure-policy
+                title: 变更安全
+                version: "1"
+                rules:
+                  - id: safe-change
+                    title: 变更安全
+                    category: migration_safety_check
+                    severity: error
+                    enforcement: required
+                """);
+        SqlTaskResult result = module(mock(ConnectionManager.class), store).execute(
+                dryRun("ALTER TABLE app.orders MODIFY COLUMN created_at DATETIME NOT NULL"));
+        assertEquals(SqlTaskResult.Status.REJECTED, result.status(), result.errorSummary());
+        assertTrue(result.errorSummary().contains("NOT NULL"), result.errorSummary());
+        assertTrue(store.load("safety-test").getTableByQualifiedName("app.orders")
+                .getColumns().stream().filter(column -> column.getName().equals("created_at"))
+                .findFirst().orElseThrow().isNullable());
+    }
 }

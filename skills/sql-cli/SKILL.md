@@ -1,17 +1,31 @@
 ---
 name: sql-cli
-description: "Query real database data, inspect table structure (DDL, table lists, columns), and maintain the schema knowledge graph — including writing back table/column meaning, business terms, value domains, join relations and column lineage found while reading application code (entities, Mapper XML, .sql files, view definitions, ETL). Also defines BI metrics (add-metric/expand-metric) for the rare case of a real 口径 dispute — not a routine step. Use it whenever a request needs table/column discovery, join selection, business-term interpretation, or a real query: search the schema graph first to ground the work before touching the database. Always call the global `sql-cli` command directly. Triggers include: sql-cli, 执行SQL, 查询数据, 查询数据库, 查库, DDL, 表结构, 表名, 字段含义, 值域, 枚举值, 数据库别名, schema graph, 知识图谱, 图谱, 补充图谱, 表注释, 业务术语, 业务描述, 语义类型, 血缘, lineage, 字段血缘, 指标口径, GMV 怎么算, metric, schema search, database alias, SQL execution, 列出表. Not for SQL syntax teaching, query tuning advice, or SQL that will not be executed."
+description: "Design and review database tables against enabled system rules; query real database data, inspect table structure, and maintain the schema knowledge graph, including meanings, business terms, value domains, relations and lineage found in application code. For DDL design, read design context before authoring and review the candidate before execution. For discovery and queries, search the schema graph first. BI metrics are only for a real 口径 dispute. Always call the global `sql-cli` command directly. Triggers include: sql-cli, 设计新表, 建表, 审查DDL, 执行SQL, 查询数据, 查询数据库, 查库, DDL, 表结构, 表名, 字段含义, 值域, 枚举值, 数据库别名, schema graph, 知识图谱, 图谱, 补充图谱, 表注释, 业务术语, 业务描述, 语义类型, 血缘, lineage, 字段血缘, 指标口径, GMV 怎么算, metric, schema search, database alias, SQL execution, 列出表. Not for generic SQL syntax teaching or query tuning advice."
 ---
 
 # sql-cli
 
-Agent 用 `sql-cli` 做两件事：**查数据**、**维护图谱**。指标（metric）不是第三件常规事——
+Agent 用 `sql-cli` **设计与审查 DDL**、**查数据**、**维护图谱**。指标（metric）不是常规步骤——
 只在真的撞见口径争议（同一个业务问题被算出两个数，必须统一）时才用得上，见下表。
 
 别名管理、驱动管理、密码管理、Web UI 属于人工运维，不要代替用户执行。
-结构规则由人在规则页启用；你**不用**在建表前先跑评审——CREATE / ALTER / DROP 经过 `sql-cli`
-执行时自动按已启用的规则检查，被拒时错误里带着修法，照改再执行即可。你能做的是**提议**规则
+结构规则由人在规则页启用。你能做的是**提议**规则
 （`schema policy rule add`，见 [graph-write.md](references/graph-write.md#规则从存量表归纳出来提议给人)）。
+
+## DDL 设计优先：先读要求，再写候选表
+
+1. 先查 `schema design --help`，再用 `schema design context --json` 读取目标 alias 的数据库类型、
+   版本和已启用规则。按 `when` 判断适用对象，按 `statement` 落实字段、主键、索引、类型和命名；
+   `required` / `blocking` 是强制要求，`advisory` 是提示。`configured: false` 表示要求尚未配置，
+   不能声称设计符合系统规范；请用户补充要求，或按授权提议规则，不能自行启用一套假定规范。
+2. 用图谱搜索和 describe 核对相关存量表，确认一行代表什么、业务唯一键、关联字段和枚举来源。
+   事实不足时标明待确认项，不凭字段名编造语义，不把已有表的偶然写法当作系统要求。
+3. 将候选 DDL 保存到文件，表名带 schema。用 `schema design review --ddl <file> --json`
+   按已启用规则审查；设计主流程不传 `--rules` 覆盖系统规则。根据 `violations` 的位置和修法修改后
+   重新评审，直到退出码 0 且每条提示都处理或解释。退出码 2 是检查未完成，不能当作通过。
+   涉及危险结构变更时附回退、预检查和后检查 SQL；评审只检查方案，不会执行这些 SQL。
+4. 交付候选 DDL、评审结论和待确认事项。DDL 执行仍遵守下面的写操作授权要求；执行前规则检查
+   是兜底，不能替代设计评审，也不能证明业务设计、线上锁表成本或数据回填已正确。
 
 ## 参数一律查 `--help`，不要凭记忆
 

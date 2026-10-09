@@ -21,19 +21,15 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * DDL 门：CREATE / ALTER / DROP 执行之前，先按别名绑定的结构规则查一遍。
+ * DDL 执行门：复用设计审查的已启用规则，required / blocking 拒绝并返回修法，
+ * advisory 作为提示返回且写入规则审计。
  *
- * <p>这是结构规则唯一不靠 agent 自觉的消费点。{@code schema design review} 一直在，
- * 但真实 DDL 走过它的次数是 0——没人会在写表之前先想起来跑一条评审命令。
- * 门开在执行链路上，agent 写表那一刻就被查，required / blocking 的违规直接拒绝并把
- * 修法一起还回去；advisory 的附在结果里（{@link SqlTaskContext#notices}）。
- *
- * <p>三种情况静默放行：别名没有图谱、没绑规则集、解析不了这条 DDL（视图、存储过程）。
- * 前两种是「没开」，第三种会留一条提示——不说的话「没违规」和「根本没查」长得一样。
+ * <p>没有图谱或没绑规则集时放行。已启用规则时，解析或评估失败必须拒绝执行：
+ * 「没查」不能当成「没违规」。
  */
 final class PolicyStage implements SqlTaskStage {
     private static final Logger log = LoggerFactory.getLogger(PolicyStage.class);
-    private static final Set<String> DDL = Set.of("CREATE", "ALTER", "DROP");
+    private static final Set<String> DDL = Set.of("CREATE", "ALTER", "DROP", "TRUNCATE");
 
     private final GraphWorkspaceStore workspaceStore;
     private final CandidateDdlProjector projector = new CandidateDdlProjector();
@@ -49,38 +45,48 @@ final class PolicyStage implements SqlTaskStage {
 
     @Override
     public void before(SqlTaskContext ctx) throws SqlTaskRejected {
-        if (!DDL.contains(ctx.sqlType)) return;
-        String alias = ctx.config.getAliasName();
+        if (!isDdl(ctx.sqlType)) return;
+        ctx.notices.addAll(checkDdl(ctx.config, ctx.sql, ctx.request.origin().name()));
+    }
+
+    static boolean isDdl(String sqlType) {
+        return DDL.contains(sqlType);
+    }
+
+    /** 单条和批次共用；批次在连接数据库之前投影整批 DDL，避免前半批已经隐式提交。 */
+    List<String> checkDdl(DatabaseConfig config, String sql, String sourceRef) throws SqlTaskRejected {
+        String alias = config.getAliasName();
+        List<String> notices = new ArrayList<>();
         List<PolicyCheckResult> results;
         try {
-            if (alias == null || !workspaceStore.exists(alias)) return;
+            if (alias == null || !workspaceStore.exists(alias)) return notices;
             GraphWorkspace workspace = workspaceStore.load(alias);
+            PolicyService service = new PolicyService(workspaceStore);
+            if (service.boundDesignRules(alias, workspace).isEmpty()) return notices;
             CandidateDdlProjector.ProjectionResult projection = projector.projectText(
-                    workspace, ctx.sql, ctx.request.origin().name(), defaultSchema(ctx.config));
+                    workspace, sql, sourceRef, defaultSchema(config));
             if (!projection.diagnostics().isEmpty()) {
-                ctx.notices.add("规则检查未执行：" + projection.diagnostics().get(0).message());
-                return;
+                throw new IllegalArgumentException(projection.diagnostics().get(0).message());
             }
-            results = new PolicyService(workspaceStore).checkBoundCandidate(
-                    alias, GraphActor.agent, projection.workspace(), input(ctx, projection));
+            results = service.checkBoundCandidate(
+                    alias, GraphActor.agent, projection.workspace(), input(sql, sourceRef, projection));
         } catch (Exception e) {
-            // 规则检查自己坏了不该挡住 DDL——但要说出来，这是「没查」不是「没违规」
-            log.debug("policy stage skipped for {}", alias, e);
-            ctx.notices.add("规则检查未执行：" + e.getMessage());
-            return;
+            log.debug("policy stage failed for {}", alias, e);
+            throw new SqlTaskRejected("DDL 规则检查未完成，未执行：" + e.getMessage());
         }
         List<String> blocking = new ArrayList<>();
         for (PolicyCheckResult result : results) {
-            if (result.evaluation().getErrorMessage() != null) {
-                ctx.notices.add("规则集 " + result.evaluation().getRuleSetId() + " 未能评估："
-                        + result.evaluation().getErrorMessage());
+            if (result.exitCode() == 2) {
+                blocking.add("规则集 " + result.evaluation().getRuleSetId() + " 检查未完成："
+                        + (result.evaluation().getErrorMessage() == null ? "工作区已变化，请重试"
+                                : result.evaluation().getErrorMessage()));
                 continue;
             }
             for (PolicyViolation violation : result.violations()) {
                 if (violation.getStatus() != PolicyViolationStatus.open) continue;
                 String line = describe(violation);
                 if (violation.getEnforcement() == PolicyEnforcement.advisory) {
-                    ctx.notices.add("规则提示 " + line);
+                    notices.add("规则提示 " + line);
                 } else {
                     blocking.add(line);
                 }
@@ -90,6 +96,7 @@ final class PolicyStage implements SqlTaskStage {
             throw new SqlTaskRejected("DDL 违反结构规则，未执行：\n  " + String.join("\n  ", blocking)
                     + "\n规则在 Web UI 规则页维护；确需例外用 schema policy waiver add。");
         }
+        return notices;
     }
 
     /** {@code [rule] target: message → remediation}，修法跟着违规走，只说「这里不对」的报告没人动。 */
@@ -111,14 +118,14 @@ final class PolicyStage implements SqlTaskStage {
      * 评估输入：变更集让结构规则只查这次碰到的表；{@code sqlStatements} 给空让
      * dangerous_dml_guard 不把 DDL 当 DML 解析；{@code sql} 给方言类规则。
      */
-    private static Map<String, Object> input(SqlTaskContext ctx,
+    private static Map<String, Object> input(String sql, String sourceRef,
             CandidateDdlProjector.ProjectionResult projection) {
         Map<String, Object> input = new LinkedHashMap<>();
         input.put("reviewType", "execute");
         input.put("inputType", "ddl");
-        input.put("inputRef", ctx.request.origin().name());
-        input.put("sql", ctx.sql);
-        input.put("ddlSql", ctx.sql);
+        input.put("inputRef", sourceRef);
+        input.put("sql", sql);
+        input.put("ddlSql", sql);
         input.put("sqlStatements", List.of());
         input.put("changes", projection.changes().stream().map(change -> {
             Map<String, Object> item = new LinkedHashMap<>();
@@ -127,6 +134,8 @@ final class PolicyStage implements SqlTaskStage {
             item.put("targetId", change.targetId());
             item.put("sourceRef", change.sourceRef());
             item.put("destructive", change.destructive());
+            if (change.before() != null) item.put("before", change.before());
+            if (change.after() != null) item.put("after", change.after());
             return item;
         }).toList());
         return input;

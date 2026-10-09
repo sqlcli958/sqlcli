@@ -1,6 +1,6 @@
 /* 页面自己撑满并管理内部滚动：不加 overflow:hidden 的话内容会把 .shell-main 顶开，
    整页一起滚，顶部工具条和左侧列表都会滚出视野。 */
-.rules-page { display: grid; grid-template-columns: 260px minmax(0, 1fr); height: 100%; overflow: hidden; background: var(--color-bg); }
+.rules-page { display: grid; grid-template-columns: 292px minmax(0, 1fr); height: 100%; overflow: hidden; background: var(--color-bg); }
 .rules-page.is-collapsed { grid-template-columns: 44px minmax(0, 1fr); }
 
 /* ── 左侧列表 ── */
@@ -33,6 +33,7 @@
 .rules-list li:hover { background: var(--color-surface-hover); }
 .rules-list li > button:first-child { flex: 1; min-width: 0; display: grid; gap: 1px; border: 0; background: none; padding: 5px 8px; text-align: left; cursor: pointer; border-left: 2px solid transparent; }
 .rules-list li > button:first-child.is-active { border-left-color: var(--color-primary); }
+.rules-list li:has(> button.is-active) { background: var(--color-surface-hover); }
 .rules-list code { font-family: var(--font-mono); font-size: 11px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; }
 .rules-list small { color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -96,6 +97,9 @@
 .rules-list .btn.is-danger, .rf-row .btn.is-danger { opacity: 0; color: var(--color-text-dim); border-color: transparent; }
 .rules-list li:hover .btn.is-danger, .rf-row:hover .btn.is-danger { opacity: 1; color: var(--color-error); }
 .rules-list .btn.is-danger:focus-visible, .rf-row .btn.is-danger:focus-visible { opacity: 1; color: var(--color-error); }
+@media (hover: none) {
+  .rules-list .btn.is-danger, .rf-row .btn.is-danger, .rf-columns .btn.is-danger { opacity: 1; }
+}
 .rules-prefill { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; color: var(--color-text-muted); }
 
 /* 必备字段：一行一个字段的表格，单元格里的输入框不带边框——边框由行分隔线担着。 */

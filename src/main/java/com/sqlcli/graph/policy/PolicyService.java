@@ -42,6 +42,17 @@ public class PolicyService {
         return check(alias, null, ref, actor, input);
     }
 
+    /** 设计上下文和执行门共用的要求：已绑定、匹配当前数据库且适用于 DDL。 */
+    public List<RuleSet> boundDesignRules(String alias, GraphWorkspace workspace) throws Exception {
+        List<RuleSet> result = new ArrayList<>();
+        for (Path path : loader.boundRulePaths(workspaceStore.workspacePath(alias))) {
+            RuleSet rules = loader.load(path);
+            rules.setRules(rules.getRules().stream().filter(PolicyEvaluator::isDdlRule).toList());
+            if (!rules.getRules().isEmpty() && evaluator.matchesRuleSet(workspace, rules)) result.add(rules);
+        }
+        return List.copyOf(result);
+    }
+
     public List<PolicyCheckResult> checkBound(String alias, GraphActor actor, Map<String, ?> input)
             throws Exception {
         List<PolicyCheckResult> results = new ArrayList<>();

@@ -3,6 +3,7 @@ package com.sqlcli.task;
 import com.sqlcli.config.DatabaseConfig;
 import com.sqlcli.config.JdbcUrlParser;
 import com.sqlcli.connection.ConnectionManager;
+import com.sqlcli.graph.workspace.GraphWorkspaceStore;
 import com.sqlcli.parser.ParsedSql;
 import com.sqlcli.parser.SqlParseException;
 import com.sqlcli.parser.SqlParser;
@@ -42,13 +43,20 @@ public class SqlBatchExecutor {
 
     private final ConnectionManager connectionManager;
     private final RunStateStore runState;
+    private final PolicyStage policy;
     private final SqlParser sqlParser = new SqlParser();
     private final SqlStatementAnalyzer analyzer = new SqlStatementAnalyzer();
     private final RecoveryBuilder recoveryBuilder = new RecoveryBuilder();
 
     public SqlBatchExecutor(ConnectionManager connectionManager, RunStateStore runState) {
+        this(connectionManager, runState, new GraphWorkspaceStore());
+    }
+
+    public SqlBatchExecutor(ConnectionManager connectionManager, RunStateStore runState,
+            GraphWorkspaceStore workspaceStore) {
         this.connectionManager = connectionManager;
         this.runState = runState;
+        this.policy = new PolicyStage(workspaceStore);
     }
 
     /** 一条条目的结局。整批失败时 {@code executionId} 为 null——它没有生效过。 */
@@ -69,6 +77,11 @@ public class SqlBatchExecutor {
             throw new IllegalStateException("批次 #" + batchId + " 里没有可执行的条目");
         }
         RecoveryExecutor.requireWritable(config);
+        String ddl = items.stream().map(ApprovalRow::detail).filter(java.util.Objects::nonNull)
+                .flatMap(sql -> analyzer.splitStatements(sql).stream())
+                .filter(sql -> PolicyStage.isDdl(analyzer.detectSqlType(sql)))
+                .collect(java.util.stream.Collectors.joining(";\n"));
+        if (!ddl.isBlank()) policy.checkDdl(config, ddl, "batch:" + batchId);
         List<String> rollbackSegments = new ArrayList<>();
         List<String> backupSegments = new ArrayList<>();
         List<ItemResult> results = new ArrayList<>();

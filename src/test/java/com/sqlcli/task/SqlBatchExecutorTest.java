@@ -2,6 +2,10 @@ package com.sqlcli.task;
 
 import com.sqlcli.config.DatabaseConfig;
 import com.sqlcli.connection.ConnectionManager;
+import com.sqlcli.graph.policy.PolicyRuleSetManager;
+import com.sqlcli.graph.policy.RuleSetLoader;
+import com.sqlcli.graph.workspace.GraphWorkspace;
+import com.sqlcli.graph.workspace.GraphWorkspaceStore;
 import com.sqlcli.runstate.ApprovalBatchRow;
 import com.sqlcli.runstate.ApprovalRow;
 import com.sqlcli.runstate.RunStateStore;
@@ -10,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -22,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -93,6 +100,49 @@ class SqlBatchExecutorTest {
         assertEquals(2, result.items().size());
         assertNotNull(result.items().get(0).executionId(), "每条都要落一行执行记录");
         assertNotNull(result.recoveryId(), "UPDATE 批次要有回滚脚本");
+    }
+
+    @Test
+    void batchChecksTheWholeDdlCandidateBeforeAnyStatementExecutes() throws Exception {
+        GraphWorkspaceStore store = new GraphWorkspaceStore(temp.resolve("graphs"));
+        store.save(GraphWorkspace.create("demo", "sqlite"));
+        Path rules = temp.resolve("pk.yaml");
+        Files.writeString(rules, """
+                kind: PolicyRuleSet
+                id: structure
+                title: 主键要求
+                version: "1"
+                rules:
+                  - id: pk
+                    title: 主键
+                    category: primary_key_required
+                    severity: error
+                    enforcement: required
+                """);
+        PolicyRuleSetManager ruleSets = new PolicyRuleSetManager(store);
+        ruleSets.create("demo", "structure.yaml", new RuleSetLoader().load(rules));
+        ruleSets.setBound("demo", "structure.yaml", true);
+        ConnectionManager disconnected = mock(ConnectionManager.class);
+        long rejectedId = runState.createBatch("demo", ApprovalBatchRow.KIND_SQL, "不合规建表");
+        List<ApprovalRow> rejected = stage(rejectedId,
+                "UPDATE t SET name = 'changed' WHERE id = 1", "CREATE TABLE main.invoice (amount NUMERIC)");
+        SqlTaskRejected error = assertThrows(SqlTaskRejected.class,
+                () -> new SqlBatchExecutor(disconnected, runState, store).execute(config(), rejectedId, rejected));
+        assertTrue(error.getMessage().contains("primary key"), error.getMessage());
+        verify(disconnected, never()).getConnection(any());
+        assertEquals("a", nameOf(1));
+
+        ConnectionManager connected = mock(ConnectionManager.class);
+        when(connected.getConnection(any())).thenAnswer(inv -> DriverManager.getConnection(dbUrl()));
+        long validId = runState.createBatch("demo", ApprovalBatchRow.KIND_SQL, "合规建表与加列");
+        List<ApprovalRow> valid = stage(validId, "CREATE TABLE main.invoice (id INTEGER PRIMARY KEY)",
+                "ALTER TABLE main.invoice ADD COLUMN amount NUMERIC");
+        assertEquals(2, new SqlBatchExecutor(connected, runState, store)
+                .execute(config(), validId, valid).items().size());
+        try (Connection conn = DriverManager.getConnection(dbUrl()); Statement st = conn.createStatement()) {
+            st.executeQuery("SELECT id, amount FROM invoice").close();
+        }
+        assertTrue(store.load("demo").getTables().isEmpty(), "检查候选结构不应写入正式图谱");
     }
 
     @Test

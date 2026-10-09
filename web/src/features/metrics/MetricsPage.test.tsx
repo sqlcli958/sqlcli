@@ -110,6 +110,7 @@ function renderPage({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  Element.prototype.scrollIntoView = vi.fn();
   sessionStorage.clear();
   vi.mocked(getMetrics).mockResolvedValue({ metrics: [gmv], revision: 7 });
   vi.mocked(getMetricRuns).mockResolvedValue({ metricId: gmv.id, runs: [] });

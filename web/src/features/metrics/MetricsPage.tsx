@@ -64,6 +64,24 @@ export function MetricsPage() {
     enabled: graphAvailable && Boolean(termId),
   });
 
+  // MetricDto 是 types/api.ts 定义的旧形状，服务端已返回比率字段。
+  const metrics = (list.data?.metrics ?? []) as RatioMetricDto[];
+  const term = termId ? terms.data?.terms.find((item) => item.id === termId) ?? null : null;
+  const visibleMetrics = useMemo(
+    () => termId
+      ? (term ? metrics.filter((metric) => term.metricRefs.includes(metric.id)) : [])
+      : metrics,
+    [list.data?.metrics, term, termId],
+  );
+
+  useEffect(() => {
+    if (!targetId || !visibleMetrics.some((metric) => metric.id === targetId)) return;
+    requestAnimationFrame(() => {
+      document.getElementById(`metric-target-${targetId}`)
+        ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+  }, [targetId, visibleMetrics]);
+
   if (!alias) {
     return (
       <div className="page metrics-page">
@@ -118,25 +136,6 @@ export function MetricsPage() {
       </div>
     );
   }
-
-  // MetricDto 是 types/api.ts 定义的旧形状，numerator/denominator/additivity 是这次加的
-  // 字段，服务端已经在返回，类型跟着断言一下（详见 api/metrics.ts 里 RatioMetricDto 的注释）。
-  const metrics = (list.data?.metrics ?? []) as RatioMetricDto[];
-  const term = termId ? terms.data?.terms.find((item) => item.id === termId) ?? null : null;
-  const visibleMetrics = useMemo(
-    () => termId
-      ? (term ? metrics.filter((metric) => term.metricRefs.includes(metric.id)) : [])
-      : metrics,
-    [metrics, term, termId],
-  );
-
-  useEffect(() => {
-    if (!targetId || !visibleMetrics.some((metric) => metric.id === targetId)) return;
-    requestAnimationFrame(() => {
-      document.getElementById(`metric-target-${targetId}`)
-        ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    });
-  }, [targetId, visibleMetrics]);
 
   return (
     <div className="page metrics-page">
@@ -378,6 +377,7 @@ function MetricItem({
             onClick={() => stashWorkbenchSql(expand.data.sql, {
               metricId: metric.id,
               metricRevision: expand.data.revision ?? revision,
+              termId: term?.id,
               grain: grain || undefined,
             })}
           >
