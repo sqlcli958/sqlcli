@@ -85,9 +85,9 @@ export function SchemaExplorer({ onSelectTable }: SchemaExplorerProps) {
         <div className="scenario-banner">
           <div className="scenario-banner-head">
             <span className="scenario-banner-name">
-              场景「{activeTerm.displayName || activeTerm.name}」
+              {activeTerm.scenarioTables.length > 0 ? '场景' : '术语'}「{activeTerm.displayName || activeTerm.name}」
             </span>
-            <span className="scenario-banner-count">{activeTerm.scenarioTables.length} 张表</span>
+            <span className="scenario-banner-count">{scenarioTables?.size ?? 0} 张表</span>
             <Button
               variant="ghost"
               size="sm"

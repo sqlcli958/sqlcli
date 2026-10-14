@@ -27,7 +27,7 @@ export function useScenario() {
   const term: TermDto | null = data?.terms.find((one) => one.id === termId) ?? null;
 
   const tables = useMemo(
-    () => (term ? new Set(term.scenarioTables.map((name) => name.toLowerCase())) : null),
+    () => (term ? termTableNames(term) : null),
     [term],
   );
   const bridges = useMemo(
@@ -36,6 +36,22 @@ export function useScenario() {
   );
 
   return { termId, term, tables, bridges };
+}
+
+/** 场景保留桥接表；普通术语按映射的表和字段所属表筛图谱。 */
+export function termTableNames(term: TermDto): Set<string> {
+  if (term.scenarioTables.length > 0) {
+    return new Set(term.scenarioTables.map((name) => name.toLowerCase()));
+  }
+  const tables = new Set<string>();
+  for (const target of term.mappedTargets) {
+    const kind = target.split(':')[0];
+    if (kind !== 'table' && kind !== 'column') continue;
+    const name = qualifiedNameOf(target);
+    const table = kind === 'column' ? name.slice(0, name.lastIndexOf('.')) : name;
+    if (table.includes('.')) tables.add(table);
+  }
+  return tables;
 }
 
 /** 图谱节点 id（`table:alias:schema.table`）里的限定名，小写。 */

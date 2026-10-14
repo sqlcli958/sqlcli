@@ -5,6 +5,7 @@ import { deleteTerm, getTerms } from '../../api/workspace';
 import { navPath } from '../../app/navigation';
 import { onMutationSuccess } from '../../api/mutationHelpers';
 import { useSessionStore } from '../../state/sessionStore';
+import { termTableNames } from '../../state/useScenario';
 import { ActionIcon } from '../../ui/ActionIcon';
 import { StatusDot } from '../../ui/StatusDot';
 import { Button } from '../../ui/Button';
@@ -18,7 +19,7 @@ import type { TermDto } from '../../types/api';
  * 不值得为这个建一整套 UI 表单）；**删在这里**——「这条是垃圾」是人的判断，
  * 而 CLI 里根本没有删术语的命令，UI 不给入口就等于删不掉。
  *
- * 有入口表的术语是**场景**，点它就把表目录筛到这个场景的表上（`?term=` 进 URL，
+ * 场景术语按场景表筛选，普通术语按映射表筛选（`?term=` 进 URL，
  * 可分享、刷新不丢）。之前这里只显示「映射：a、b、c」三个点不动的字符串——
  * 看完还得自己回表目录一张张找，等于写入口做完了、消费侧没做。
  */
@@ -50,14 +51,16 @@ export function TermList({ onPick }: { onPick?: () => void }) {
   return (
     <>
     <ul className="term-list">
-      {terms.map((term) => (
+      {terms.map((term) => {
+        const tableCount = termTableNames(term).size;
+        return (
         <li key={term.id} className="term-list-item" data-active={term.id === activeTermId || undefined}>
           <div className="term-list-head">
-            {term.scenarioTables.length > 0 ? (
+            {tableCount > 0 ? (
               <button
                 type="button"
                 className="term-list-name is-scenario"
-                title={`筛出这个场景的 ${term.scenarioTables.length} 张表`}
+                title={`筛出这个术语关联的 ${tableCount} 张表`}
                 onClick={() => {
                   setSearchParams((params) => {
                     if (term.id === activeTermId) params.delete('term');
@@ -72,8 +75,8 @@ export function TermList({ onPick }: { onPick?: () => void }) {
             ) : (
               <span className="term-list-name">{term.displayName || term.name}</span>
             )}
-            {term.scenarioTables.length > 0 && (
-              <span className="term-list-badge">{term.scenarioTables.length} 表</span>
+            {tableCount > 0 && (
+              <span className="term-list-badge">{tableCount} 表</span>
             )}
             {term.metricRefs.length > 0 && (
               <span className="term-list-badge">{term.metricRefs.length} 指标</span>
@@ -125,7 +128,8 @@ export function TermList({ onPick }: { onPick?: () => void }) {
             </p>
           )}
         </li>
-      ))}
+        );
+      })}
     </ul>
     {detail && <TermDetailDialog term={detail} alias={alias} onClose={() => setDetail(null)} />}
     </>

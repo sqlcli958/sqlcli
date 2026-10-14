@@ -44,7 +44,7 @@ const 报事 = term({
   scenarioTables: ['app.report', 'app.assign'],
 });
 
-// 没有入口表 → 展不开子图 → 不该可点
+// 没有场景表和有效映射，不能筛出子图
 const 顺序巡检 = term({ id: 'term:demo:顺序巡检', name: '顺序巡检', displayName: '顺序巡检' });
 
 function Probe() {
@@ -117,13 +117,27 @@ test('再点一次取消筛选', async () => {
   await waitFor(() => expect(screen.getByTestId('term-param').textContent).toBe(''));
 });
 
-test('没有入口表的术语不可点，也不显示过滤', async () => {
+test('没有关联表的术语不可点，也不显示过滤', async () => {
   renderList();
   await screen.findByRole('button', { name: '报事' });
 
   // 展不开子图的术语点了也没东西可筛，做成可点是骗人
   expect(screen.queryByRole('button', { name: '顺序巡检' })).toBeNull();
   expect(screen.getByText('顺序巡检')).toBeTruthy();
+});
+
+test('普通术语按映射筛表，字段映射归到所属表并去重', async () => {
+  vi.mocked(getTerms).mockResolvedValue({ terms: [term({
+    id: 'term:demo:车辆', name: '车辆', displayName: '车辆',
+    mappedTargets: ['table:demo:app.car', 'column:demo:app.car.id',
+      'column:demo:app.car_post.car_id', 'metric:demo:car_count'],
+  })], total: 1 });
+  const onPick = renderList();
+  const button = await screen.findByRole('button', { name: '车辆' });
+  expect(screen.getByText('2 表')).toBeTruthy();
+  await userEvent.click(button);
+  expect(screen.getByTestId('term-param').textContent).toBe('term:demo:车辆');
+  expect(onPick).toHaveBeenCalled();
 });
 
 test('详情里的绑定指标能直接进入同一场景的指标页', async () => {

@@ -93,6 +93,22 @@ test('没有筛选时照常走分页列表', async () => {
   expect(screen.getByText('499')).toBeTruthy();
 });
 
+test('普通术语按表和字段映射筛选，显示术语而非场景', async () => {
+  vi.mocked(getTerms).mockResolvedValue({ terms: [{
+    ...报事, id: 'term:demo:车辆', name: '车辆', displayName: '车辆',
+    primaryTarget: null, scenarioTables: [], bridgeTables: [], filters: [],
+    mappedTargets: ['table:demo:APP.erp_prop_report',
+      'column:demo:app.erp_prop_report.id', 'column:demo:app.sys_user.id'],
+  }], total: 1 });
+  renderExplorer('&term=' + encodeURIComponent('term:demo:车辆'));
+  expect(await screen.findByText('erp_prop_report')).toBeTruthy();
+  expect(screen.getByText('sys_user')).toBeTruthy();
+  expect(screen.getByText('术语「车辆」')).toBeTruthy();
+  expect(screen.getByText('2 张表')).toBeTruthy();
+  expect(screen.queryByText('other')).toBeNull();
+  expect(getTables).not.toHaveBeenCalled();
+});
+
 test('滚到底才取下一页，不是一把梭', async () => {
   // 原来一次请求 200 张，剩下的 299 张在侧栏里根本不存在——
   // 没有翻页也没有滚动，只能靠搜索找
