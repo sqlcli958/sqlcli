@@ -169,6 +169,9 @@ public final class MetricSqlExpander {
                 throw new MetricExpansionException(
                         "metric joinPath 第 1 步引用的关系不存在: " + firstStep.getRelationId());
             }
+            if (edge.getStatus() == GraphStatus.ignored) {
+                throw new MetricExpansionException("metric joinPath 引用了已拒绝的关系: " + edge.getId());
+            }
             return tableIdForColumn(edge.getFrom());
         }
         throw new MetricExpansionException(
@@ -191,6 +194,10 @@ public final class MetricSqlExpander {
             if (edge == null) {
                 throw new MetricExpansionException(
                         "metric joinPath 第 " + stepIndex + " 步引用的关系不存在: " + step.getRelationId());
+            }
+            if (edge.getStatus() == GraphStatus.ignored) {
+                throw new MetricExpansionException("metric joinPath 第 " + stepIndex
+                        + " 步引用了已拒绝的关系: " + edge.getId());
             }
             if (edge.getJoinExpression() == null || edge.getJoinExpression().isBlank()) {
                 throw new MetricExpansionException(

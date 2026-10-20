@@ -23,6 +23,24 @@ class GraphEvaluatorTest {
     private static final String ALIAS = "eval-test";
 
     @Test
+    void bulkBasisChangesAreSummarizedWithoutCallingThemAProbeMistake() {
+        GraphWorkspace workspace = workspace();
+        TableWorkspaceNode table = workspace.getTables().values().iterator().next();
+        for (int i = 0; i <= GraphEvaluator.FINDING_LIMIT; i++) {
+            ColumnWorkspaceNode column = ColumnWorkspaceNode.create("changed_" + i);
+            column.setDescription("人工语义");
+            column.getAttributes().put(ColumnWorkspaceNode.ATTR_SEMANTIC_BASIS_CHANGES,
+                    java.util.Map.of("comment", java.util.Map.of("before", "旧", "after", "新")));
+            table.getColumns().add(column);
+        }
+        List<GraphFinding> findings = probe(new GraphEvaluator().evaluate(workspace), "column.semantic-basis-changed");
+        assertEquals(1, findings.size());
+        assertTrue(findings.get(0).message().contains("51"));
+        assertTrue(findings.get(0).message().contains("分批复核"));
+        assertFalse(findings.get(0).message().contains("用错了对象"));
+    }
+
+    @Test
     void lineageShapeIsAWarningWithARemoveCommand() {
         GraphWorkspace workspace = workspace();
         TableWorkspaceNode orders = workspace.getTables().values().iterator().next();

@@ -45,7 +45,7 @@ class TaskEvalTest {
         assertEquals(TaskEval.Verdict.passed, report.results().get(0).verdict());
         assertEquals(TaskEval.Verdict.graph, report.results().get(1).verdict(),
                 "对照组失败、作弊组通过 = 图谱信息不足");
-        assertEquals(TaskEval.Verdict.skill, report.results().get(2).verdict(),
+        assertEquals(TaskEval.Verdict.unattributable, report.results().get(2).verdict(),
                 "给了正确表还做不对 = skill 问题");
         assertEquals(1.0 / 3, report.passRate(), 1e-9);
         assertFalse(report.allPassed());
@@ -218,9 +218,8 @@ class TaskEvalTest {
         assertEquals(1, text.exitCode(), text.stderr());
         assertTrue(text.stdout().contains("图谱信息不足"), text.stdout());
         assertTrue(text.stdout().contains("用了配置表"), text.stdout());
-        assertTrue(text.stdout().contains("skill 问题"), text.stdout());
-        assertTrue(text.stdout().contains("改 skills/sql-cli/references/query.md"),
-                "skill 侧失败必须指向该改的那份文档");
+        assertTrue(text.stdout().contains("两组都失败"), text.stdout());
+        assertTrue(text.stdout().contains("不能仅据此归因"), text.stdout());
         assertTrue(text.stdout().contains("typo-id"), "作答里多出来的 id 要说出来");
 
         CliResult json = runCli("demo", "schema", "task-eval",
@@ -229,10 +228,11 @@ class TaskEvalTest {
         JsonNode data = new ObjectMapper().readTree(json.stdout()).get("data");
         assertEquals(2, data.get("cases").asInt());
         assertEquals(1, data.get("graphFailures").asInt());
-        assertEquals(1, data.get("skillFailures").asInt());
+        assertEquals(0, data.get("skillFailures").asInt());
+        assertEquals(1, data.get("unattributable").asInt());
         assertEquals(0.0, data.get("passRate").asDouble(), 1e-9);
         assertEquals("graph", data.get("results").get(0).get("verdict").asText());
-        assertEquals("skill", data.get("results").get(1).get("verdict").asText());
+        assertEquals("unattributable", data.get("results").get(1).get("verdict").asText());
         assertEquals("typo-id", data.get("unknownAnswerIds").get(0).asText());
     }
 
@@ -251,6 +251,67 @@ class TaskEvalTest {
         assertEquals(2, runCli("demo", "schema", "task-eval",
                 "--cases", cases.toString(),
                 "--answers", temp.resolve("nope.yaml").toString()).exitCode());
+    }
+
+    @Test
+    void sqlCannotBeRescuedByCorrectNarrativeOrCommentOrLiteral() {
+        TaskEval.TaskCase task = new TaskEval.TaskCase("sql", "paid orders", List.of("orders", "users"),
+                List.of("orders.user_id -> users.id"),
+                List.of(new TaskEval.Pitfall("paid filter", List.of(), List.of("orders.status=1"))), null);
+        for (String sql : List.of(
+                "SELECT o.user_id,u.id FROM orders o CROSS JOIN users u WHERE o.status=0",
+                "SELECT o.user_id,u.id FROM orders o JOIN users u ON o.user_id=u.id WHERE o.status=0 /* orders.status=1 */",
+                "SELECT 'orders.status=1' FROM orders o JOIN users u ON o.user_id=u.id WHERE o.status=0",
+                "SELECT o.user_id FROM orders o JOIN users u ON o.user_id=u.id WHERE o.status=10",
+                "SELECT o.user_id FROM orders o JOIN users u ON o.user_id=u.id WHERE o.status=1 OR o.status=0",
+                "SELECT o.user_id FROM orders o LEFT JOIN users u ON o.user_id=u.id AND o.status=1")) {
+            TaskEval.Answer answer = new TaskEval.Answer(List.of("orders", "users"),
+                    List.of("orders.user_id=users.id"), sql, Map.of("orders.status", "1"));
+            TaskEval.GroupResult result = groupOf(task, answer);
+            assertFalse(result.pass(), sql);
+            assertEquals(TaskEval.CheckLevel.sql, result.level());
+            assertTrue(result.complete(), result.limitations().toString());
+        }
+        TaskEval.GroupResult correct = groupOf(task, new TaskEval.Answer(List.of(), List.of(),
+                "SELECT o.user_id FROM orders o JOIN users u ON u.id=o.user_id WHERE 1=o.status", Map.of()));
+        assertTrue(correct.pass(), correct.toString());
+        TaskEval.TaskCase equalityCase = new TaskEval.TaskCase("equality", "join", List.of(),
+                List.of("orders.user_id = users.id"), List.of(), null);
+        assertTrue(groupOf(equalityCase, new TaskEval.Answer(List.of(), List.of(),
+                "SELECT o.user_id FROM orders o JOIN users u ON u.id=o.user_id", Map.of())).pass());
+    }
+
+    @Test
+    void sqlUsesActualTablesAndRetainsSchemaIdentity() {
+        TaskEval.TaskCase task = new TaskEval.TaskCase("schema", "t", List.of("sales.orders"), List.of(), List.of(), null);
+        assertFalse(groupOf(task, new TaskEval.Answer(List.of("sales.orders"), List.of(),
+                "SELECT * FROM archive.orders", Map.of())).pass());
+        assertTrue(groupOf(task, new TaskEval.Answer(List.of(), List.of(),
+                "SELECT * FROM sales.orders", Map.of())).pass());
+    }
+
+    @Test
+    void forbiddenConditionsAreDetectedInsideOrWithoutMatchingLiteralsOrComments() {
+        TaskEval.TaskCase task = new TaskEval.TaskCase("forbid", "t", List.of(), List.of(),
+                List.of(new TaskEval.Pitfall("wrong status", List.of("status=0", "erp_shift_"), List.of())), null);
+        assertFalse(groupOf(task, new TaskEval.Answer(List.of(), List.of(),
+                "SELECT * FROM orders WHERE status=0 OR status=2", Map.of())).pass());
+        assertFalse(groupOf(task, new TaskEval.Answer(List.of(), List.of(),
+                "SELECT * FROM erp_shift_attendance", Map.of())).pass());
+        assertTrue(groupOf(task, new TaskEval.Answer(List.of(), List.of(),
+                "SELECT 'status=0' FROM orders WHERE status=10 /* status=0 */", Map.of())).pass());
+    }
+
+    @Test
+    void noSqlIsOnlyAPlanAndUnsupportedSqlIsIncomplete() {
+        assertEquals(TaskEval.CheckLevel.plan, groupOf(simpleCase("p"), answer(List.of("orders"))).level());
+        for (String sql : List.of("not sql", "WITH x AS (SELECT * FROM orders) SELECT * FROM x",
+                "SELECT * FROM (SELECT * FROM orders) x", "SELECT * FROM orders UNION SELECT * FROM orders")) {
+            var result = groupOf(simpleCase("p"), new TaskEval.Answer(List.of("orders"), List.of(), sql, Map.of()));
+            assertFalse(result.pass(), sql);
+            assertFalse(result.complete(), sql);
+            assertFalse(result.limitations().isEmpty());
+        }
     }
 
     // -------------------------------------------------------------------- 辅助

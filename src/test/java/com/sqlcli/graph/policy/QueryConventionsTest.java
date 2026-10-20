@@ -11,6 +11,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * 全库查询约定规则。
@@ -41,13 +43,14 @@ class QueryConventionsTest {
         // 这张表用 1 表示存在，规则要求值域里有 0——不匹配，一条提示都不给。
         // 给了就是把「查得到的数据」整批筛掉，而且不报错。
         GraphWorkspace workspace = seed("1=存在", "2=删除");
-        assertTrue(load().forTable(workspace, table(workspace)).isEmpty());
+        assertNull(load().forTable(workspace, table(workspace)).get(0).filter());
+        assertTrue(load().forTable(workspace, table(workspace)).get(0).warning().contains("未声明"));
     }
 
     @Test
     void skipsColumnsWithNoValueDomainAtAll() throws Exception {
         GraphWorkspace workspace = seed();   // 值域没人标注过
-        assertTrue(load().forTable(workspace, table(workspace)).isEmpty(),
+        assertNull(load().forTable(workspace, table(workspace)).get(0).filter(),
                 "值域未知就不该猜——猜错是静默筛掉全部数据");
     }
 
@@ -82,6 +85,36 @@ class QueryConventionsTest {
         assertTrue(violations.isEmpty(), "约定规则不该产出违规");
     }
 
+    @Test
+    void oppositeOrAmbiguousMeaningsNeverProduceAFilter() throws Exception {
+        for (String[] values : List.of(new String[]{"0=删除", "1=存在"},
+                new String[]{"0=存在", "0=删除"}, new String[]{"0"})) {
+            GraphWorkspace workspace = seed(values);
+            var hint = load().forTable(workspace, table(workspace)).get(0);
+            assertNull(hint.filter());
+            assertEquals("del_flag = 0", hint.proposedFilter());
+            assertTrue(hint.warning().contains("需要 0=存在"));
+        }
+    }
+
+    @Test
+    void legacyNumericRuleRequestsMigrationInsteadOfSilentlyFiltering() throws Exception {
+        GraphWorkspace workspace = seed("0=存在");
+        Path file = temp.resolve(ALIAS).resolve("policy/rules/conventions.yaml");
+        Files.writeString(file, Files.readString(file).replace("      columnValueMeanings: {\"0\": \"存在\"}\n", ""));
+        var hint = load().forTable(workspace, table(workspace)).get(0);
+        assertNull(hint.filter());
+        assertTrue(hint.warning().contains("旧规则"));
+    }
+
+    @Test
+    void loaderRejectsMalformedMeaningMap() throws Exception {
+        seed("0=存在");
+        Path file = temp.resolve(ALIAS).resolve("policy/rules/conventions.yaml");
+        Files.writeString(file, Files.readString(file).replace("{\"0\": \"存在\"}", "[0]"));
+        assertThrows(IllegalArgumentException.class, () -> new RuleSetLoader().load(file));
+    }
+
     // ── fixtures ──
 
     private QueryConventions load() {
@@ -110,6 +143,7 @@ class QueryConventionsTest {
                     when:
                       columnNameRegex: "^(del_flag|is_deleted)$"
                       columnValueIn: ["0"]
+                      columnValueMeanings: {"0": "存在"}
                     statement:
                       queryFilter: "{column} = 0"
                 """);

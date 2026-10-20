@@ -14,6 +14,42 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class WorkspacePathFinderTest {
 
+    @Test
+    void trustAndIdentitySurviveBothDirectionsAndPublishing() {
+        GraphWorkspace workspace = baseWorkspace();
+        RelationWorkspaceEdge edge = compositeFkEdge("column:unit:trade.orders.tenant_id",
+                "column:unit:trade.order_master.tenant_id");
+        edge.setStatus(GraphStatus.candidate);
+        edge.setVerified(false);
+        edge.setConfidence(0.8);
+        edge.setCardinality(RelationCardinality.many_to_one);
+        workspace.getRelations().add(edge);
+        for (boolean reverse : List.of(false, true)) {
+            var segment = new WorkspacePathFinder(workspace).findPaths(
+                    reverse ? "trade.order_master" : "trade.orders",
+                    reverse ? "trade.orders" : "trade.order_master").get(0).getPath().get(0);
+            assertEquals(edge.getId(), segment.getRelationId());
+            assertEquals(GraphStatus.candidate, segment.getStatus());
+            assertEquals(false, segment.getVerified());
+            assertEquals(0.8, segment.getConfidence());
+            assertEquals(reverse ? RelationCardinality.one_to_many : RelationCardinality.many_to_one,
+                    segment.getCardinality());
+        }
+        edge.setStatus(GraphStatus.verified);
+        assertEquals(GraphStatus.verified, new WorkspacePathFinder(workspace)
+                .findPaths("trade.orders", "trade.order_master").get(0).getPath().get(0).getStatus());
+    }
+
+    @Test
+    void compositeKeyIsOneConnectionWithAllPredicates() {
+        GraphWorkspace workspace = baseWorkspace();
+        workspace.getRelations().add(compositeFkEdge("column:unit:trade.orders.tenant_id", "column:unit:trade.order_master.tenant_id"));
+        workspace.getRelations().add(compositeFkEdge("column:unit:trade.orders.order_no", "column:unit:trade.order_master.order_no"));
+        var paths = new WorkspacePathFinder(workspace).findPaths("trade.orders", "trade.order_master");
+        assertEquals(1, paths.size());
+        assertTrue(paths.get(0).getPath().get(0).getJoinExpression().contains(" AND "));
+    }
+
     private GraphWorkspace baseWorkspace() {
         GraphWorkspace workspace = GraphWorkspace.create("unit", "mysql");
         TableWorkspaceNode orders = TableWorkspaceNode.create("unit", "trade", "orders", GraphActor.extractor);

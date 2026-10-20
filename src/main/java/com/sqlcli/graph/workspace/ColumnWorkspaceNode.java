@@ -78,6 +78,8 @@ public class ColumnWorkspaceNode {
     /** 权威来源列的 id（{@code column:alias:schema.table.column}），值存的是目标列而不是
      * 布尔位：查权威值时要能直接跳过去，光知道"我是冗余的"没用。 */
     public static final String ATTR_REDUNDANT_OF = "redundantOf";
+    /** 人工语义所依据的数据库元数据发生变化，按字段保存 before/after，等待人工复核。 */
+    public static final String ATTR_SEMANTIC_BASIS_CHANGES = "semanticBasisChanges";
 
     /** 本列的权威来源列 id；不是冗余副本时返回 null。 */
     public String getRedundantOf() {
@@ -99,7 +101,8 @@ public class ColumnWorkspaceNode {
      * {@code [待确认]} 和完整性看板的待确认数共用它——判据只有一份，两处不会漂。
      */
     public boolean hasUnconfirmedSemantics() {
-        return hasSemantics() && !Boolean.TRUE.equals(verified);
+        return hasSemantics() && (!Boolean.TRUE.equals(verified)
+                || attributes.containsKey(ATTR_SEMANTIC_BASIS_CHANGES));
     }
 
     private static boolean notBlank(String value) {

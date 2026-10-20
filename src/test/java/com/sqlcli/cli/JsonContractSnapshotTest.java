@@ -152,7 +152,8 @@ class JsonContractSnapshotTest {
         // completeness 是 D1 新增：agent 开工前判断「这张表能不能直接用」。图谱按需生长，
         // 没有描述不等于这张表简单——curated=false 才说明没人干过这块，该先读代码。
         // 同样必须在 --json 里，只出现在文本输出等于 Agent 拿不到。
-        assertEquals(8, data.size(), "describe 载荷恰好八个键");
+        assertEquals(9, data.size(), "describe 包含约定待确认信息");
+        assertTrue(data.get("unresolvedConventions").isArray());
         assertTrue(data.has("table"));
         assertTrue(data.get("columns").isArray());
         assertTrue(data.get("relations").isArray());

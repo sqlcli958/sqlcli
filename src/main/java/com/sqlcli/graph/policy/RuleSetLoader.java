@@ -25,7 +25,7 @@ public class RuleSetLoader {
             // 值域闸门，query_convention 用：软删除的值全库并不统一（真库上见过注释写
             // 「2 代表删除」而库里实际出现 1 的），值域不支持就不该给提示——
             // 给错一条注入 WHERE 的条件是静默筛掉全部数据
-            "columnValueIn");
+            "columnValueIn", "columnValueMeanings");
     private static final Set<String> CATEGORIES = Set.of(
             "naming_convention", "required_business_columns", "money_type_decimal",
             "primary_key_required", "sensitive_column_policy", "controlled_vocabulary",
@@ -167,6 +167,21 @@ public class RuleSetLoader {
                 }
                 if (condition.getKey().endsWith("Regex")) {
                     compile(String.valueOf(condition.getValue()), condition.getKey());
+                }
+                if ("columnValueMeanings".equals(condition.getKey())) {
+                    if (!QueryConventions.CATEGORY.equals(rule.getCategory())
+                            || !(condition.getValue() instanceof Map<?, ?> meanings) || meanings.isEmpty()) {
+                        throw new IllegalArgumentException("columnValueMeanings must be a non-empty value-to-meaning map for query_convention");
+                    }
+                    for (Map.Entry<?, ?> meaning : meanings.entrySet()) {
+                        if (!(meaning.getKey() instanceof String value) || value.isBlank()
+                                || !(meaning.getValue() instanceof String label) || label.isBlank()) {
+                            throw new IllegalArgumentException("columnValueMeanings keys and meanings must be non-empty strings (quote numeric keys)");
+                        }
+                    }
+                    if (!meanings.keySet().containsAll(strings(rule.getWhen().get("columnValueIn")))) {
+                        throw new IllegalArgumentException("columnValueMeanings must describe every columnValueIn value");
+                    }
                 }
                 if ("tableTypeAny".equals(condition.getKey())) {
                     for (String value : strings(condition.getValue())) {

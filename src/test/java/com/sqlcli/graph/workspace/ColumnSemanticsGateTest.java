@@ -50,6 +50,14 @@ class ColumnSemanticsGateTest {
     @Test
     void uiEditConfirms() throws Exception {
         GraphWorkspaceStore store = workspace();
+        GraphWorkspace graph = store.load(ALIAS);
+        ColumnWorkspaceNode changed = graph.getTableByQualifiedName("app.orders").findColumn("buyer_id");
+        changed.setDescription("下单人");
+        changed.setVerified(true);
+        changed.getAttributes().put(ColumnWorkspaceNode.ATTR_SEMANTIC_BASIS_CHANGES,
+                Map.of("comment", Map.of("before", "买家", "after", "联系人")));
+        store.save(graph);
+        assertTrue(buyerId(store).hasUnconfirmedSemantics());
         WorkspaceMutationService service = new WorkspaceMutationService(
                 store, new WorkspaceValidator(), new WorkspaceLockManager());
 
@@ -62,6 +70,7 @@ class ColumnSemanticsGateTest {
         assertEquals(Boolean.TRUE, column.getVerified());
         assertEquals(1.0, column.getConfidence());
         assertFalse(column.hasUnconfirmedSemantics());
+        assertFalse(column.getAttributes().containsKey(ColumnWorkspaceNode.ATTR_SEMANTIC_BASIS_CHANGES));
     }
 
     /**

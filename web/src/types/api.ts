@@ -425,6 +425,33 @@ export interface SchemaDto {
 
 // ── Terms ──
 
+export interface ScenarioHopDto {
+  fromTable: string;
+  fromColumn: string;
+  toTable: string;
+  toColumn: string;
+  relationId: string;
+  relationshipType: string;
+  status: string;
+  verified: boolean | null;
+  confidence: number | null;
+  cardinality: RelationCardinality;
+  joinExpression: string | null;
+  fromOptional: boolean | null;
+  toOptional: boolean | null;
+  optionalitySource: string | null;
+}
+
+export interface TermScenarioDto {
+  termId: string;
+  entryTableId: string;
+  tables: { tableId: string; qualifiedName: string; role: 'primary' | 'mapped' | 'bridge' }[];
+  hops: ScenarioHopDto[];
+  filters: string[];
+  unreachable: string[];
+  ambiguities: { targetTable: string; alternatives: { hops: number; path: ScenarioHopDto[] }[] }[];
+}
+
 /** 业务术语（只读，CLI `add-term` 维护）。mappedTargets 来自 term_mapping 关系反查。 */
 export interface TermDto {
   id: string;
@@ -446,6 +473,8 @@ export interface TermDto {
   scenarioTables: string[];
   /** 其中为了连通补进来的——术语并没有映射它们，要标出来 */
   bridgeTables: string[];
+  /** 完整路径及未解决的关联选择；旧服务可能不返回此字段。 */
+  scenario?: TermScenarioDto | null;
 }
 
 export interface TermsResponseDto {

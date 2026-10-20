@@ -69,7 +69,30 @@ public class GraphEvaluator {
         findings.addAll(gate("desc.dead-ref", deadReferences(workspace, alias)));
         findings.addAll(gate("rel.endpoint-mismatch", endpointMismatch(workspace, alias)));
         findings.addAll(gate("lineage.shape", lineageShape(workspace, alias)));
+        findings.addAll(gate("column.semantic-basis-changed", semanticBasisChanges(workspace, alias)));
         return new GraphEvaluation(metrics(workspace), findings);
+    }
+
+    private List<GraphFinding> semanticBasisChanges(GraphWorkspace workspace, String alias) {
+        List<GraphFinding> findings = new ArrayList<>();
+        for (TableWorkspaceNode table : workspace.getTables().values()) {
+            for (ColumnWorkspaceNode column : table.getColumns()) {
+                Object changes = column.getAttributes().get(ColumnWorkspaceNode.ATTR_SEMANTIC_BASIS_CHANGES);
+                if (changes == null) continue;
+                findings.add(GraphFinding.warning("column.semantic-basis-changed",
+                        column.computeId(alias, table.getSchema(), table.getName()),
+                        "语义来源变化，原业务描述和值域已保留，需复核：" + changes,
+                        "sql-cli " + alias + " schema describe " + table.getQualifiedName()
+                                + " --column " + column.getName() + "；核对后在字段编辑页保存确认"));
+            }
+        }
+        if (findings.size() > FINDING_LIMIT) {
+            return List.of(GraphFinding.warning("column.semantic-basis-changed", null,
+                    "有 " + findings.size() + " 个字段的语义来源发生变化，请分批复核。样例："
+                            + String.join("、", findings.stream().limit(3).map(GraphFinding::targetId).toList()),
+                    findings.get(0).remediation()));
+        }
+        return findings;
     }
 
     /**

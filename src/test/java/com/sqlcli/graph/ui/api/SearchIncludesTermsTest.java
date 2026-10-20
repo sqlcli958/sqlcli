@@ -61,6 +61,7 @@ class SearchIncludesTermsTest {
         WorkspaceQueryController controller =
                 new WorkspaceQueryController(workspace, session, new JsonHttpSupport(), null);
         server.createContext("/api/search", controller::handle);
+        server.createContext("/api/terms", controller::handle);
         server.start();
         return origin;
     }
@@ -153,5 +154,34 @@ class SearchIncludesTermsTest {
                     "没标主次时退到第一条 term_mapping，否则这条术语点不动");
         }
         assertTrue(found, "术语必须在结果里");
+    }
+
+    @Test
+    void termsApiExposesAmbiguousConnectionsWithTheirTrustState() throws Exception {
+        GraphWorkspace workspace = buildWorkspace();
+        TermWorkspaceNode term = workspace.getTerms().values().iterator().next();
+        term.setPrimaryTarget(GraphIds.tableId(ALIAS, "app", "task_plan"));
+        TableWorkspaceNode target = TableWorkspaceNode.create(ALIAS, "app", "users", GraphActor.extractor);
+        target.getColumns().add(ColumnWorkspaceNode.create("id"));
+        target.getColumns().add(ColumnWorkspaceNode.create("owner_id"));
+        workspace.getTables().put(target.getId(), target);
+        workspace.getRelations().add(RelationWorkspaceEdge.create(ALIAS, RelationType.term_mapping,
+                term.getId(), target.getId(), GraphActor.agent));
+        for (String column : java.util.List.of("id", "owner_id")) {
+            RelationWorkspaceEdge edge = RelationWorkspaceEdge.create(ALIAS, RelationType.join_observed,
+                    GraphIds.columnId(ALIAS, "app", "task_plan", "is_scan"),
+                    GraphIds.columnId(ALIAS, "app", "users", column), GraphActor.agent);
+            edge.setConfidence(0.8);
+            workspace.getRelations().add(edge);
+        }
+        String origin = start(workspace);
+        var response = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(origin + "/api/terms"))
+                .GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, response.statusCode());
+        JsonNode scenario = MAPPER.readTree(response.body()).path("terms").get(0).path("scenario");
+        assertEquals(0, scenario.path("hops").size());
+        JsonNode alternatives = scenario.path("ambiguities").get(0).path("alternatives");
+        assertEquals(2, alternatives.size());
+        assertEquals("candidate", alternatives.get(0).path("path").get(0).path("status").asText());
     }
 }

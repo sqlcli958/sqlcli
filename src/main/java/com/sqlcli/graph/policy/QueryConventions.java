@@ -33,8 +33,8 @@ import java.util.regex.Pattern;
  * 一条无条件注入 {@code del_flag = 0} 的规则在这张表上**恰好蒙对**，
  * 但只要有一张表用 {@code del_flag = 1} 表示存在，同一条规则就会静默筛掉全部数据。
  *
- * <p>所以 {@code when.columnValueIn} 是必要的闸门：值域里没有那个值就不匹配，
- * 宁可不给提示，也不给一条错的。
+ * <p>枚举条件使用 {@code when.columnValueMeanings} 校验值和含义；仅有数字的旧规则
+ * 输出迁移提示，不作为可直接应用的过滤条件。
  *
  * <pre>
  * - id: soft_delete_filter
@@ -42,6 +42,7 @@ import java.util.regex.Pattern;
  *   when:
  *     columnNameRegex: "^(del_flag|is_deleted)$"
  *     columnValueIn: ["0"]
+ *     columnValueMeanings: {"0": "存在"}
  *   statement:
  *     queryFilter: "{column} = 0"
  * </pre>
@@ -51,18 +52,24 @@ public final class QueryConventions {
     public static final String CATEGORY = "query_convention";
 
     /** 一条适用于某张表的约定：给 Agent 看的过滤条件，以及它出自哪条规则。 */
-    public record Hint(String ruleId, String filter) {
+    public record Hint(String ruleId, String filter, String proposedFilter, String warning) {
     }
 
     private final List<PolicyRule> rules;
     private final Set<String> waivedRuleTargets;
+    private final String loadWarning;
 
     private QueryConventions(List<PolicyRule> rules, Set<String> waivedRuleTargets) {
-        this.rules = rules;
-        this.waivedRuleTargets = waivedRuleTargets;
+        this(rules, waivedRuleTargets, null);
     }
 
-    /** 空实例：没有绑定规则集、或读取失败时用它，调用方不用判空。 */
+    private QueryConventions(List<PolicyRule> rules, Set<String> waivedRuleTargets, String loadWarning) {
+        this.rules = rules;
+        this.waivedRuleTargets = waivedRuleTargets;
+        this.loadWarning = loadWarning;
+    }
+
+    /** 空实例：没有绑定规则集时用它，调用方不用判空。 */
     public static QueryConventions empty() {
         return new QueryConventions(List.of(), Set.of());
     }
@@ -71,7 +78,7 @@ public final class QueryConventions {
      * 从工作区加载约定规则。
      *
      * <p><b>读不到规则不是错误</b>——多数工作区根本没绑规则集。这条路径挂在 describe /
-     * search 上，为了一份可选的提示让查询失败是本末倒置，所以任何异常都退化成空实例。
+     * search 上，为了一份可选的提示让查询失败是本末倒置，所以读取失败返回显式待确认提示，不阻断查询。
      */
     public static QueryConventions load(Path workspaceRoot, List<RuleWaiver> waivers) {
         List<PolicyRule> found = new ArrayList<>();
@@ -84,7 +91,7 @@ public final class QueryConventions {
                 }
             }
         } catch (Exception e) {
-            return empty();
+            return new QueryConventions(List.of(), Set.of(), "查询约定读取失败，过滤条件未检查: " + e.getMessage());
         }
         Set<String> waived = new LinkedHashSet<>();
         for (RuleWaiver waiver : waivers == null ? List.<RuleWaiver>of() : waivers) {
@@ -96,12 +103,13 @@ public final class QueryConventions {
     }
 
     public boolean isEmpty() {
-        return rules.isEmpty();
+        return rules.isEmpty() && loadWarning == null;
     }
 
     /** 这张表命中了哪些约定。没有就是空表。 */
     public List<Hint> forTable(GraphWorkspace workspace, TableWorkspaceNode table) {
-        if (rules.isEmpty() || table == null) return List.of();
+        if (table == null) return List.of();
+        if (loadWarning != null) return List.of(new Hint(null, null, null, loadWarning));
         List<Hint> hints = new ArrayList<>();
         for (PolicyRule rule : rules) {
             if (waivedRuleTargets.contains(rule.getId() + "#" + table.getId())) continue;
@@ -110,15 +118,21 @@ public final class QueryConventions {
             if (template == null || template.isBlank()) continue;
             for (ColumnWorkspaceNode column : table.getColumns()) {
                 if (!matchesColumn(rule, column)) continue;
-                hints.add(new Hint(rule.getId(), template.replace("{column}", column.getName())));
-                break;  // 一条规则在一张表上只给一次提示，命中第一列即可
+                String filter = template.replace("{column}", column.getName());
+                String warning = meaningWarning(rule, column);
+                hints.add(new Hint(rule.getId(), warning == null ? filter : null,
+                        warning == null ? null : filter, warning));
             }
         }
-        return List.copyOf(hints);
+        return hints.stream().distinct().toList();
     }
 
     private static boolean matchesTable(GraphWorkspace workspace, PolicyRule rule, TableWorkspaceNode table) {
         Map<String, Object> when = rule.getWhen();
+        if (when.containsKey("tableTagsAny") && strings(when.get("tableTagsAny")).stream()
+                .noneMatch(tag -> table.getTags().stream().anyMatch(tag::equalsIgnoreCase))) return false;
+        if (when.containsKey("tableTypeAny") && strings(when.get("tableTypeAny")).stream()
+                .noneMatch(type -> table.getTableType() != null && type.equals(table.getTableType().name()))) return false;
         Object dbTypes = when.get("dbTypeAny");
         if (dbTypes != null && strings(dbTypes).stream()
                 .noneMatch(value -> value.equalsIgnoreCase(workspace.getDataSource().getDbType()))) {
@@ -131,22 +145,46 @@ public final class QueryConventions {
 
     private static boolean matchesColumn(PolicyRule rule, ColumnWorkspaceNode column) {
         Map<String, Object> when = rule.getWhen();
+        if (when.containsKey("columnTagsAny") && strings(when.get("columnTagsAny")).stream()
+                .noneMatch(tag -> strings(column.getAttributes().get("tags")).stream().anyMatch(tag::equalsIgnoreCase))) return false;
+        if (when.containsKey("semanticTypeAny") && strings(when.get("semanticTypeAny")).stream()
+                .noneMatch(value -> column.getSemanticType() != null && value.equalsIgnoreCase(column.getSemanticType().name()))) return false;
         Object nameRegex = when.get("columnNameRegex");
         if (nameRegex != null && !Pattern.compile(String.valueOf(nameRegex))
                 .matcher(column.getName()).find()) {
             return false;
         }
-        Object valueIn = when.get("columnValueIn");
-        if (valueIn == null) return true;
-        // 值域没标注过就不匹配——**宁可不给提示，也不给一条错的**。
-        // 提示是要被 Agent 直接写进 WHERE 的，错一次就是静默筛掉全部数据。
-        if (column.getValueHints() == null || column.getValueHints().getEnumValues() == null) return false;
-        Set<String> declared = new LinkedHashSet<>();
-        for (String item : column.getValueHints().getEnumValues()) {
-            int split = item.indexOf('=');
-            declared.add((split < 0 ? item : item.substring(0, split)).trim());
+        return true;
+    }
+
+    private static String meaningWarning(PolicyRule rule, ColumnWorkspaceNode column) {
+        Object configured = rule.getWhen().get("columnValueMeanings");
+        if (!(configured instanceof Map<?, ?> expected)) {
+            if (rule.getWhen().containsKey("columnValueIn")) {
+                return "旧规则仅声明枚举值，请补充 when.columnValueMeanings 并核对含义后使用";
+            }
+            return column.getValueHints() != null && column.getValueHints().getEnumValues() != null
+                    && !column.getValueHints().getEnumValues().isEmpty()
+                    ? "枚举过滤未声明含义，请补充 when.columnValueMeanings 并核对后使用" : null;
         }
-        return declared.containsAll(strings(valueIn));
+        if (column.getAttributes().containsKey(ColumnWorkspaceNode.ATTR_SEMANTIC_BASIS_CHANGES)) {
+            return "字段来源已变化，请先复核值域含义";
+        }
+        List<String> declared = column.getValueHints() == null || column.getValueHints().getEnumValues() == null
+                ? List.of() : column.getValueHints().getEnumValues();
+        for (Map.Entry<?, ?> entry : expected.entrySet()) {
+            String value = String.valueOf(entry.getKey());
+            String meaning = String.valueOf(entry.getValue()).trim();
+            List<String> meanings = declared.stream().filter(java.util.Objects::nonNull)
+                    .filter(item -> item.split("=", 2)[0].trim().equals(value))
+                    .map(item -> item.contains("=") ? item.substring(item.indexOf('=') + 1).trim() : "")
+                    .distinct().toList();
+            if (meanings.size() != 1 || !meanings.get(0).equals(meaning)) {
+                return "字段 " + column.getName() + " 需要 " + value + "=" + meaning
+                        + "，实际含义为 " + (meanings.isEmpty() ? "未声明" : meanings) + "，请核对后使用";
+            }
+        }
+        return null;
     }
 
     private static List<String> strings(Object value) {

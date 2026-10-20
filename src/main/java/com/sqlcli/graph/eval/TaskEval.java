@@ -14,7 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * 任务级评估的**评分器**：给定评估集（期望）与 agent 的作答，判分并归因。
+ * 任务级评估的**评分器**：给定评估集（期望）与 agent 的作答，检查计划声明或实际 SQL，提供定位线索。
  *
  * <h2>这里不跑 agent</h2>
  * 跑 agent 是外部 harness 的事（Claude Code 起两个子 agent，把产出填进 answers.yaml）。
@@ -22,7 +22,7 @@ import java.util.Map;
  *
  * <h2>为什么必须两组</h2>
  * 一次失败如果不分组，什么也说明不了——可能图谱缺信息，也可能 agent 笨，
- * 而两者的修法完全相反（补图谱 vs 改 skill）。所以每个 case 跑两组：
+ * 两组对照提供定位线索，不足以直接断言失败原因。每个 case 可跑两组：
  * {@code control} 只给图谱、{@code cheat} 额外给正确表集合。见
  * docs/graph-concept-boundaries.zh-CN.md §6.2。
  *
@@ -61,14 +61,16 @@ public final class TaskEval {
         passed,
         /** 对照组失败、作弊组通过 → 图谱信息不足，补描述/术语/检索 */
         graph,
-        /** 两组都失败 → 给了表还做不对，改 skill 的指引 */
+        /** 保留历史报告的枚举；仅凭两组失败不能确定是 skill 问题。 */
         skill,
         /** 缺组，或对照组过而作弊组反而失败 —— 说不出该修哪 */
         unattributable
     }
 
+    public enum CheckLevel { plan, sql }
+
     public record GroupResult(boolean pass, List<String> missingTables, List<String> missingJoins,
-            List<String> pitfalls) {
+            List<String> pitfalls, CheckLevel level, boolean complete, List<String> limitations) {
     }
 
     /** control/cheat 缺组时对应字段为 null。 */
@@ -106,6 +108,9 @@ public final class TaskEval {
             if (control == null) {
                 verdict = Verdict.unattributable;
                 note = "对照组没有作答";
+            } else if (!control.complete() || cheat != null && (!cheat.complete() || control.level() != cheat.level())) {
+                verdict = Verdict.unattributable;
+                note = "检查未完成或两组证据层次不同，不能判定通过或归因";
             } else if (control.pass()) {
                 if (cheat != null && !cheat.pass()) {
                     verdict = Verdict.unattributable;
@@ -117,7 +122,9 @@ public final class TaskEval {
                 verdict = Verdict.unattributable;
                 note = "作弊组缺失，分不清是图谱信息不足还是 skill 问题";
             } else {
-                verdict = cheat.pass() ? Verdict.graph : Verdict.skill;
+                verdict = cheat.pass() ? Verdict.graph : Verdict.unattributable;
+                note = cheat.pass() ? "给出表集合后通过，优先检查定位信息；不是因果证明"
+                        : "两组都失败：还需核对关系、值域、任务判据和 skill，不能仅据此归因";
             }
             results.add(new CaseResult(taskCase.id(), taskCase.task(), taskCase.skillRef(),
                     verdict, control, cheat, note));
@@ -129,6 +136,7 @@ public final class TaskEval {
         if (answer == null) {
             return null;
         }
+        if (answer.sql() != null && !answer.sql().isBlank()) return scoreSql(taskCase, answer.sql());
         List<String> missingTables = taskCase.tables().stream()
                 .filter(expected -> answer.tables().stream().noneMatch(actual -> sameTable(actual, expected)))
                 .toList();
@@ -141,18 +149,38 @@ public final class TaskEval {
                 .map(Pitfall::desc)
                 .toList();
         boolean pass = missingTables.isEmpty() && missingJoins.isEmpty() && hitPitfalls.isEmpty();
-        return new GroupResult(pass, missingTables, missingJoins, hitPitfalls);
+        return new GroupResult(pass, missingTables, missingJoins, hitPitfalls,
+                CheckLevel.plan, true, List.of("仅检查计划声明，未验证 SQL 或结果"));
     }
 
-    /** 期望表集合是作答的子集即可（多带一张不算错）。按最后一段比，作答写不写 schema 前缀都认。 */
+    private static GroupResult scoreSql(TaskCase taskCase, String sql) {
+        try {
+            TaskSqlEvidence evidence = TaskSqlEvidence.parse(sql);
+            List<String> missingTables = taskCase.tables().stream().filter(table -> !evidence.hasTable(table)).toList();
+            List<String> missingJoins = new ArrayList<>();
+            for (String join : taskCase.joins()) {
+                String[] ends = endpoints(join);
+                if (ends[1].isEmpty() ? !evidence.hasJoinExpression(join) : !evidence.hasJoin(ends[0], ends[1])) missingJoins.add(join);
+            }
+            List<String> pitfalls = new ArrayList<>();
+            for (Pitfall pitfall : taskCase.pitfalls()) {
+                boolean hit = false;
+                for (String forbidden : pitfall.forbid()) if (evidence.contains(forbidden, false)) hit = true;
+                for (String required : pitfall.require()) if (!evidence.contains(required, true)) hit = true;
+                if (hit) pitfalls.add(pitfall.desc());
+            }
+            return new GroupResult(missingTables.isEmpty() && missingJoins.isEmpty() && pitfalls.isEmpty(),
+                    missingTables, missingJoins, pitfalls, CheckLevel.sql, true,
+                    List.of("仅检查 SQL 的表、等值连接和声明的静态条件，结果正确性未验证"));
+        } catch (Exception e) {
+            return new GroupResult(false, List.of(), List.of(), List.of(), CheckLevel.sql, false,
+                    List.of("SQL 检查未完成: " + e.getMessage()));
+        }
+    }
+
+    /** 期望表集合是作答的子集即可（多带一张不算错）。期望声明 schema 时必须匹配该 schema。 */
     private static boolean sameTable(String actual, String expected) {
-        return lastSegment(actual).equals(lastSegment(expected));
-    }
-
-    private static String lastSegment(String ref) {
-        String trimmed = ref == null ? "" : ref.trim().toLowerCase(Locale.ROOT);
-        int dot = trimmed.lastIndexOf('.');
-        return dot < 0 ? trimmed : trimmed.substring(dot + 1);
+        return TaskSqlEvidence.matchesIdentifier(actual, expected);
     }
 
     /**

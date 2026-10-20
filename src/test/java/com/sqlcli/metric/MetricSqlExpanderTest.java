@@ -28,6 +28,20 @@ class MetricSqlExpanderTest {
 
     private static final String ALIAS = "metric-test";
 
+    @Test
+    void rejectedRelationCannotDriveMetricSql() {
+        GraphWorkspace workspace = seedOrdersAndUsersWithCompositeFk();
+        RelationWorkspaceEdge edge = workspace.getRelations().get(0);
+        MetricRecord metric = metricWithGrainAndExpression();
+        metric.setJoinPath(List.of(joinStep(edge.getId(), MetricRecord.MetricJoinType.inner)));
+        assertTrue(MetricSqlExpander.expand(workspace, metric, mysql(), request(null, null, null)).contains("JOIN"));
+        edge.setStatus(GraphStatus.ignored);
+        MetricExpansionException error = assertThrows(MetricExpansionException.class,
+                () -> MetricSqlExpander.expand(workspace, metric, mysql(), request(null, null, null)));
+        assertTrue(error.getMessage().contains(edge.getId()));
+        assertTrue(error.getMessage().contains("已拒绝"));
+    }
+
     // ------------------------------------------------------------ 单表
 
     @Test

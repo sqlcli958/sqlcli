@@ -19,6 +19,48 @@ class GraphWorkspaceMergerTest {
         merger = new GraphWorkspaceMerger();
     }
 
+    @Test
+    void changedBasisPreservesKnowledgeAndSurvivesRepeatedImportAndStorage() throws Exception {
+        GraphWorkspace existing = createWorkspace("unit");
+        GraphWorkspace incoming = createWorkspace("unit");
+        TableWorkspaceNode oldTable = createTable("unit", "trade", "orders");
+        TableWorkspaceNode newTable = createTable("unit", "trade", "orders");
+        ColumnWorkspaceNode oldColumn = createColumn("status", 1);
+        ColumnWorkspaceNode newColumn = createColumn("status", 1);
+        oldColumn.setComment("1=paid");
+        oldColumn.setDescription("1 means paid");
+        oldColumn.setVerified(true);
+        ColumnValueHints hints = new ColumnValueHints();
+        hints.setEnumValues(List.of("1=paid"));
+        oldColumn.setValueHints(hints);
+        newColumn.setComment("1=unpaid");
+        oldTable.getColumns().add(oldColumn);
+        newTable.getColumns().add(newColumn);
+        existing.getTables().put(oldTable.getId(), oldTable);
+        incoming.getTables().put(newTable.getId(), newTable);
+
+        merger.merge(incoming, existing);
+        assertEquals("1=unpaid", oldColumn.getComment());
+        assertEquals("1 means paid", oldColumn.getDescription());
+        assertEquals(List.of("1=paid"), oldColumn.getValueHints().getEnumValues());
+        assertTrue(oldColumn.hasUnconfirmedSemantics());
+        Object changes = oldColumn.getAttributes().get(ColumnWorkspaceNode.ATTR_SEMANTIC_BASIS_CHANGES);
+        String serialized = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(oldColumn);
+        ColumnWorkspaceNode restored = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readValue(serialized, ColumnWorkspaceNode.class);
+        oldTable.setColumns(new java.util.ArrayList<>(List.of(restored)));
+        merger.merge(incoming, existing);
+        assertEquals(changes, restored.getAttributes().get(ColumnWorkspaceNode.ATTR_SEMANTIC_BASIS_CHANGES));
+        assertTrue(restored.hasUnconfirmedSemantics());
+        var findings = new com.sqlcli.graph.eval.GraphEvaluator().evaluate(existing).findings();
+        assertTrue(findings.stream().anyMatch(f -> f.probe().equals("column.semantic-basis-changed")
+                && f.message().contains("1=paid") && f.message().contains("1=unpaid")));
+
+        restored.getAttributes().remove(ColumnWorkspaceNode.ATTR_SEMANTIC_BASIS_CHANGES);
+        merger.merge(incoming, existing);
+        assertFalse(restored.hasUnconfirmedSemantics(), "复核之后相同导入不能再次报警");
+    }
+
     private GraphWorkspace createWorkspace(String alias) {
         return GraphWorkspace.create(alias, "mysql");
     }

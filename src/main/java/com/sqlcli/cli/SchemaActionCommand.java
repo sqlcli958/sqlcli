@@ -303,7 +303,7 @@ public class SchemaActionCommand implements Runnable {
         System.out.println("  metric <name>                  查看指标详情");
         System.out.println("  expand-metric <name>           把指标按粒度/维度展开成可执行 SQL");
         System.out.println("  search-eval                   用评估集度量搜索命中率");
-        System.out.println("  task-eval                     给 agent 的作答判分并归因（图谱侧 / skill 侧）");
+        System.out.println("  task-eval                     检查 agent 的计划或 SQL，并提供定位线索");
         System.out.println("  value-domain                  值域三源交叉（库分布×注释×代码枚举），产出待审批");
         System.out.println("  data-quality                  数据层质量探针（连库只读聚合）：字段能删吗 / 表还活着吗");
         System.out.println("  index                         管理搜索索引");
@@ -896,7 +896,7 @@ public class SchemaActionCommand implements Runnable {
                         cheat    额外给正确的表集合（只藏 JOIN 和值域）
                       两组的意义是归因。没有对照，通过率是个看了也不知道该做什么的数字:
                         对照✗ 作弊✓  图谱信息不足 → 补描述 / 术语 / 检索
-                        对照✗ 作弊✗  skill 问题   → 改 references/ 里对应那一节
+                        对照✗ 作弊✗  无法归因     → 核对关系、值域、判据与 skill
                         对照✓        通过
 
                     作答格式 (YAML):
@@ -913,10 +913,14 @@ public class SchemaActionCommand implements Runnable {
                       docs/task-eval-erp-inspection.yaml。
 
                     判分口径:
-                      tables    期望表集合是作答的子集（多带一张不算错，少一张算错），按表名末段比
-                      joins     每条期望连接的两端都出现在作答的同一条 JOIN 或 SQL 里，且左端在前
+                      无 SQL    只检查 tables / joins / values 的计划声明，level=plan
+                      有 SQL    从实际语法树检查表、等值连接和 WHERE/HAVING 条件，level=sql
+                                注释、字符串文字和计划声明不能补足实际 SQL 的缺失
+                      未支持    CTE、子查询、集合运算、自关联等返回 complete=false，不判通过
+                      表标识    期望带 schema 时必须匹配；仅表名可匹配带 schema 的实际表
                       pitfalls  一条都不能踩中——这是最要紧的一项。只比表和 JOIN 测不出
                                 「选错了名字相近的那张表」，因为那种 SQL 照样能跑
+                      结果      从未执行 SQL；实际数据结果由外部 harness 在固定数据上验证
 
                     选项:
                       --cases FILE    评估集 YAML（tasks 数组，每条带 expect.pitfalls）。
@@ -1179,7 +1183,9 @@ public class SchemaActionCommand implements Runnable {
             payload.put("sm4Columns", new ArrayList<>(sm4Columns));
             payload.put("recentSql", recentSql);
             payload.put("conventions", conventionHints.stream()
-                    .map(QueryConventions.Hint::filter).toList());
+                    .map(QueryConventions.Hint::filter).filter(Objects::nonNull).toList());
+            payload.put("unresolvedConventions", conventionHints.stream()
+                    .filter(hint -> hint.warning() != null).toList());
             payload.put("scenarios", scenarios);
             payload.put("completeness", completeness.toMap());
             CliJson.printSuccess(payload);
@@ -1207,7 +1213,7 @@ public class SchemaActionCommand implements Runnable {
         System.out.println(completeness.line());
         // 约定紧跟表头：它是要被写进 WHERE 的，埋在字段列表后面就等于没有
         for (QueryConventions.Hint hint : conventionHints) {
-            System.out.println("约定过滤: " + hint.filter() + "    [规则 " + hint.ruleId() + "]");
+            System.out.println(conventionText(hint));
         }
         // 反向索引：Agent 直接 describe 一张表时，得知道自己踩在哪个业务场景里，
         // 那个场景带着 join 路径和过滤，比在这里逐条关系去猜省事
@@ -1258,6 +1264,8 @@ public class SchemaActionCommand implements Runnable {
             if (column.hasUnconfirmedSemantics()) {
                 extra.append(" [待确认]");
             }
+            Object basisChanges = column.getAttributes().get(ColumnWorkspaceNode.ATTR_SEMANTIC_BASIS_CHANGES);
+            if (basisChanges != null) extra.append(" [语义来源变化，需复核: ").append(basisChanges).append("]");
             String lineageTag = lineageSuffix(describeLineageHints, table.getSchema(), table.getName(), column.getName());
             if (!lineageTag.isEmpty()) {
                 extra.append(" ").append(lineageTag);
@@ -1560,6 +1568,8 @@ public class SchemaActionCommand implements Runnable {
                 ? "未标注" : column.getConfidence()));
         System.out.println("人工确认: " + (Boolean.TRUE.equals(column.getVerified())
                 ? "是" : "否——这条语义没有人复核过"));
+        Object basisChanges = column.getAttributes().get(ColumnWorkspaceNode.ATTR_SEMANTIC_BASIS_CHANGES);
+        if (basisChanges != null) System.out.println("语义来源变化，原确认需要复核: " + basisChanges);
         if (!column.hasSemantics()) {
             System.out.println("注: 这一列只有库注释，"
                     + "没有任何人写过业务语义——"
@@ -1804,6 +1814,11 @@ public class SchemaActionCommand implements Runnable {
      */
     private static String joinSummary(WorkspacePathFinder.PathSegment seg) {
         StringBuilder sb = new StringBuilder();
+        sb.append("  [relationId=").append(seg.getRelationId())
+                .append(" status=").append(seg.getStatus())
+                .append(" verified=").append(seg.getVerified())
+                .append(" confidence=").append(seg.getConfidence())
+                .append(" cardinality=").append(seg.getCardinality()).append("]");
         if (seg.getFromOptional() != null) {
             String basis = RelationWorkspaceEdge.OPTIONALITY_SOURCE_PROFILED
                     .equals(seg.getOptionalitySource()) ? "实测" : "推断";
@@ -1904,13 +1919,24 @@ public class SchemaActionCommand implements Runnable {
                     (com.fasterxml.jackson.databind.node.ObjectNode) jsonMapper.valueToTree(hitsShown.get(i));
             String key = fh.schema() != null && fh.table() != null ? lower(fh.schema() + "." + fh.table()) : null;
             String viaTermId = key == null ? null : expandedBy.get(key);
-            if (scenarioOf(workspace, fh) != null) {
+            TermScenario scenario = scenarioOf(workspace, fh);
+            if (scenario != null) {
                 node.put("origin", "term");
+                node.set("scenario", jsonMapper.valueToTree(scenario));
             } else if (viaTermId != null) {
                 node.put("origin", "term_expansion");
                 node.put("expandedByTermId", viaTermId);
             } else {
                 node.put("origin", "keyword");
+            }
+            TableWorkspaceNode contextTable = scenario != null ? workspace.getTables().get(scenario.entryTableId())
+                    : key == null ? null : workspace.getTableByQualifiedName(key);
+            if (contextTable != null) {
+                List<QueryConventions.Hint> hints = queryConventions().forTable(workspace, contextTable);
+                node.set("conventions", jsonMapper.valueToTree(hints.stream()
+                        .map(QueryConventions.Hint::filter).filter(Objects::nonNull).toList()));
+                node.set("unresolvedConventions", jsonMapper.valueToTree(hints.stream()
+                        .filter(hint -> hint.warning() != null).toList()));
             }
             enriched.add(node);
         }
@@ -2070,7 +2096,13 @@ public class SchemaActionCommand implements Runnable {
         TableWorkspaceNode table = tableId == null ? null : workspace.getTables().get(tableId);
         if (table == null) return List.of();
         return queryConventions().forTable(workspace, table).stream()
-                .map(QueryConventions.Hint::filter).toList();
+                .map(SchemaActionCommand::conventionText).toList();
+    }
+
+    private static String conventionText(QueryConventions.Hint hint) {
+        return hint.warning() == null ? "约定过滤: " + hint.filter() + " [规则 " + hint.ruleId() + "]"
+                : "约定待确认 [规则 " + hint.ruleId() + "]: " + hint.warning()
+                        + "（拟用条件: " + hint.proposedFilter() + "；尚不可直接应用）";
     }
 
     /** 这张表属于哪些场景（术语侧的反向索引）。 */
@@ -2103,7 +2135,7 @@ public class SchemaActionCommand implements Runnable {
     private void printScenarioGroup(GraphWorkspace workspace, FoldableHit first, TermScenario scenario) {
         TermWorkspaceNode term = workspace.getTerms().get(first.id());
 
-        System.out.printf("  ⌘ 场景「%s」%s%n", first.title(),
+        System.out.printf("  ⌘ 场景「%s」%s%s%n", first.title(), candidateMark(term.getStatus()),
                 term.getDescription() == null || term.getDescription().isBlank()
                         ? "" : " — " + term.getDescription());
         List<String> meta = new ArrayList<>();
@@ -2137,6 +2169,16 @@ public class SchemaActionCommand implements Runnable {
         for (String missing : scenario.unreachable()) {
             // 如实说连不上，别假装子图是完整的——多半是关系还没录进图谱
             System.out.println("      " + missing + "  [连不上入口表，关系可能还没录进图谱]");
+        }
+        for (TermScenario.Ambiguity ambiguity : scenario.ambiguities()) {
+            System.out.println("    关联待确认: " + ambiguity.targetTable() + "，请按业务含义选择以下备选路径：");
+            int index = 0;
+            for (WorkspacePathFinder.PathResult alternative : ambiguity.alternatives()) {
+                System.out.println("      备选 " + (++index));
+                for (WorkspacePathFinder.PathSegment hop : alternative.getPath()) {
+                    System.out.println("        " + hop.getFromTable() + " -> " + hop.getToTable() + joinSummary(hop));
+                }
+            }
         }
     }
 
@@ -3344,14 +3386,15 @@ public class SchemaActionCommand implements Runnable {
         }
 
         System.out.printf(Locale.ROOT, "任务评估: %d cases%n", taskCases.size());
+        System.out.println("检查层次：plan 仅计划声明；sql 检查实际 SQL；均未执行结果验证。");
         printTaskEvalSection(report, TaskEval.Verdict.graph,
                 "图谱信息不足（对照组失败、作弊组通过 → 补描述 / 术语 / 检索）:");
         printTaskEvalSection(report, TaskEval.Verdict.skill,
-                "skill 问题（两组都失败 → 改 references/ 里对应那一节）:");
+                "历史 skill 归因:");
         printTaskEvalSection(report, TaskEval.Verdict.unattributable, "无法归因:");
         List<TaskEval.CaseResult> passed = report.byVerdict(TaskEval.Verdict.passed);
         if (!passed.isEmpty()) {
-            System.out.println("通过: " + passed.stream().map(TaskEval.CaseResult::id)
+            System.out.println("通过: " + passed.stream().map(result -> result.id() + " [" + result.control().level() + "]")
                     .collect(Collectors.joining(", ")));
         }
         if (!unknownIds.isEmpty()) {
@@ -3384,9 +3427,11 @@ public class SchemaActionCommand implements Runnable {
     }
 
     private void printTaskEvalGroup(String label, TaskEval.GroupResult group) {
-        if (group == null || group.pass()) {
+        if (group == null) {
             return;
         }
+        System.out.printf("      %s [%s / %s]: %s%n", label, group.level(),
+                group.complete() ? "已检查" : "未完成", String.join("；", group.limitations()));
         if (!group.missingTables().isEmpty()) {
             System.out.printf("      %s 缺表: %s%n", label, String.join(", ", group.missingTables()));
         }

@@ -37,6 +37,8 @@ class SchemaTermScenarioSearchTest {
         assertTrue(out.contains("同义词: 工单、报修"), out);
         // join 条件必须给出来——这正是「只给点不给边」要修的
         assertTrue(out.contains("ON app.report.id = app.assign.report_id"), out);
+        assertTrue(out.contains("status=candidate"), out);
+        assertTrue(out.contains("confidence=0.9"), out);
         // 过滤单独一行，含占位符的必填参数
         assertTrue(out.contains("过滤: state IN (0,1,6)  AND  subject_id = :subjectId"), out);
         assertTrue(out.contains("★ app.report"), out);
@@ -92,6 +94,10 @@ class SchemaTermScenarioSearchTest {
         }
         assertTrue(termHit != null, "场景术语本身仍要出现在 JSON 里");
         assertEquals("term", termHit.get("origin").asText());
+        JsonNode hop = termHit.path("scenario").path("hops").get(0);
+        assertEquals("candidate", hop.path("status").asText());
+        assertTrue(hop.path("relationId").asText().startsWith("relation:"));
+        assertTrue(termHit.path("scenario").path("ambiguities").isArray());
         assertTrue(expandedTable != null, "术语带出的表要在 JSON 命中里能找到");
         assertEquals("term_expansion", expandedTable.get("origin").asText());
         assertEquals(termId, expandedTable.get("expandedByTermId").asText());
@@ -126,11 +132,16 @@ class SchemaTermScenarioSearchTest {
     }
 
     private String searchFor(GraphWorkspace workspace) throws Exception {
+        return searchFor(workspace, false);
+    }
+
+    private String searchFor(GraphWorkspace workspace, boolean json) throws Exception {
         new GraphWorkspaceStore(temp).save(workspace);
         SchemaActionCommand cmd = new SchemaActionCommand(new GraphWorkspaceStore(temp));
         cmd.setAlias(ALIAS);
         cmd.setAction("search");
         cmd.setKeyword("报事");
+        cmd.setJsonOutput(json);
         cmd.setCommandArgs(List.of("search", "报事"));
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         PrintStream original = System.out;
@@ -141,5 +152,26 @@ class SchemaTermScenarioSearchTest {
             System.setOut(original);
         }
         return buffer.toString("UTF-8");
+    }
+
+    @Test
+    void ambiguousScenarioShowsAlternativesInTextAndJson() throws Exception {
+        GraphWorkspace workspace = seedScenario();
+        RelationWorkspaceEdge other = RelationWorkspaceEdge.create(ALIAS, RelationType.join_observed,
+                GraphIds.columnId(ALIAS, "app", "report", "report_id"),
+                GraphIds.columnId(ALIAS, "app", "assign", "id"), GraphActor.agent);
+        other.setConfidence(0.8);
+        other.setJoinExpression("app.report.report_id = app.assign.id");
+        workspace.getRelations().add(other);
+        String text = searchFor(workspace);
+        assertTrue(text.contains("关联待确认"), text);
+        assertTrue(text.contains("ON app.report.report_id = app.assign.id"), text);
+        assertTrue(text.contains("ON app.report.id = app.assign.report_id"), text);
+        JsonNode data = new ObjectMapper().readTree(searchFor(workspace, true)).path("data");
+        JsonNode scenario = null;
+        for (JsonNode hit : data) if (hit.has("scenario")) scenario = hit.get("scenario");
+        assertTrue(scenario != null);
+        assertEquals(0, scenario.path("hops").size());
+        assertEquals(2, scenario.path("ambiguities").get(0).path("alternatives").size());
     }
 }

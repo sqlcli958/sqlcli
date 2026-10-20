@@ -185,6 +185,14 @@ public class GraphWorkspaceMerger {
                 continue;
             }
 
+            if (existingCol.hasSemantics()) {
+                recordBasisChange(existingCol, "comment", existingCol.getComment(), incomingCol.getComment());
+                recordBasisChange(existingCol, "dataType", String.valueOf(existingCol.getDataType()), String.valueOf(incomingCol.getDataType()));
+                recordBasisChange(existingCol, "nullable", existingCol.isNullable(), incomingCol.isNullable());
+                recordBasisChange(existingCol, "defaultValue", existingCol.getDefaultValue(), incomingCol.getDefaultValue());
+                recordBasisChange(existingCol, "primaryKey", existingCol.isPrimaryKey(), incomingCol.isPrimaryKey());
+                recordBasisChange(existingCol, "unique", existingCol.isUnique(), incomingCol.isUnique());
+            }
             // 系统字段：始终从 DB 更新
             existingCol.setDataType(incomingCol.getDataType());
             existingCol.setNullable(incomingCol.isNullable());
@@ -227,7 +235,8 @@ public class GraphWorkspaceMerger {
 
             // valueHints: existing wins（agent/用户补充的值提示）
             // verified/confidence: 如果 existing 没有特殊设置，采用 incoming
-            if (!Boolean.TRUE.equals(existingCol.getVerified()) && Boolean.TRUE.equals(incomingCol.getVerified())) {
+            if (!existingCol.hasSemantics() && !Boolean.TRUE.equals(existingCol.getVerified())
+                    && Boolean.TRUE.equals(incomingCol.getVerified())) {
                 existingCol.setVerified(true);
                 existingCol.setConfidence(incomingCol.getConfidence());
             }
@@ -258,6 +267,21 @@ public class GraphWorkspaceMerger {
         // 按 ordinal 排序
         target.getColumns().sort(java.util.Comparator.comparing(
                 ColumnWorkspaceNode::getOrdinal, java.util.Comparator.nullsLast(Integer::compareTo)));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void recordBasisChange(ColumnWorkspaceNode column, String field, Object before, Object after) {
+        if (java.util.Objects.equals(before, after)) return;
+        Map<String, Object> changes = (Map<String, Object>) column.getAttributes()
+                .computeIfAbsent(ColumnWorkspaceNode.ATTR_SEMANTIC_BASIS_CHANGES, key -> new java.util.LinkedHashMap<>());
+        Map<String, Object> difference = (Map<String, Object>) changes.computeIfAbsent(field, key -> {
+            Map<String, Object> value = new java.util.LinkedHashMap<>();
+            value.put("before", before);
+            return value;
+        });
+        difference.put("after", after);
+        if (java.util.Objects.equals(difference.get("before"), after)) changes.remove(field);
+        if (changes.isEmpty()) column.getAttributes().remove(ColumnWorkspaceNode.ATTR_SEMANTIC_BASIS_CHANGES);
     }
 
     private void mergeRelations(GraphWorkspace incoming, GraphWorkspace existing, Set<String> scannedFkTableIds) {

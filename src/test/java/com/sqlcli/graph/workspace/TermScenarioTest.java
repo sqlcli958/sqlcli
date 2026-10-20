@@ -20,6 +20,39 @@ class TermScenarioTest {
     private static final String ALIAS = "demo";
 
     @Test
+    void competingConnectionsStayUnresolvedRegardlessOfStorageOrder() {
+        GraphWorkspace workspace = seed();
+        relation(workspace, "report", "report_id", "assign", "id");
+        relation(workspace, "report", "assign_id", "assign", "id");
+        TermWorkspaceNode term = term(workspace, "报事");
+        term.setPrimaryTarget(tableId("report"));
+        map(workspace, term, "assign");
+        TermScenario before = TermScenario.of(workspace, term);
+        java.util.Collections.reverse(workspace.getRelations());
+        TermScenario after = TermScenario.of(workspace, term);
+        assertEquals(before, after);
+        assertTrue(before.hops().isEmpty());
+        assertTrue(before.unreachable().isEmpty());
+        assertEquals(2, before.ambiguities().get(0).alternatives().size());
+        assertEquals(GraphStatus.candidate, before.ambiguities().get(0).alternatives()
+                .get(0).getPath().get(0).getStatus());
+    }
+
+    @Test
+    void alternateBridgePrefixesAreNotLostWhenPathsConverge() {
+        GraphWorkspace workspace = seed();
+        relation(workspace, "report", "report_id", "assign", "id");
+        relation(workspace, "report", "assign_id", "assign", "id");
+        relation(workspace, "assign", "id", "score", "assign_id");
+        TermWorkspaceNode term = term(workspace, "报事");
+        term.setPrimaryTarget(tableId("report"));
+        map(workspace, term, "score");
+        TermScenario scenario = TermScenario.of(workspace, term);
+        assertTrue(scenario.hops().isEmpty());
+        assertEquals(2, scenario.ambiguities().get(0).alternatives().size());
+    }
+
+    @Test
     void withoutAPrimaryTableItIsNotAScenario() {
         GraphWorkspace workspace = seed();
         TermWorkspaceNode term = term(workspace, "报事");

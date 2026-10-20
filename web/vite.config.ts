@@ -10,6 +10,8 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:9999',
         changeOrigin: true,
+        // 开发页通过代理访问后端，写请求的 Origin 也须与代理目标一致。
+        headers: { Origin: 'http://localhost:9999' },
       },
     },
   },

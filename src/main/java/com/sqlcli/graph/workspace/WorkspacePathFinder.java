@@ -12,6 +12,10 @@ public class WorkspacePathFinder {
     }
 
     public List<PathResult> findPaths(String fromTableName, String toTableName) {
+        return findPaths(fromTableName, toTableName, null);
+    }
+
+    List<PathResult> findPaths(String fromTableName, String toTableName, Set<String> allowedTables) {
         TableWorkspaceNode from = workspace.getTableByQualifiedName(fromTableName);
         TableWorkspaceNode to = workspace.getTableByQualifiedName(toTableName);
         if (from == null || to == null) {
@@ -26,9 +30,10 @@ public class WorkspacePathFinder {
 
         RelationAdjacency adjacency = RelationAdjacency.build(workspace);
         Queue<List<RelationWorkspaceEdge>> queue = new ArrayDeque<>();
-        Set<String> visited = new HashSet<>();
+        Map<String, Integer> depths = new HashMap<>();
 
         for (RelationWorkspaceEdge edge : edgesFrom(adjacency, from.getId())) {
+            if (allowedTables != null && !allowedTables.contains(RelationAdjacency.tableIdForNode(edge.getTo()))) continue;
             queue.add(new ArrayList<>(List.of(edge)));
         }
         List<PathResult> results = new ArrayList<>();
@@ -36,6 +41,7 @@ public class WorkspacePathFinder {
 
         while (!queue.isEmpty()) {
             List<RelationWorkspaceEdge> path = queue.poll();
+            if (path.size() > shortest) break;
             RelationWorkspaceEdge last = path.get(path.size() - 1);
             String targetTableId = RelationAdjacency.tableIdForNode(last.getTo());
             if (targetTableId == null) {
@@ -46,10 +52,12 @@ public class WorkspacePathFinder {
                 results.add(toPathResult(path));
                 continue;
             }
-            if (path.size() >= shortest || !visited.add(last.getTo() + "#" + path.size())) {
+            if (path.size() >= shortest || path.size() > depths.getOrDefault(targetTableId, Integer.MAX_VALUE)) {
                 continue;
             }
+            depths.put(targetTableId, path.size());
             for (RelationWorkspaceEdge next : edgesFrom(adjacency, targetTableId)) {
+                if (allowedTables != null && !allowedTables.contains(RelationAdjacency.tableIdForNode(next.getTo()))) continue;
                 if (containsNode(path, next.getTo())) {
                     continue;
                 }
@@ -64,8 +72,10 @@ public class WorkspacePathFinder {
     }
 
     private boolean containsNode(List<RelationWorkspaceEdge> path, String nodeId) {
+        String tableId = RelationAdjacency.tableIdForNode(nodeId);
         for (RelationWorkspaceEdge edge : path) {
-            if (edge.getFrom().equals(nodeId) || edge.getTo().equals(nodeId)) {
+            if (Objects.equals(RelationAdjacency.tableIdForNode(edge.getFrom()), tableId)
+                    || Objects.equals(RelationAdjacency.tableIdForNode(edge.getTo()), tableId)) {
                 return true;
             }
         }
@@ -73,14 +83,17 @@ public class WorkspacePathFinder {
     }
 
     /**
-     * ignored 过滤、复合外键分组、按表分桶都挪进了共享的 {@link RelationAdjacency}；
-     * 这里只做本类独有的事——把 {@code reversed} 的邻接记录，在查询时临时构造成一条
-     * 真正的反向 {@link RelationWorkspaceEdge}（方向、optionality 都要翻转），
-     * 这一步不落盘、每次调用都重新构造，行为和重构前完全一致。
+     * 邻接层过滤 ignored 并按表分桶；路径层将同一复合外键视为一次连接。
+     * 反向记录保留原关系身份与状态，只翻转方向、基数和 optionality，不落盘。
      */
     private static List<RelationWorkspaceEdge> edgesFrom(RelationAdjacency adjacency, String tableId) {
         List<RelationWorkspaceEdge> edges = new ArrayList<>();
-        for (RelationAdjacency.Entry entry : adjacency.neighbors(tableId)) {
+        Set<String> groups = new HashSet<>();
+        for (RelationAdjacency.Entry entry : adjacency.neighbors(tableId).stream()
+                .sorted(Comparator.comparing(item -> item.getEdge().getId())).toList()) {
+            RelationWorkspaceEdge edge = entry.getEdge();
+            if (edge.getType() == RelationType.foreign_key && edge.getFkGroup() != null
+                    && !groups.add(entry.getNeighborTableId() + "#" + entry.isReversed() + "#" + edge.getFkGroup())) continue;
             edges.add(entry.isReversed() ? reverseOf(entry.getEdge()) : entry.getEdge());
         }
         return edges;
@@ -90,7 +103,11 @@ public class WorkspacePathFinder {
         RelationWorkspaceEdge reverse = RelationWorkspaceEdge.create(
                 edge.getSourceAlias(), edge.getType(), edge.getTo(), edge.getFrom(), GraphActor.system);
         reverse.setDirection(RelationDirection.reverse);
-        reverse.setCardinality(edge.getCardinality());
+        reverse.setId(edge.getId());
+        reverse.setStatus(edge.getStatus());
+        reverse.setCardinality(edge.getCardinality() == RelationCardinality.one_to_many
+                ? RelationCardinality.many_to_one : edge.getCardinality() == RelationCardinality.many_to_one
+                ? RelationCardinality.one_to_many : edge.getCardinality());
         reverse.setConfidence(edge.getConfidence());
         reverse.setVerified(edge.getVerified());
         // joinExpression 是等式，正反方向读出来都成立，原样带过去；
@@ -131,6 +148,11 @@ public class WorkspacePathFinder {
             segment.setToTable(toRef.table);
             segment.setToColumn(toRef.column);
             segment.setRelationshipType(edge.getType().name());
+            segment.setRelationId(edge.getId());
+            segment.setStatus(edge.getStatus());
+            segment.setVerified(edge.getVerified());
+            segment.setConfidence(edge.getConfidence());
+            segment.setCardinality(edge.getCardinality());
             // 复合外键的每条列边现在都带着同组拼好的完整 joinExpression（见
             // WorkspaceMetadataExtractor），这里不用另起一套按组重新拼接的逻辑，
             // 直接透传即可拿到全部列对，不会漏掉复合键里的租户列这类字段。
@@ -181,6 +203,12 @@ public class WorkspacePathFinder {
         private String toTable;
         private String toColumn;
         private String relationshipType;
+        private String relationId;
+        private GraphStatus status;
+        private Boolean verified;
+        private Double confidence;
+        /** 按本跳 from/to 方向表达，反向遍历时一对多与多对一互换。 */
+        private RelationCardinality cardinality;
         /** 可执行的 join 条件，复合外键已经是拼好的完整 AND 条件。 */
         private String joinExpression;
         /** fromTable 端参与是否可选，null 表示还没有可选性信息（非外键关系）。 */

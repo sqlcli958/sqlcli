@@ -356,6 +356,7 @@ public class WorkspaceQueryController implements HttpHandler {
             item.put("filters", term.getFilters());
             item.put("metricRefs", term.getMetricRefs());
             TermScenario scenario = TermScenario.of(workspace, term);
+            item.put("scenario", scenario);
             item.put("scenarioTables", scenario == null ? List.of()
                     : scenario.tables().stream().map(TermScenario.ScenarioTable::qualifiedName).toList());
             item.put("bridgeTables", scenario == null ? List.of()

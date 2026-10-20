@@ -1,8 +1,6 @@
 package com.sqlcli.graph.workspace;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -37,7 +35,12 @@ public record TermScenario(
         List<WorkspacePathFinder.PathSegment> hops,
         List<String> filters,
         /** 补了桥接也连不上入口的表：不是错误，多半是关系还没录进图谱 */
-        List<String> unreachable) {
+        List<String> unreachable,
+        /** 多条最短连接可选时，保留备选而不替业务挑一条。 */
+        List<Ambiguity> ambiguities) {
+
+    public record Ambiguity(String targetTable, List<WorkspacePathFinder.PathResult> alternatives) {
+    }
 
     public enum Role {
         /** 入口表，子图的 FROM */
@@ -69,26 +72,28 @@ public record TermScenario(
             if (tableId != null) roles.putIfAbsent(tableId, Role.mapped);
         }
 
-        RelationAdjacency adjacency = RelationAdjacency.build(workspace);
         WorkspacePathFinder pathFinder = new WorkspacePathFinder(workspace);
         List<WorkspacePathFinder.PathSegment> hops = new ArrayList<>();
-        Set<String> reached = walkInside(workspace, adjacency, entryTableId, roles.keySet(), hops);
-
-        // 集合内部连不上的，才去全图找最短路径补桥接。顺序固定（roles 是 LinkedHashMap），
-        // 否则同一份图谱两次展开可能给出不同的桥接表，对不上账。
+        Set<String> connections = new LinkedHashSet<>();
         List<String> unreachable = new ArrayList<>();
-        for (String tableId : new ArrayList<>(roles.keySet())) {
-            if (reached.contains(tableId)) continue;
-            List<WorkspacePathFinder.PathSegment> bridge =
-                    shortestPath(workspace, pathFinder, entryTableId, tableId);
-            if (bridge.isEmpty()) {
-                unreachable.add(qualifiedNameOf(workspace, tableId));
-                continue;
-            }
-            for (WorkspacePathFinder.PathSegment segment : bridge) {
-                String toId = idOfQualifiedName(workspace, segment.getToTable());
-                if (toId != null) roles.putIfAbsent(toId, Role.bridge);
-                if (reached.add(toId)) hops.add(segment);
+        List<Ambiguity> ambiguities = new ArrayList<>();
+        Set<String> inside = new LinkedHashSet<>(roles.keySet());
+        for (String tableId : inside.stream().sorted().toList()) {
+            if (tableId.equals(entryTableId)) continue;
+            String from = qualifiedNameOf(workspace, entryTableId);
+            String to = qualifiedNameOf(workspace, tableId);
+            List<WorkspacePathFinder.PathResult> paths = pathFinder.findPaths(from, to, inside);
+            if (paths.isEmpty()) paths = pathFinder.findPaths(from, to);
+            if (paths.isEmpty()) {
+                unreachable.add(to);
+            } else if (paths.size() > 1) {
+                ambiguities.add(new Ambiguity(to, List.copyOf(paths)));
+            } else {
+                for (WorkspacePathFinder.PathSegment segment : paths.get(0).getPath()) {
+                    String toId = idOfQualifiedName(workspace, segment.getToTable());
+                    if (toId != null) roles.putIfAbsent(toId, Role.bridge);
+                    if (connections.add(segment.getRelationId())) hops.add(segment);
+                }
             }
         }
 
@@ -96,58 +101,7 @@ public record TermScenario(
         roles.forEach((tableId, role) ->
                 tables.add(new ScenarioTable(tableId, qualifiedNameOf(workspace, tableId), role)));
         return new TermScenario(term.getId(), entryTableId, List.copyOf(tables),
-                List.copyOf(hops), List.copyOf(term.getFilters()), List.copyOf(unreachable));
-    }
-
-    /** 从入口表做 BFS，**只走表集合内部的边**，返回走到的表。 */
-    private static Set<String> walkInside(GraphWorkspace workspace, RelationAdjacency adjacency,
-            String entryTableId, Set<String> inside, List<WorkspacePathFinder.PathSegment> hops) {
-        Set<String> reached = new LinkedHashSet<>();
-        reached.add(entryTableId);
-        Deque<String> queue = new ArrayDeque<>();
-        queue.add(entryTableId);
-        while (!queue.isEmpty()) {
-            String tableId = queue.poll();
-            for (RelationAdjacency.Entry entry : adjacency.neighbors(tableId)) {
-                String neighbor = entry.getNeighborTableId();
-                if (neighbor == null || !inside.contains(neighbor) || !reached.add(neighbor)) {
-                    continue;
-                }
-                hops.add(segmentOf(workspace, entry, tableId));
-                queue.add(neighbor);
-            }
-        }
-        return reached;
-    }
-
-    /**
-     * 邻接记录转成一跳。{@code reversed} 时两端要整体翻转——包括 optionality，
-     * 不翻的话消费方读到的「哪端可选」和实际方向对不上，会选错 INNER / LEFT。
-     */
-    private static WorkspacePathFinder.PathSegment segmentOf(GraphWorkspace workspace,
-            RelationAdjacency.Entry entry, String fromTableId) {
-        RelationWorkspaceEdge edge = entry.getEdge();
-        boolean reversed = entry.isReversed();
-        WorkspacePathFinder.PathSegment segment = new WorkspacePathFinder.PathSegment();
-        String fromColumnId = reversed ? edge.getTo() : edge.getFrom();
-        String toColumnId = reversed ? edge.getFrom() : edge.getTo();
-        segment.setFromTable(qualifiedNameOf(workspace, fromTableId));
-        segment.setFromColumn(leafOf(fromColumnId));
-        segment.setToTable(qualifiedNameOf(workspace, entry.getNeighborTableId()));
-        segment.setToColumn(leafOf(toColumnId));
-        segment.setRelationshipType(edge.getType().name());
-        // 复合外键的每条列边都带着同组拼好的完整条件，原样透传就不会漏掉租户列
-        segment.setJoinExpression(edge.getJoinExpression());
-        segment.setFromOptional(reversed ? edge.getToOptional() : edge.getFromOptional());
-        segment.setToOptional(reversed ? edge.getFromOptional() : edge.getToOptional());
-        return segment;
-    }
-
-    private static List<WorkspacePathFinder.PathSegment> shortestPath(GraphWorkspace workspace,
-            WorkspacePathFinder pathFinder, String fromTableId, String toTableId) {
-        List<WorkspacePathFinder.PathResult> paths = pathFinder.findPaths(
-                qualifiedNameOf(workspace, fromTableId), qualifiedNameOf(workspace, toTableId));
-        return paths.isEmpty() ? List.of() : paths.get(0).getPath();
+                List.copyOf(hops), List.copyOf(term.getFilters()), List.copyOf(unreachable), List.copyOf(ambiguities));
     }
 
     private static String tableIdOf(GraphWorkspace workspace, String ref) {
@@ -166,9 +120,4 @@ public record TermScenario(
         return table == null ? null : table.getId();
     }
 
-    private static String leafOf(String columnId) {
-        if (columnId == null) return null;
-        int lastDot = columnId.lastIndexOf('.');
-        return lastDot < 0 ? columnId : columnId.substring(lastDot + 1);
-    }
 }

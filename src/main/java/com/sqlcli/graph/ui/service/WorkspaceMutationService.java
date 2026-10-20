@@ -1559,6 +1559,7 @@ public class WorkspaceMutationService {
         // 调用方 updateColumnDescription 的 actor 恒为 human，这里不需要再判一次。
         column.setVerified(true);
         column.setConfidence(1.0);
+        column.getAttributes().remove(ColumnWorkspaceNode.ATTR_SEMANTIC_BASIS_CHANGES);
     }
 
     /** 按需建 valueHints：只有真写了值域的字段才带这个对象，其余字段保持 null 不落盘。 */

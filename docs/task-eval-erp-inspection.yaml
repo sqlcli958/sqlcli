@@ -10,10 +10,13 @@
 #   3. 填进 answers.yaml（模板 docs/task-eval-answers.example.yaml），再判分：
 #        sql-cli <alias> schema task-eval --cases 本文件 --answers <answers.yaml>
 #
-# 判分口径（一次做对 = 三条全中）：
-#   tables  期望表集合是 agent 产出的子集（多带一张不算错，少一张算错），按表名末段比
-#   joins   每条期望连接的两端都出现在作答的同一条 JOIN 或 SQL 里，且左端在右端之前（方向）
-#   pitfalls 一条都没踩中
+# 静态检查口径（不能等同于任务结果正确）：
+#   无 SQL 时只检查计划声明，报告 level=plan；有 SQL 时按语法树检查，level=sql。
+#   tables  期望集合是实际表集合的子集；期望写明 schema 时必须一致。
+#   joins   实际 SQL 必须存在对应等值条件，等式左右可交换。
+#   pitfalls  条件按 WHERE/HAVING 的必要子句检查；注释、字面量、说明不能补足条件。
+#   当前不支持 CTE/子查询/集合运算/自关联，complete=false 时不能判通过。
+#   本评估集是初稿，部分连接与自然语言判据仍待核实，不能充当业务结果验收。
 #
 # 字段说明：
 #   pitfalls 是这份评估集的核心。它把「安静地出错数」这类失败变成可判定的——
@@ -28,7 +31,7 @@
 #   匹配前两边都去掉空白并转小写，所以 `is_scan = 0` 和 `is_scan=0` 是同一件事。
 #   forbid 的串要挑「正确作答里绝不会出现」的，否则会误判。
 #
-#   skillRef 是这个 task 失败（两组都失败）时该改的那份技能文档。
+#   skillRef 是排查时参考的技能文档；两组都失败不能直接确定是 skill 错误。
 #
 # ⚠️ 置信度标注：
 #   [已验证] = 我这次实际 describe / search 确认过的表和字段

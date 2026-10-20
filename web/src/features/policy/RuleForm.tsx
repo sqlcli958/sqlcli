@@ -165,6 +165,10 @@ export function RuleForm({ rule, onChange }: {
   onChange: (next: PolicyRuleDto) => void;
 }) {
   const spec = CATEGORIES[rule.category];
+  const businessKey = rule.category === 'business_unique_index';
+  const fixedKey = strings(rule.statement.columns).length > 0;
+  const candidateKey = Boolean(rule.when.columnNameRegex)
+    || strings(rule.when.columnTagsAny).length > 0 || strings(rule.when.semanticTypeAny).length > 0;
   const setStatement = (key: string, next: unknown) => {
     const statement: Dict = { ...rule.statement };
     if (next === '' || (Array.isArray(next) && next.length === 0)) delete statement[key];
@@ -206,8 +210,7 @@ export function RuleForm({ rule, onChange }: {
     ? [...TABLE_CONDITIONS, ...COLUMN_CONDITIONS]
     : spec.whenScope === 'table' ? TABLE_CONDITIONS : [];
 
-  return <div className="rule-form">
-    <div className="rf-grid">
+  const settings = <div className="rf-grid">
       <label className="rf-field"><span>规则名称</span>
         <input value={rule.title} onChange={(event) => onChange({ ...rule, title: event.target.value })} /></label>
       <label className="rf-field"><span>规则 ID<small className="rf-help"> 按类别自动生成</small></span>
@@ -233,7 +236,46 @@ export function RuleForm({ rule, onChange }: {
       <label className="rf-field rf-wide"><span>修复建议<small className="rf-help"> 会随违规一起输出给使用者</small></span>
         <input value={rule.remediation ?? ''}
           onChange={(event) => onChange({ ...rule, remediation: event.target.value })} /></label>
-    </div>
+    </div>;
+
+  return <div className="rule-form">
+    {businessKey ? <>
+      <p className="rf-note">指定不能重复的业务字段，例如订单号。这与“每张表必须有主键”是两条独立规则。</p>
+      <div className="rf-block rf-grid">
+        <TextField spec={{ key: 'tableNameRegex', label: '检查哪些表（可选）', kind: 'text',
+          placeholder: '^orders$', help: '按表名正则匹配；留空检查所有表。固定唯一键应限定到包含这些字段的表。' }}
+          value={String(rule.when.tableNameRegex ?? '')} onChange={(next) => setWhen('tableNameRegex', next)} />
+        <TagsField label="不能重复的字段" value={strings(rule.statement.columns)}
+          help="一个字段表示单列唯一；多个字段用逗号分隔，表示组合唯一，例如 tenant_id, order_no。"
+          onChange={(next) => setStatement('columns', next)} />
+      </div>
+      {!fixedKey && !candidateKey && <p className="rules-error" role="alert">请填写不能重复的字段，或展开下面的字段条件；两者都留空会导致检查无法完成。</p>}
+      {fixedKey ? <p className="rf-note">将检查这些字段按填写顺序组成的唯一索引；不使用字段筛选条件。</p>
+        : <details className="rf-block" open={candidateKey}>
+          <summary>按字段条件检查（不填写固定唯一键时使用）</summary>
+          <p className="rf-note">固定唯一键与字段条件至少填写一种。命中的每个字段分别要求单列唯一索引。</p>
+          <div className="rf-grid">
+            <TextField spec={{ key: 'columnNameRegex', label: '字段名匹配', kind: 'text', placeholder: '^order_no$' }}
+              value={String(rule.when.columnNameRegex ?? '')} onChange={(next) => setWhen('columnNameRegex', next)} />
+            <TagsField label="字段标签任一" value={strings(rule.when.columnTagsAny)}
+              onChange={(next) => setWhen('columnTagsAny', next)} />
+            <CheckGroup label="字段语义类型" options={SEMANTIC_TYPES}
+              value={strings(rule.when.semanticTypeAny)} onChange={(next) => setWhen('semanticTypeAny', next)} />
+          </div>
+        </details>}
+      <details className="rf-block">
+        <summary>高级设置（规则信息、检查强度和表筛选）</summary>
+        {settings}
+        <div className="rf-grid rf-block">
+          <CheckGroup label="表类型" options={TABLE_TYPES}
+            value={strings(rule.when.tableTypeAny)} onChange={(next) => setWhen('tableTypeAny', next)} />
+          <TagsField label="表标签任一" value={strings(rule.when.tableTagsAny)}
+            onChange={(next) => setWhen('tableTagsAny', next)} />
+        </div>
+        <p className="rf-note">表类型和表标签会进一步限定检查范围；修改业务字段不会清除这些配置。</p>
+      </details>
+    </> : <>
+    {settings}
 
     <div className="rf-block">
       <span className="rf-block-title">适用条件<small>留空表示不限</small></span>
@@ -258,5 +300,6 @@ export function RuleForm({ rule, onChange }: {
         field.kind === 'text' || field.kind === 'tags').map(statementField)}</div>
       {spec.statement.filter((field) => field.kind !== 'text' && field.kind !== 'tags').map(statementField)}
     </div>}
+    </>}
   </div>;
 }
