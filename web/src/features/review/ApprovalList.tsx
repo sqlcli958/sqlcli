@@ -331,7 +331,7 @@ function BatchCard({ batch, items }: { batch: ApprovalBatchDto; items: ApprovalD
   const [excluded, setExcluded] = useState<Set<number>>(new Set());
   const pending = items.filter((item) => item.status === 'pending');
   const rejected = items.filter((item) => item.status === 'rejected').length;
-  const decidable = batch.status === 'pending' && pending.length > 0;
+  const decidable = (batch.status === 'pending' || batch.status === 'failed') && pending.length > 0;
   const willApprove = pending.filter((item) => !excluded.has(item.id));
   const willReject = pending.filter((item) => excluded.has(item.id));
 

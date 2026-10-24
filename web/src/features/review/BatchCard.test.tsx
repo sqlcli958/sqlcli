@@ -77,8 +77,8 @@ test('点开才出条目', async () => {
   renderList();
   await userEvent.click(await screen.findByRole('button', { expanded: false }));
 
-  expect(await screen.findByText('schema edit #1')).toBeTruthy();
-  expect(screen.getByText('schema edit #3')).toBeTruthy();
+  expect(await screen.findByRole('checkbox', { name: '批准第 1 条' })).toBeTruthy();
+  expect(screen.getByRole('checkbox', { name: '批准第 3 条' })).toBeTruthy();
 });
 
 test('取消勾选的条目在批准时被单独否掉，其余整批落地', async () => {
@@ -119,4 +119,23 @@ test('整批批准后不把已批准条目算作已否', async () => {
 
   expect(screen.getByText('4 条')).toBeTruthy();
   expect(screen.queryByText(/已否/)).toBeNull();
+});
+
+test.each(['approved', 'rejected'] as const)('失败批次仍可再次裁决：%s', async (decision) => {
+  vi.mocked(getApprovals).mockResolvedValue({
+    approvals: [item(1)],
+    batches: [{ ...batch, status: 'failed', reason: '结构规则校验失败' }],
+    total: 1,
+    pending: 1,
+  });
+  renderList();
+  await screen.findByText('落地失败');
+  expect(screen.getByText('理由：结构规则校验失败')).toBeTruthy();
+  const reject = screen.getByRole('button', { name: '否掉整批' });
+  expect(reject).toBeDisabled();
+  await userEvent.type(screen.getByLabelText('审批理由'), '已核对失败原因');
+  await userEvent.click(decision === 'approved'
+    ? screen.getByRole('button', { name: '批准这一批（1 条）' })
+    : reject);
+  await waitFor(() => expect(decideBatch).toHaveBeenCalledWith(7, decision, '已核对失败原因'));
 });
