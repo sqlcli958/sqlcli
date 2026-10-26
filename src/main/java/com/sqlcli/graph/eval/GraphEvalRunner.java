@@ -7,6 +7,7 @@ import com.sqlcli.runstate.RunStateStore;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -58,9 +59,10 @@ public final class GraphEvalRunner {
         // 返回合并后的那份，不是纯评估那份：接口报的 warningCount 必须跟落库的一致，
         // 否则「页面上说 3 条、点进去有 5 条」——这种对不上没人会去查是哪一半错了。
         // status 仍由 evaluation 决定（交互发现全是 warning，不影响成败）。
-        GraphEvaluation merged = new GraphEvaluation(evaluation.metrics(), List.copyOf(findings));
+        GraphEvaluation merged = new GraphEvaluation(evaluation.metrics(), List.copyOf(findings), evaluation.coverageCounts());
         save(evaluationId, alias, SOURCE_EVAL, revision, startedAt, evaluation.status(),
-                findings, new ObjectMapper().writeValueAsString(evaluation.metrics()));
+                findings, new ObjectMapper().writeValueAsString(Map.of(
+                        "metrics", evaluation.metrics(), "coverageCounts", evaluation.coverageCounts())));
         return new Result(evaluationId, merged, revision, startedAt,
                 System.currentTimeMillis() - startedAt);
     }

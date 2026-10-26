@@ -1,6 +1,7 @@
 import { lazy } from 'react';
 import { Navigate, createBrowserRouter, useLocation, useSearchParams } from 'react-router-dom';
 import { AppShell } from './AppShell';
+import { DraftGuard } from './DraftGuard';
 import { WORKSPACE_BASE } from './navigation';
 
 const WorkbenchPage = lazy(() => import('../features/workbench/WorkbenchPage')
@@ -63,7 +64,7 @@ export const router = createBrowserRouter([
   { path: '/', element: <LegacyRedirect /> },
   {
     path: WORKSPACE_BASE,
-    element: <AppShell />,
+    element: <DraftGuard><AppShell /></DraftGuard>,
     children: [
       { index: true, element: <KeepQuery to="sql" /> },
       { path: 'sql', element: <WorkbenchPage /> },

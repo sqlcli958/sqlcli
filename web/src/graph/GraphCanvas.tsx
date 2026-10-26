@@ -11,6 +11,8 @@ import { RelationTypeBadge } from '../features/relation-editor/RelationTypeBadge
 import type { GraphViewDto, MutationResultDto, RelationEdgeDto } from '../types/api';
 import { adaptGraph, highlightNodeNeighbors, resetHighlight, SMALL_GRAPH } from './graphAdapter';
 import { useGraphStore } from '../state/graphStore';
+import { Button } from '../ui/Button';
+import { Select } from '../ui/Select';
 
 interface GraphCanvasProps {
   graphData: GraphViewDto | undefined;
@@ -537,11 +539,30 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
   }, [selectedNodeId]);
 
   // Handle keyboard events
+  function zoomBy(factor: number) {
+    const camera = sigmaRef.current?.getCamera();
+    if (camera) camera.animate({ ratio: Math.max(0.03, Math.min(25, camera.ratio * factor)) }, { duration: 160 });
+  }
+  function resetCamera() {
+    if (sigmaRef.current && graphRef.current) fitToNodes(sigmaRef.current, graphRef.current);
+  }
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Escape') {
         selectNode(null);
         clearOverlayState();
+      } else if (e.target === e.currentTarget) {
+        const camera = sigmaRef.current?.getCamera();
+        if (!camera) return;
+        const step = camera.ratio * 0.08;
+        const positions: Record<string, { x?: number; y?: number }> = {
+          ArrowLeft: { x: camera.x - step }, ArrowRight: { x: camera.x + step },
+          ArrowUp: { y: camera.y + step }, ArrowDown: { y: camera.y - step },
+        };
+        if (positions[e.key]) { e.preventDefault(); camera.animate(positions[e.key], { duration: 100 }); }
+        else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomBy(0.8); }
+        else if (e.key === '-') { e.preventDefault(); zoomBy(1.25); }
+        else if (e.key === '0') { e.preventDefault(); resetCamera(); }
       }
     },
     [clearOverlayState, selectNode],
@@ -721,9 +742,35 @@ export function GraphCanvas({ graphData, isLoading }: GraphCanvasProps) {
       ref={containerRef}
       onKeyDown={handleKeyDown}
       tabIndex={0}
+      role="group"
+      aria-label="关系图画布"
+      aria-describedby="graph-navigation-help"
       style={{ width: '100%', height: '100%', position: 'relative' }}
     >
       <div ref={sigmaHostRef} className="graph-canvas-surface" />
+      <div className="graph-navigation" role="toolbar" aria-label="图谱操作">
+        <Button size="sm" aria-label="放大图谱" onClick={() => zoomBy(0.8)} disabled={!graphData?.nodes.length}>放大</Button>
+        <Button size="sm" aria-label="缩小图谱" onClick={() => zoomBy(1.25)} disabled={!graphData?.nodes.length}>缩小</Button>
+        <Button size="sm" onClick={resetCamera} disabled={!graphData?.nodes.length}>复位视图</Button>
+        <Select size="sm" label="定位图谱表" value={selectedNodeId ?? ''} onChange={(event) => {
+          const id = event.target.value;
+          selectNode(id || null);
+          const point = sigmaRef.current?.getNodeDisplayData(id);
+          if (point) sigmaRef.current?.getCamera().animate({ x: point.x, y: point.y, ratio: 0.8 }, { duration: 160 });
+        }}>
+          <option value="">定位表并查看关系</option>
+          {graphData?.nodes.map((node) => <option key={node.id} value={node.id}>{node.schema ? `${node.schema}.` : ''}{node.label}</option>)}
+        </Select>
+        <details className="graph-navigation-help"><summary>图例与操作说明</summary>
+          <p id="graph-navigation-help">聚焦画布后，方向键平移，+ / − 缩放，0 复位，Esc 取消选择。也可用“定位图谱表”打开表详情，通过键盘查看关系和新建关系表单。</p>
+          <ul className="graph-legend">
+            <li><i data-kind="foreign_key" />数据库外键（foreign_key）</li>
+            <li><i data-kind="join_observed" />查询观察关系（join_observed）</li>
+            <li><i data-kind="term_mapping" />术语映射（term_mapping）</li>
+          </ul>
+          <p>缩远时关系线统一淡化；放大或选择表后突出关联关系。</p>
+        </details>
+      </div>
       {isLoading && (
         <div className="graph-canvas-loading">
           <div className="spinner" />

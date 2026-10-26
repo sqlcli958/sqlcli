@@ -1,5 +1,7 @@
 /* ── CSS Variables ── */
 :root {
+  --font-body-size: 14px;
+  --font-small-size: 12px;
   --left-panel-width: 240px;
   --right-panel-width: 320px;
   --toolbar-height: 44px;
@@ -52,7 +54,7 @@ html, body, #root {
   height: 100%;
   width: 100%;
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--font-body-size);
   color: var(--color-text);
   background: var(--color-bg);
   /*
@@ -2609,3 +2611,5 @@ html, body, #root {
   padding: 14px;
   overflow: auto;
 }
+
+.dialog-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 16px; }

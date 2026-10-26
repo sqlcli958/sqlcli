@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useDraftGuard } from '../../app/useDraftGuard';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   checkSqlitePath,
@@ -34,6 +35,8 @@ const initialForm: CreateAliasRequest = {
 /** `editName` 为空即新建；非空时回填该别名并改用 PATCH 提交。 */
 export function AliasAddPage({ onDone, editName }: { onDone: () => void; editName?: string }) {
   const [form, setForm] = useState(initialForm);
+  const original = useRef(initialForm);
+  const confirmDiscard = useDraftGuard(JSON.stringify(form) !== JSON.stringify(original.current));
   /** 保存前的 sqlite 路径预检结果；路径一变就作废，避免拿旧结果掩盖新路径没测过。 */
   const [sqliteCheck, setSqliteCheck] = useState<'checking' | SqlitePathCheckResult | null>(null);
   /** 是否展开服务端目录选择器；路径输入框本身保留，这只是个辅助入口 */
@@ -47,7 +50,7 @@ export function AliasAddPage({ onDone, editName }: { onDone: () => void; editNam
   useEffect(() => {
     if (!detail.data) return;
     const d = detail.data;
-    setForm({
+    const loaded: CreateAliasRequest = {
       name: d.name,
       accessMode: d.accessMode === 'yearning' ? 'yearning' : 'jdbc',
       dbType: d.dbType ?? 'mysql',
@@ -64,7 +67,9 @@ export function AliasAddPage({ onDone, editName }: { onDone: () => void; editNam
       yearningHost: d.yearningHost ?? '',
       yearningIdc: d.yearningIdc ?? '',
       yearningDatabase: d.yearningDatabase ?? '',
-    });
+    };
+    original.current = loaded;
+    setForm(loaded);
   }, [detail.data]);
 
   const create = useMutation({
@@ -156,7 +161,7 @@ export function AliasAddPage({ onDone, editName }: { onDone: () => void; editNam
           <Button
             aria-label="返回数据源列表"
             title="返回数据源列表"
-            onClick={onDone}
+            onClick={() => confirmDiscard(onDone)}
             className="alias-back-button"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -363,7 +368,7 @@ export function AliasAddPage({ onDone, editName }: { onDone: () => void; editNam
         </section>
 
         <div className="alias-form-actions">
-          <Button className="alias-cancel-action" onClick={onDone}>取消</Button>
+          <Button className="alias-cancel-action" onClick={() => confirmDiscard(onDone)}>取消</Button>
           <Button className="alias-save-action" type="submit" disabled={pending} variant="primary">
             {pending ? '保存中…' : '保存'}
           </Button>

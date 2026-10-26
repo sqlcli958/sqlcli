@@ -1,8 +1,18 @@
 import { render, screen } from '@testing-library/react';
 import { expect, test } from 'vitest';
 import { ResultTable } from './ResultTable';
+import userEvent from '@testing-library/user-event';
 
 const longText = 'x'.repeat(500);
+
+test('通过键盘入口查看完整值，空字符串与 NULL 分开呈现', async () => {
+  render(<ResultTable result={{ columns: [{ name: 'note', type: 'TEXT' }], rows: [[longText], [''], [null]],
+    rowCount: 3, elapsedMs: 1, truncated: false }} />);
+  await userEvent.click(screen.getByRole('button', { name: '查看第 1 行 note 的完整值' }));
+  expect(screen.getByRole('dialog')).toHaveTextContent(longText);
+  expect(screen.getByText('空字符串')).toBeInTheDocument();
+  expect(screen.getByText('NULL')).toBeInTheDocument();
+});
 
 test('NULL、长文本与截断提示都能读出来', () => {
   render(

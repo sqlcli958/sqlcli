@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useDraftGuard } from '../../app/useDraftGuard';
 import { ActionIcon } from '../../ui/ActionIcon';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
@@ -137,6 +138,9 @@ function DriverForm({ driver, onDone }: { driver: DriverDto | null; onDone: () =
   const [driverClass, setDriverClass] = useState(driver?.driverClass ?? DEFAULT_DRIVER_CLASS.mysql);
   const [jars, setJars] = useState<string[]>(driver?.jars ?? []);
   const [manualJar, setManualJar] = useState('');
+  const draft = JSON.stringify({ name, dbType, driverClass, jars, manualJar });
+  const original = useRef(draft);
+  const confirmDiscard = useDraftGuard(draft !== original.current);
 
   const upload = useMutation({
     mutationFn: (file: File) => uploadDriverJar(dbType, file),
@@ -169,7 +173,7 @@ function DriverForm({ driver, onDone }: { driver: DriverDto | null; onDone: () =
         <Button
           aria-label="返回驱动列表"
           title="返回驱动列表"
-          onClick={onDone}
+          onClick={() => confirmDiscard(onDone)}
           className="alias-back-button"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -281,7 +285,7 @@ function DriverForm({ driver, onDone }: { driver: DriverDto | null; onDone: () =
       </section>
 
       <div className="alias-form-actions">
-        <Button className="alias-cancel-action" onClick={onDone}>取消</Button>
+        <Button className="alias-cancel-action" onClick={() => confirmDiscard(onDone)}>取消</Button>
         <Button className="alias-save-action" type="submit" disabled={save.isPending || upload.isPending} variant="primary">
           {save.isPending ? '保存中…' : '保存'}
         </Button>

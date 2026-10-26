@@ -1,5 +1,5 @@
 import * as RadixDialog from '@radix-ui/react-dialog';
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 
 /**
  * 带遮罩的模态弹窗。样式走 App.css 的 `.dialog` 段。
@@ -31,11 +31,12 @@ export function Dialog({
   /** 内容宽的场景（血缘图这类）撑到接近视口宽 */
   wide?: boolean;
 }) {
+  const descriptionId = useId();
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="dialog-overlay" />
-        <RadixDialog.Content className={`dialog${wide ? ' is-wide' : ''}`}>
+        <RadixDialog.Content className={`dialog${wide ? ' is-wide' : ''}`} aria-describedby={description ? descriptionId : undefined}>
           <div className="dialog-head">
             <RadixDialog.Title className="dialog-title">{title}</RadixDialog.Title>
             <RadixDialog.Close className="btn is-icon" title="关闭" aria-label="关闭">
@@ -46,7 +47,7 @@ export function Dialog({
             </RadixDialog.Close>
           </div>
           {description && (
-            <RadixDialog.Description className="dialog-desc">{description}</RadixDialog.Description>
+            <RadixDialog.Description id={descriptionId} className="dialog-desc">{description}</RadixDialog.Description>
           )}
           <div className="dialog-body">{children}</div>
         </RadixDialog.Content>

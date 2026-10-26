@@ -92,6 +92,15 @@ test('KPI 取最近一次评估：硬错误数与每个覆盖率', async () => {
   expect(screen.getByText('20%')).toBeTruthy();
 });
 
+test('零样本显示不适用，保留评估时的分子分母', async () => {
+  vi.mocked(getEvaluations).mockResolvedValue([{ ...latest, metrics: { termMapping: 1 },
+    coverageCounts: { termMapping: { covered: 0, total: 0 } } }]);
+  renderPage();
+  expect(await screen.findByText('不适用')).toBeInTheDocument();
+  expect(screen.getByText('0 / 0 · 暂无适用样本')).toBeInTheDocument();
+  expect(screen.queryByText('100%')).not.toBeInTheDocument();
+});
+
 test('columnComment 是库自带注释的镜像：留 tile，不进趋势折线', async () => {
   renderPage();
   await screen.findByText('硬错误数');

@@ -238,10 +238,19 @@ class GraphEvaluatorTest {
                 "comment 有用，但必须和 description 分开报");
         assertEquals(0.0, evaluation.metrics().get("columnValueDomain"), 0.0001);
         assertEquals(0.0, evaluation.metrics().get("termMapping"), 0.0001);
+        assertEquals(new GraphEvaluation.CoverageCount(1, 2), evaluation.coverageCounts().get("columnDescription"));
+        assertEquals(new GraphEvaluation.CoverageCount(0, 1), evaluation.coverageCounts().get("termMapping"));
         assertFalse(evaluation.failed(), "覆盖率再低也不判失败——它没有普适阈值");
     }
 
     // ---------------------------------------------------------------- 固件
+
+    @Test
+    void emptyTermCoverageKeepsZeroSampleCount() {
+        GraphEvaluation evaluation = new GraphEvaluator().evaluate(workspace());
+        assertEquals(new GraphEvaluation.CoverageCount(0, 0), evaluation.coverageCounts().get("termMapping"));
+        assertEquals(1.0, evaluation.metrics().get("termMapping"));
+    }
 
     /**
      * 三张 {@code erp_} 前缀的表——凑够 3 张，{@code erp_} 才算这个库的表名前缀

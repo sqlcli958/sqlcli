@@ -59,6 +59,21 @@ beforeEach(() => {
   cancelWorkbenchSql.mockReset();
 });
 
+test('SQL 编辑器有可访问名称和快捷键说明', () => {
+  renderEditor('SELECT 1');
+  expect(screen.getByRole('textbox', { name: 'SQL 编辑器' })).toHaveAccessibleDescription(/Ctrl/);
+});
+
+test('中止请求失败时说明仍在等待执行结果', async () => {
+  executeWorkbenchSql.mockImplementationOnce(() => new Promise(() => {}));
+  cancelWorkbenchSql.mockRejectedValueOnce(new Error('连接中断'));
+  renderEditor('SELECT 1');
+  await userEvent.click(screen.getByRole('button', { name: '执行' }));
+  await userEvent.click(await screen.findByRole('button', { name: '中止' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('中止请求失败');
+  expect(screen.getByRole('alert')).toHaveTextContent('仍在等待执行结果');
+});
+
 test('写语句先预检再确认，第二次请求才是真执行', async () => {
   executeWorkbenchSql
     .mockResolvedValueOnce(ok({

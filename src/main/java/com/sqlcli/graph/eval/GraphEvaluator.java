@@ -70,7 +70,7 @@ public class GraphEvaluator {
         findings.addAll(gate("rel.endpoint-mismatch", endpointMismatch(workspace, alias)));
         findings.addAll(gate("lineage.shape", lineageShape(workspace, alias)));
         findings.addAll(gate("column.semantic-basis-changed", semanticBasisChanges(workspace, alias)));
-        return new GraphEvaluation(metrics(workspace), findings);
+        return withCoverage(workspace, findings);
     }
 
     private List<GraphFinding> semanticBasisChanges(GraphWorkspace workspace, String alias) {
@@ -250,7 +250,7 @@ public class GraphEvaluator {
      * <p>{@code columnComment} 单独报：它有用（agent 能不能看懂这张表，库注释也算数），
      * 但和「整理进度」是两个问题，混成一个数就两个都答不了。
      */
-    private Map<String, Double> metrics(GraphWorkspace workspace) {
+    private GraphEvaluation withCoverage(GraphWorkspace workspace, List<GraphFinding> findings) {
         int tables = 0;
         int tablesDescribed = 0;
         int columns = 0;
@@ -288,7 +288,13 @@ public class GraphEvaluator {
         metrics.put("columnComment", ratio(columnsCommented, columns));
         metrics.put("columnValueDomain", ratio(columnsWithValueDomain, columns));
         metrics.put("termMapping", ratio(termsMapped, terms));
-        return metrics;
+        Map<String, GraphEvaluation.CoverageCount> counts = new LinkedHashMap<>();
+        counts.put("tableDescription", new GraphEvaluation.CoverageCount(tablesDescribed, tables));
+        counts.put("columnDescription", new GraphEvaluation.CoverageCount(columnsDescribed, columns));
+        counts.put("columnComment", new GraphEvaluation.CoverageCount(columnsCommented, columns));
+        counts.put("columnValueDomain", new GraphEvaluation.CoverageCount(columnsWithValueDomain, columns));
+        counts.put("termMapping", new GraphEvaluation.CoverageCount(termsMapped, terms));
+        return new GraphEvaluation(metrics, findings, counts);
     }
 
     /** 分母为 0 时给 1.0：一张表都没有的图谱不该报「覆盖率 0%」，那是在说一个不存在的问题。 */

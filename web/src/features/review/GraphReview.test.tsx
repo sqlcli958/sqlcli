@@ -113,6 +113,7 @@ test('默认列裁决过的图谱审批，排掉待审批的', async () => {
 test('审批记录里带着当时批的那份 before/after', async () => {
   renderReview();
   await screen.findByText('APP.ORDERS.USER_ID');
+  await userEvent.click(screen.getByRole('button', { name: '详情' }));
 
   expect(screen.getByText('旧描述')).toBeTruthy();
   expect(screen.getByText('下单用户 ID')).toBeTruthy();

@@ -20,6 +20,7 @@ export interface EvaluationDto {
   warningCount: number;
   /** 指标名 → 0~1 的覆盖率。键会增减，按键名动态渲染，不要写死 */
   metrics: Record<string, number> | null;
+  coverageCounts?: Record<string, { covered: number; total: number }>;
 }
 
 export interface FindingDto {

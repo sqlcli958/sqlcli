@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { cancelWorkbenchSql, executeWorkbenchSql, type WorkbenchSemanticContext } from '../../api/workbench';
@@ -50,6 +50,9 @@ export function SqlEditor({
   // 「中止」按钮拿同一个令牌去调 /workbench/cancel。dry-run 是一次快查，不给中止。
   const cancelTokenRef = useRef<string>();
   const [aborted, setAborted] = useState(false);
+  const [cancelMessage, setCancelMessage] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+  const editorHelpId = useId();
 
   const dry = useMutation({
     mutationFn: (text: string) =>
@@ -180,6 +183,8 @@ export function SqlEditor({
     dry.reset();
     run.reset();
     setAborted(false);
+    setCancelMessage('');
+    setCancelling(false);
   }
 
   function execute(text: string) {
@@ -199,11 +204,21 @@ export function SqlEditor({
   async function abort() {
     const token = cancelTokenRef.current;
     if (!token) return;
+    setCancelling(true);
+    setCancelMessage('正在请求中止，等待执行端确认…');
     try {
       const { cancelled } = await cancelWorkbenchSql(token);
-      if (cancelled) setAborted(true);
-    } catch {
-      // 中止请求本身失败：什么都不改，执行结果稍后自己回来。
+      if (cancelTokenRef.current !== token) return;
+      if (cancelled) {
+        setAborted(true);
+        setCancelMessage('中止请求已接收，正在等待最终执行结果；不代表事务已回滚。');
+      } else {
+        setCancelMessage('本次中止未生效，操作可能已结束；仍在等待执行结果。');
+      }
+    } catch (error) {
+      if (cancelTokenRef.current === token) setCancelMessage(`中止请求失败：${(error as Error).message}。仍在等待执行结果。`);
+    } finally {
+      if (cancelTokenRef.current === token) setCancelling(false);
     }
   }
 
@@ -213,7 +228,7 @@ export function SqlEditor({
     <section className="wb-section wb-editor">
       <div className="wb-section-head">
         <h2 className="wb-section-title">SQL</h2>
-        <span className="wb-muted">
+        <span className="wb-muted" id={editorHelpId}>
           {aliasInfo?.readOnly ? '只读数据源，写语句会被拒绝' : 'Ctrl + Enter 执行'}
         </span>
       </div>
@@ -222,6 +237,8 @@ export function SqlEditor({
         <textarea
           ref={textareaRef}
           className="wb-sql"
+          aria-label="SQL 编辑器"
+          aria-describedby={editorHelpId}
           spellCheck={false}
           rows={7}
           value={sql}
@@ -322,10 +339,11 @@ export function SqlEditor({
           <Button
             title="中止本次执行：语句执行中调 Statement.cancel()，审批等待中会作废该审批"
             onClick={abort}
+            disabled={cancelling || aborted}
             variant="danger"
             size="sm"
           >
-            中止
+            {cancelling ? '请求中…' : '中止'}
           </Button>
         )}
         {sql.length > 0 && (
@@ -351,6 +369,9 @@ export function SqlEditor({
         </div>
       )}
 
+      {cancelMessage && run.isPending && (
+        <p className="wb-hint" role={cancelMessage.startsWith('中止请求失败') ? 'alert' : 'status'}>{cancelMessage}</p>
+      )}
       {run.isPending && needsApproval && (
         <p className="wb-approval" role="status">
           等待审批中，请到评审页放行。

@@ -211,7 +211,7 @@ export function EvalPage() {
         <li className="eval-kpi">
           <span className="eval-kpi-name">
             <StatusDot tone={current.errorCount > 0 ? 'bad' : 'ok'}
-              label={current.errorCount > 0 ? '评估未通过' : '评估通过'} />
+              label={current.errorCount > 0 ? '存在硬错误' : '无硬错误，不代表知识已完善'} />
             硬错误数
           </span>
           <strong className="eval-kpi-value">{current.errorCount}</strong>
@@ -224,8 +224,13 @@ export function EvalPage() {
               {labelOf(key)}
             </span>
             <strong className="eval-kpi-value">
-              {current.metrics?.[key] != null ? percent(current.metrics[key]) : '—'}
+              {current.coverageCounts?.[key]?.total === 0 ? '不适用' : current.metrics?.[key] != null ? percent(current.metrics[key]) : '—'}
             </strong>
+            <span className="eval-kpi-sample">
+              {current.coverageCounts?.[key]
+                ? `${current.coverageCounts[key].covered} / ${current.coverageCounts[key].total}${current.coverageCounts[key].total === 0 ? ' · 暂无适用样本' : ' 已覆盖'}`
+                : '历史记录未保存样本数，复评后可见'}
+            </span>
             <Sparkline
               values={trend.map((point) => point.values[key]).filter((value) => typeof value === 'number')}
               color={colorOf(key)}

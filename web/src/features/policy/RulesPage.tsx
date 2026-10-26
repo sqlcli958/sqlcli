@@ -33,6 +33,7 @@ import { RuleForm } from './RuleForm';
 import { CATEGORIES, CATEGORY_KEYS, newRule, type RulePhase } from './ruleSchema';
 import './rules-page.css';
 import { Button } from '../../ui/Button';
+import { useDraftGuard } from '../../app/useDraftGuard';
 
 type View = 'catalog' | 'rule' | 'add-rule';
 
@@ -147,6 +148,18 @@ export function RulesPage() {
   });
 
   function select(group: Group, index: number | null) {
+    if (group.fileName !== activeFile && dirty) {
+      confirmDiscard(() => loadGroup(group, index));
+      return;
+    }
+    if (group.fileName === activeFile && draft) {
+      setRuleIndex(index ?? ruleIndex);
+      setView(draft.rules.length ? 'rule' : 'add-rule');
+      return;
+    }
+    loadGroup(group, index);
+  }
+  function loadGroup(group: Group, index: number | null) {
     setPendingApprovalId(null);
     const existing = stored(group)?.ruleSet;
     setActiveFile(group.fileName);
@@ -208,7 +221,9 @@ export function RulesPage() {
   }
 
   const dirty = draft != null
+    && pendingApprovalId == null
     && JSON.stringify(draft.rules) !== JSON.stringify(activeStored?.ruleSet.rules ?? []);
+  const confirmDiscard = useDraftGuard(dirty);
 
   return <div className={`rules-page${collapsed ? ' is-collapsed' : ''}`}>
     <aside className="rules-side">
@@ -249,7 +264,12 @@ export function RulesPage() {
                 {group.title}
               </button>
               <ActionIcon action="add" label={`给「${group.title}」添加规则`}
-                onClick={() => { select(group, null); setView('add-rule'); }} />
+                onClick={() => {
+                  const open = () => { loadGroup(group, null); setView('add-rule'); };
+                  if (group.fileName === activeFile && draft) setView('add-rule');
+                  else if (dirty) confirmDiscard(open);
+                  else open();
+                }} />
             </div>
             {shown.rules.length === 0
               ? <p className="rules-empty">还没有规则</p>
@@ -275,8 +295,17 @@ export function RulesPage() {
     <section className="rules-main" aria-label="规则编辑区">
       {!isConnected && <p className="rules-error">正在连接图谱工作区…</p>}
       {view === 'catalog' && <>
+        <section className="rules-start">
+          <h2>从一条规则开始</h2>
+          <p>选择检查任务，添加规则并保存，再开启校验。仅提示会保留提醒；必须通过的规则会阻止不合规操作。</p>
+          <div className="rules-start-actions">
+            {GROUPS.map((group) => <Button key={group.id} onClick={() => select(group, null)}>
+              配置{group.title}
+            </Button>)}
+          </div>
+        </section>
         <PolicyRuntimePanel alias={alias} enabled={isConnected} />
-        <RuleCatalog />
+        <details className="rules-guide"><summary>规则讲解与配置示例</summary><RuleCatalog /></details>
       </>}
 
       {view !== 'catalog' && draft && activeGroup && <>
@@ -372,7 +401,7 @@ function PolicyRuntimePanel({ alias, enabled }: { alias: string | null; enabled:
 
   const openViolations = (runtime.data?.violations ?? []).filter((item) => item.status === 'open');
   const activeWaivers = (runtime.data?.waivers ?? []).filter((item) =>
-    item.status === 'active' && (!item.expiresAt || new Date(item.expiresAt).getTime() > Date.now()));
+    item.status === 'active' && (!item.expiresAt || new Date(item.expiresAt).getTime() > runtime.dataUpdatedAt));
 
   function requestWaiver(violation: PolicyViolationDto) {
     if (!violation.ruleId || !violation.targetId) return;

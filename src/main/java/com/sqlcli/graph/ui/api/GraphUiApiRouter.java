@@ -312,7 +312,14 @@ public class GraphUiApiRouter implements HttpHandler {
             item.put("elapsedMs", row.elapsedMs());
             item.put("errorCount", row.errorCount());
             item.put("warningCount", row.warningCount());
-            item.put("metrics", parseJsonOrNull(row.metricsJson()));
+            Object savedMetrics = parseJsonOrNull(row.metricsJson());
+            if (savedMetrics instanceof Map<?, ?> snapshot && snapshot.containsKey("metrics")) {
+                item.put("metrics", snapshot.get("metrics"));
+                item.put("coverageCounts", snapshot.get("coverageCounts"));
+            } else {
+                // 旧记录只有比率，不能用当前图谱的数量冒充历史样本数。
+                item.put("metrics", savedMetrics);
+            }
             items.add(item);
         }
         Map<String, Object> body = new LinkedHashMap<>();

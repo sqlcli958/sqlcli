@@ -281,8 +281,10 @@ function RuleCard({ rule }: { rule: RuleDoc }) {
       <dt>限制场景</dt><dd>{rule.scene}</dd>
       <dt>达到效果</dt><dd>{rule.effect}</dd>
     </dl>
-    {rule.note && <p className="catalog-note">{rule.note}</p>}
-    <pre>{rule.example}</pre>
+    <details><summary>详细说明与配置示例</summary>
+      {rule.note && <p className="catalog-note">{rule.note}</p>}
+      <pre>{rule.example}</pre>
+    </details>
   </article>;
 }
 

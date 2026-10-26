@@ -332,7 +332,7 @@ function SchemaTableList({
           <button
             className="table-item"
             onClick={() => onSelectTable(schemaName, table.name)}
-            title={table.comment}
+            title={[table.qualifiedName, table.comment].filter(Boolean).join('\n')}
           >
             <svg viewBox="0 0 24 24" width="14" height="14" className="table-icon">
               <path fill="currentColor" d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v2H7V7zm0 4h10v2H7v-2zm0 4h7v2H7v-2z" />
@@ -345,7 +345,7 @@ function SchemaTableList({
             )}
             {/* 场景行只有表名（目录字段在分页列表里，而筛场景时不查那个列表）。
                 显示占位的「BASE TABLE / 0 字段」是拿假值冒充真值，不如不显示 */}
-            {!scenarioRows && table.tableType && (
+            {!scenarioRows && table.tableType && table.tableType.toLowerCase() !== 'base_table' && (
               <span className="table-type-badge">{table.tableType}</span>
             )}
             {!scenarioRows && (

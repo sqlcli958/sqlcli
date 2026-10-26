@@ -311,6 +311,7 @@ function ColumnRow({ tableId, tableQualifiedName, column, revision, onRefetch }:
             type="button"
             className="column-expand-button"
             aria-expanded={expanded}
+            title={column.name}
             aria-label={`${expanded ? '收起' : '展开'} ${column.name} 的字段详情`}
             onClick={(event) => {
               event.stopPropagation();
@@ -678,7 +679,7 @@ export function TableInspector() {
         >
           {refresh.isPending ? <span className="spinner" /> : <RefreshIcon />}
         </Button>
-        <button className="inspector-close" onClick={() => selectNode(null)} title="关闭">
+        <button type="button" className="inspector-close" onClick={() => selectNode(null)} title="关闭" aria-label="关闭表详情">
           &times;
         </button>
       </div>
@@ -933,7 +934,7 @@ function NullableDot({ nullable }: { nullable?: boolean | null }) {
   const tone = nullable == null ? 'warn' : nullable ? 'ok' : 'bad';
   const detail = nullable == null ? '可空性未知' : nullable ? '可空' : '不可空';
   return (
-    <StatusDot tone={tone} label={detail} />
+    <span className="nullable-value"><StatusDot tone={tone} /><span>{detail === '可空性未知' ? '未知' : detail}</span></span>
   );
 }
 

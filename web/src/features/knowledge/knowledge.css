@@ -45,6 +45,8 @@
 }
 
 .knowledge-body {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex: 1;
   /* flex 子项默认 min-height: auto，不写 0 的话它不收缩、改为被内容撑开——
@@ -55,9 +57,9 @@
 }
 
 .knowledge-left {
-  width: var(--left-panel-width);
-  min-width: var(--left-panel-width);
-  max-width: var(--left-panel-width);
+  width: 290px;
+  min-width: 250px;
+  max-width: 310px;
   display: flex;
   flex-direction: column;
   background: var(--color-surface);
@@ -111,8 +113,8 @@
 /* 详情面板按视口宽度自适应：目录收起时能吃到更多空间，
    字段表格的注释列因此不需要横向拖动就能看全。 */
 .knowledge-right {
-  flex: 0 1 clamp(270px, 25vw, 480px);
-  min-width: 270px;
+  flex: 0 1 clamp(400px, 34vw, 560px);
+  min-width: 360px;
   display: flex;
   flex-direction: column;
   background: var(--color-surface);
@@ -185,10 +187,74 @@
   .knowledge-right {
     inset: auto 8px 8px;
     width: auto;
-    max-height: 72dvh;
+    max-height: calc(100% - 16px);
     border-radius: 12px;
   }
 }
+
+.knowledge-right .inspector-header {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: var(--color-surface);
+  flex-shrink: 0;
+}
+.knowledge-right .table-inspector { min-height: 0; overflow-y: auto; }
+.knowledge-right .inspector-title { flex: 1; overflow-wrap: anywhere; }
+.knowledge-right .inspector-close { flex-shrink: 0; min-width: 32px; min-height: 32px; }
+.knowledge-right .column-expand-button { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; height: auto; text-align: left; }
+.knowledge-right .columns-table td:first-child { white-space: normal; }
+.knowledge-right .columns-table th:nth-child(1) { width: 35%; }
+.knowledge-right .columns-table th:nth-child(2) { width: 20%; }
+.knowledge-right .columns-table th:nth-child(3) { width: 10%; }
+.knowledge-right .columns-table th:nth-child(4) { width: 15%; }
+.knowledge-right .col-type { white-space: normal; overflow-wrap: anywhere; }
+.nullable-value { display: inline-flex; gap: 3px; align-items: center; white-space: normal; }
+.knowledge-left .table-name { white-space: normal; overflow-wrap: anywhere; font-size: 13px; }
+.knowledge-left .table-col-count { font-size: var(--font-small-size); }
+.knowledge-right .columns-table { font-size: 13px; }
+.knowledge-right .col-len, .knowledge-right .col-null { font-size: var(--font-small-size); }
+@media (max-width: 720px) {
+  .knowledge-right .columns-table th:nth-child(3),
+  .knowledge-right .columns-table td:nth-child(3) { display: none; }
+  .knowledge-right .columns-table th:nth-child(1) { width: 45%; }
+  .knowledge-right .columns-table th:nth-child(2) { width: 25%; }
+  .knowledge-right .columns-table th:nth-child(4) { width: 18%; }
+  .knowledge-right .nullable-value { white-space: nowrap; }
+  .knowledge-right .nullable-value .cell-dot { display: none; }
+  .knowledge-right .col-type { font-size: 12px; }
+}
+.graph-navigation {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-card);
+}
+.graph-navigation .select { min-width: 0; max-width: 100%; }
+.graph-navigation .select select { max-width: 100%; }
+.graph-navigation-help { font-size: 12px; }
+.graph-navigation-help[open] { flex-basis: 100%; }
+.graph-navigation-help p { margin-block: 6px; }
+.graph-legend { display: flex; gap: 8px 16px; flex-wrap: wrap; list-style: none; }
+.graph-legend li { display: flex; align-items: center; gap: 6px; }
+.graph-legend i { width: 18px; border-top: 2px solid; }
+.graph-legend [data-kind='foreign_key'] { color: #087ea4; }
+.graph-legend [data-kind='join_observed'] { color: #b45309; border-top-style: dashed; }
+.graph-legend [data-kind='term_mapping'] { color: #be185d; border-top-style: dotted; }
+html[data-theme='dark'] .graph-legend [data-kind='foreign_key'] { color: #65d8ff; }
+html[data-theme='dark'] .graph-legend [data-kind='join_observed'] { color: #ffc266; }
+html[data-theme='dark'] .graph-legend [data-kind='term_mapping'] { color: #ff82cb; }
 
 /* 索引重建：状态在顶栏状态灯，这里只放操作。 */
 .knowledge-index {

@@ -92,6 +92,9 @@ class RunEvalFromUiTest {
         assertEquals("eval", row.get("source").asText(),
                 "必须落 source=eval，否则评估页的趋势图会把它过滤掉（那里只连 source=eval 的点）");
         assertTrue(row.get("metrics").isObject(), "覆盖率指标要有，趋势图靠它");
+        assertEquals(0, row.path("coverageCounts").path("tableDescription").path("covered").asInt(-1));
+        assertEquals(1, row.path("coverageCounts").path("tableDescription").path("total").asInt(-1));
+        assertEquals(1, row.path("coverageCounts").path("termMapping").path("total").asInt(-1));
     }
 
     @Test

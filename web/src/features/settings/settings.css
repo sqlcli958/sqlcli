@@ -181,5 +181,22 @@
 }
 
 .settings-switches small {
-  color: #b91c1c;
+  color: var(--color-text-muted);
+}
+.settings-switches small[role='alert'] { color: var(--color-error); }
+
+@media (max-width: 720px) {
+  .settings .settings-table-wrap { overflow: visible; }
+  .settings .settings-table { display: block; overflow: visible; border: 0; }
+  .settings .settings-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .settings .settings-table tbody { display: grid; gap: 14px; }
+  .settings .settings-table tr { display: grid; border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden; }
+  .settings .settings-table td { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 12px; overflow-wrap: anywhere; }
+  .settings .settings-table td::before { content: attr(data-label); flex: 0 0 64px; color: var(--color-text-muted); font-size: var(--font-small-size); }
+  .settings .settings-table td:first-child { display: block; }
+  .settings .settings-table td:first-child::before { display: none; }
+  .settings .settings-table td:first-child .settings-name { font-size: 15px; }
+  .settings .settings-row-actions { flex: 1; justify-content: flex-start; }
+  .settings .settings-row-actions > .btn { min-width: 36px; min-height: 36px; }
+  .settings .settings-switches { flex: 1; }
 }

@@ -11,6 +11,8 @@ import './settings.css';
 import { Button } from '../../ui/Button';
 import { Menu, MenuItem } from '../../ui/Menu';
 import { Tabs } from '../../ui/Tabs';
+import { Dialog } from '../../ui/Dialog';
+import { useDraftNavigation } from '../../app/useDraftGuard';
 
 type Tab = 'sources' | 'drivers';
 const SETTINGS_TABS = [
@@ -21,6 +23,7 @@ const SETTINGS_TABS = [
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('sources');
   const [editing, setEditing] = useState<string | null>(null);
+  const confirmNavigation = useDraftNavigation();
 
   return (
     <div className="page settings">
@@ -30,7 +33,7 @@ export function SettingsPage() {
           label="设置分类"
           items={SETTINGS_TABS}
           value={tab}
-          onChange={setTab}
+          onChange={(next) => confirmNavigation(() => setTab(next))}
           className="settings-tabs"
           panelId="settings-tabs-panel"
         />
@@ -132,12 +135,12 @@ function SourceSettings({ onAdd, onEdit }: { onAdd: () => void; onEdit: (name: s
             <tbody>
               {aliases.map((a) => (
                 <tr key={a.name}>
-                  <td><span className="settings-name">{a.name}</span>{a.description && <small>{a.description}</small>}</td>
-                  <td><span className="settings-type-badge">{a.dbType || 'unknown'}</span></td>
-                  <td>{a.graphAvailable ? <span className="settings-state is-ok"><i />{a.tables ?? 0} 表 · {a.relations ?? 0} 关系</span> : <span className="settings-state is-muted"><i />未导入</span>}</td>
-                  <td><span className={`settings-state ${a.readOnly ? 'is-muted' : 'is-ok'}`}><i />{a.readOnly ? '只读' : '可写'}</span></td>
-                  <td><ApprovalSwitches alias={a} /></td>
-                  <td>
+                  <td data-label="数据源"><span className="settings-name">{a.name}</span>{a.description && <small>{a.description}</small>}</td>
+                  <td data-label="类型"><span className="settings-type-badge">{a.dbType || 'unknown'}</span></td>
+                  <td data-label="图谱">{a.graphAvailable ? <span className="settings-state is-ok"><i />{a.tables ?? 0} 表 · {a.relations ?? 0} 关系</span> : <span className="settings-state is-muted"><i />未导入</span>}</td>
+                  <td data-label="访问模式"><span className={`settings-state ${a.readOnly ? 'is-muted' : 'is-ok'}`}><i />{a.readOnly ? '只读' : '可写'}</span></td>
+                  <td data-label="审批策略"><ApprovalSwitches alias={a} /></td>
+                  <td data-label="操作">
                     <div className="settings-row-actions">
                       <ActionIcon action="edit" label={`编辑 ${a.name}`} onClick={() => onEdit(a.name)} />
                       <ActionIcon action="test" label={testing === a.name ? `正在测试 ${a.name}` : `测试 ${a.name} 的连接`} disabled={testing === a.name} onClick={() => runTest(a.name)} />
@@ -163,9 +166,14 @@ function SourceSettings({ onAdd, onEdit }: { onAdd: () => void; onEdit: (name: s
 }
 
 function ApprovalSwitches({ alias }: { alias: AliasSummaryDto }) {
+  const [closing, setClosing] = useState<UpdateAliasRequest | null>(null);
+  const [closingLabel, setClosingLabel] = useState('');
   const toggle = useMutation({
     mutationFn: (patch: UpdateAliasRequest) => updateAlias(alias.name, patch),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['aliases'] }),
+    onSuccess: () => {
+      setClosing(null);
+      queryClient.invalidateQueries({ queryKey: ['aliases'] });
+    },
   });
   const switches = [
     { key: 'approveQuery', label: '查询', on: alias.approveQuery, hint: '查询执行前需要审批' },
@@ -173,9 +181,29 @@ function ApprovalSwitches({ alias }: { alias: AliasSummaryDto }) {
     { key: 'approveGraph', label: '图谱', on: alias.approveGraph, hint: '图谱变更需要人工审批；关闭时自动批准并留底' },
   ] as const;
   return (
-    <span className="settings-switches">
-      {switches.map((item) => <label key={item.key} title={`${item.hint}${item.on ? '（已开启）' : ''}`}><input type="checkbox" checked={item.on} disabled={toggle.isPending} onChange={(event) => toggle.mutate({ [item.key]: event.target.checked })} />{item.label}</label>)}
+    <span className="settings-switches" role="group" aria-label={`${alias.name} 的审批策略`}>
+      {switches.map((item) => <label key={item.key} title={`${item.hint}${item.on ? '（已开启）' : ''}`}><input type="checkbox" checked={item.on} disabled={toggle.isPending} onChange={(event) => {
+        if (event.target.checked) toggle.mutate({ [item.key]: true });
+        else {
+          toggle.reset();
+          setClosing({ [item.key]: false });
+          setClosingLabel(item.label);
+        }
+      }} />{item.label}</label>)}
+      {toggle.isPending && <small role="status">保存中…</small>}
+      {toggle.isSuccess && <small role="status">已保存</small>}
       {toggle.isError && <small role="alert">保存失败：{toggle.error.message}</small>}
+      <Dialog open={closing !== null} onOpenChange={(open) => { if (!open && !toggle.isPending) setClosing(null); }}
+        title={`关闭${closingLabel}审批保护？`}
+        description={`数据源「${alias.name}」的${closingLabel}操作将不再等待人工审批。${closingLabel === '图谱' ? '图谱变更会自动批准并留底。' : '符合其他执行限制的操作将直接执行。'}请确认操作影响。`}>
+        <div className="dialog-actions">
+          <Button disabled={toggle.isPending} onClick={() => setClosing(null)}>保留保护</Button>
+          <Button variant="danger" disabled={toggle.isPending} onClick={() => { if (closing) toggle.mutate(closing); }}>
+            {toggle.isPending ? '保存中…' : '确认关闭保护'}
+          </Button>
+        </div>
+        {toggle.isError && <p role="alert">保存失败：{toggle.error.message}，保护状态未确认变更，请重试。</p>}
+      </Dialog>
     </span>
   );
 }

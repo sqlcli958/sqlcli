@@ -144,3 +144,9 @@
   .policy-runtime-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .policy-runtime-grid { grid-template-columns: minmax(0, 1fr); }
 }
+.rules-start { padding: 20px; border-bottom: 1px solid var(--color-border); }
+.rules-start h2 { font-size: 20px; margin-bottom: 8px; }
+.rules-start p { color: var(--color-text-muted); line-height: 1.6; }
+.rules-start-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.rules-guide { margin: 16px 20px; }
+.rules-guide summary, .catalog-rule summary { cursor: pointer; color: var(--color-primary); padding: 8px 0; }

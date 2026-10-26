@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
 import { columnRef, expandMetricSql, getMetricRuns, getMetrics, upsertMetric } from '../../api/metrics';
@@ -6,7 +6,8 @@ import type { MetricAdditivity, RatioMetricDto } from '../../api/metrics';
 import { executeWorkbenchSql } from '../../api/workbench';
 import { getAliases } from '../../api/aliases';
 import { queryClient } from '../../api/queryClient';
-import { getTerms } from '../../api/workspace';
+import { getTerms, getTables, getTableDetail } from '../../api/workspace';
+import { useDraftGuard, useDraftNavigation } from '../../app/useDraftGuard';
 import { navPath } from '../../app/navigation';
 import { useSessionStore } from '../../state/sessionStore';
 import { stashWorkbenchSql } from '../workbench/workbenchSql';
@@ -43,6 +44,7 @@ export function MetricsPage() {
     graphStatusError: boolean;
   }>();
   const [editing, setEditing] = useState<RatioMetricDto | 'new' | null>(null);
+  const confirmNavigation = useDraftNavigation();
 
   const aliases = useQuery({
     queryKey: ['aliases'],
@@ -65,13 +67,13 @@ export function MetricsPage() {
   });
 
   // MetricDto 是 types/api.ts 定义的旧形状，服务端已返回比率字段。
-  const metrics = (list.data?.metrics ?? []) as RatioMetricDto[];
+  const metrics = useMemo(() => (list.data?.metrics ?? []) as RatioMetricDto[], [list.data?.metrics]);
   const term = termId ? terms.data?.terms.find((item) => item.id === termId) ?? null : null;
   const visibleMetrics = useMemo(
     () => termId
       ? (term ? metrics.filter((metric) => term.metricRefs.includes(metric.id)) : [])
       : metrics,
-    [list.data?.metrics, term, termId],
+    [metrics, term, termId],
   );
 
   useEffect(() => {
@@ -142,7 +144,7 @@ export function MetricsPage() {
       <header className="metrics-head">
         <h1>指标</h1>
         {!termId && (
-          <Button size="sm" onClick={() => setEditing(editing === 'new' ? null : 'new')}>
+          <Button size="sm" onClick={() => confirmNavigation(() => setEditing(editing === 'new' ? null : 'new'))}>
             {editing === 'new' ? '收起' : '新建指标'}
           </Button>
         )}
@@ -183,13 +185,14 @@ export function MetricsPage() {
             还没有指标。指标声明的是口径——算不算取消单、按哪个时间列、能按什么切。
             出现口径争议时才需要建一条：同一个业务问题被算出两个数，且必须统一成一个。
           </p>
-          <p>可以在这里点「新建指标」，或者用 CLI：</p>
+          <Button variant="primary" onClick={() => setEditing('new')}>定义第一个指标</Button>
+          <details><summary>查看 CLI 配置示例</summary>
           <pre className="metric-sql">
             {'sql-cli <alias> schema add-metric gmv_paid \\\n' +
               '  --expression "SUM(orders.amount)" --filters "status IN (2,3)" \\\n' +
               '  --business-name "已支付GMV" --grain-column app.orders.created_at \\\n' +
               '  --grains day,week,month --dimensions app.orders.channel'}
-          </pre>
+          </pre></details>
         </div>
       )}
 
@@ -207,7 +210,7 @@ export function MetricsPage() {
             targeted={metric.id === targetId}
             aliasInfo={aliasInfo}
             editing={editing !== 'new' && editing?.id === metric.id}
-            onToggleEdit={() => setEditing(editing !== 'new' && editing?.id === metric.id ? null : metric)}
+            onToggleEdit={() => confirmNavigation(() => setEditing(editing !== 'new' && editing?.id === metric.id ? null : metric))}
             revision={list.data?.revision ?? revision ?? 0}
             onDone={() => {
               setEditing(null);
@@ -596,6 +599,19 @@ function MetricForm({
   );
   const [grains, setGrains] = useState((metric?.grain?.grains ?? []).join(','));
   const [dimensions, setDimensions] = useState((metric?.dimensions ?? []).map(columnRef).join(','));
+  const draft = JSON.stringify({ name, businessName, isRatio, expression, filters, additivity,
+    numeratorExpr, numeratorFilters, denominatorExpr, denominatorFilters, grainColumn, grains, dimensions });
+  const initialDraft = useRef(draft);
+  useDraftGuard(draft !== initialDraft.current);
+  const helperId = useId();
+  const [params] = useSearchParams();
+  const alias = params.get('alias');
+  const [helperTable, setHelperTable] = useState('');
+  const [helperColumn, setHelperColumn] = useState('');
+  const tables = useQuery({ queryKey: ['metric-form-tables', alias],
+    queryFn: ({ signal }) => getTables(undefined, 0, 500, undefined, signal), enabled: !!alias, retry: false });
+  const columns = useQuery({ queryKey: ['metric-form-columns', alias, helperTable],
+    queryFn: ({ signal }) => getTableDetail(helperTable, signal), enabled: !!helperTable, retry: false });
 
   const save = useMutation({
     mutationFn: () =>
@@ -680,7 +696,7 @@ function MetricForm({
             <input value={denominatorFilters} onChange={(e) => setDenominatorFilters(e.target.value)} />
           </label>
           <p className="term-list-hint" title="怎么加都不对，只能从分子分母重新算，展开器自动推定，不用填">
-            可加性：non_additive（比率指标自动推定）
+            可加性：不可直接累加（non_additive）。比率需要从分子、分母重新计算。
           </p>
         </>
       ) : (
@@ -696,22 +712,46 @@ function MetricForm({
           </label>
           <label className="metric-field" title="算不算取消单、算不算退款单——大部分口径争议都在这一行">
             <span>过滤条件</span>
-            <input value={filters} onChange={(e) => setFilters(e.target.value)} placeholder="status IN (2,3)" />
+            <input value={filters} onChange={(e) => setFilters(e.target.value)} placeholder="status IN (2,3)" aria-describedby={`${helperId}-filters`} />
           </label>
+          <p className="metric-help" id={`${helperId}-filters`}>明确是否包含取消单、退款单等；例如 status IN (2,3)。</p>
           <label
             className="metric-field"
             title="跨时间不可加的快照（如库存余额）标 semi_additive；expand-metric 请求按时间分桶展开会拒绝，避免把快照值错误相加"
           >
             <span>可加性</span>
-            <Select value={additivity} onChange={(e) => setAdditivity(e.target.value as MetricAdditivity | '')}>
+            <Select value={additivity} aria-describedby={`${helperId}-additivity`} onChange={(e) => setAdditivity(e.target.value as MetricAdditivity | '')}>
               <option value="">未标注</option>
-              <option value="additive">additive</option>
-              <option value="semi_additive">semi_additive</option>
-              <option value="non_additive">non_additive</option>
+              <option value="additive">可累加（additive）</option>
+              <option value="semi_additive">部分维度可累加（semi_additive）</option>
+              <option value="non_additive">不可直接累加（non_additive）</option>
             </Select>
           </label>
+          <p className="metric-help" id={`${helperId}-additivity`}>金额等通常可累加；库存余额等快照不能跨时间相加；比率应重新计算。</p>
         </>
       )}
+      <details className="metric-column-helper">
+        <summary>从图谱选择时间列或维度</summary>
+        <label className="metric-field"><span>辅助表</span>
+          <Select value={helperTable} onChange={(e) => { setHelperTable(e.target.value); setHelperColumn(''); }}>
+            <option value="">选择已导入的表</option>
+            {tables.data?.items.map((table) => <option key={table.id} value={table.qualifiedName}>{table.qualifiedName}</option>)}
+          </Select>
+        </label>
+        <label className="metric-field"><span>辅助字段</span>
+          <Select value={helperColumn} onChange={(e) => setHelperColumn(e.target.value)} disabled={!columns.data}>
+            <option value="">选择字段</option>
+            {columns.data?.columns.map((column) => <option key={column.name} value={`${helperTable}.${column.name}`}>{column.name} · {column.dataType.raw}</option>)}
+          </Select>
+        </label>
+        <div className="metric-form-actions">
+          <Button size="sm" disabled={!helperColumn} onClick={() => setGrainColumn(helperColumn)}>填入时间列</Button>
+          <Button size="sm" disabled={!helperColumn} onClick={() => setDimensions([...new Set([...splitCsv(dimensions), helperColumn])].join(','))}>加入维度</Button>
+        </div>
+        {(tables.isLoading || columns.isLoading) && <p role="status">正在读取元数据…</p>}
+        {(tables.isError || columns.isError) && <p role="alert">字段辅助读取失败，仍可在下方手动填写完整列名。</p>}
+        {(tables.data?.total ?? 0) > 500 && <p className="metric-help">仅展示前500张表，其他表请手动填写限定列名。</p>}
+      </details>
       <label className="metric-field">
         <span>时间列</span>
         <input
@@ -724,6 +764,7 @@ function MetricForm({
         <span>粒度</span>
         <input value={grains} onChange={(e) => setGrains(e.target.value)} placeholder="day,week,month" />
       </label>
+      <p className="metric-help">列名格式：schema.table.column。粒度用 day、week、month 等，多个值用逗号分隔；维度同样可填写多个完整列名。</p>
       <label className="metric-field">
         <span>维度</span>
         <input

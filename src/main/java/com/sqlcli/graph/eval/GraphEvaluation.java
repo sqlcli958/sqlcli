@@ -13,7 +13,14 @@ import java.util.Map;
  *                 没有普适答案，设阈值就是瞎设。它存在是为了画趋势
  * @param findings 硬错误与改进项，按探针分组顺序
  */
-public record GraphEvaluation(Map<String, Double> metrics, List<GraphFinding> findings) {
+public record GraphEvaluation(Map<String, Double> metrics, List<GraphFinding> findings,
+                              Map<String, CoverageCount> coverageCounts) {
+
+    public record CoverageCount(int covered, int total) { }
+
+    public GraphEvaluation(Map<String, Double> metrics, List<GraphFinding> findings) {
+        this(metrics, findings, Map.of());
+    }
 
     public long errorCount() {
         return findings.stream().filter(f -> f.severity() == GraphFinding.Severity.error).count();

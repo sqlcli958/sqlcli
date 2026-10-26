@@ -241,3 +241,4 @@
   text-decoration: none;
 }
 .eval-target-link:hover { text-decoration: underline; }
+.eval-kpi-sample { color: var(--color-text-muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }

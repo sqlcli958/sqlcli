@@ -333,7 +333,24 @@
 .shell-main {
   grid-area: main;
   min-width: 0;
+  min-height: 0;
   overflow: auto;
+}
+
+.shell-source { position: relative; }
+.shell-source-feedback {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: min(340px, 85vw);
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-float);
+  font-size: 13px;
 }
 
 .shell-route-loading {
@@ -439,3 +456,4 @@
   line-height: 1;
   padding: 0 2px;
 }
+.shell .shell-meta { font-size: var(--font-small-size); }

@@ -46,6 +46,7 @@ export function AppShell() {
   };
 
   const [draft, setDraft] = useState(alias ?? '');
+  const [sourceError, setSourceError] = useState('');
   useEffect(() => setDraft(alias ?? ''), [alias]);
 
   const [collapsed, setCollapsed] = useState(
@@ -208,17 +209,28 @@ export function AppShell() {
             placeholder="搜索数据源…"
             autoComplete="off"
             aria-label="数据源"
+            aria-invalid={sourceError ? true : undefined}
+            aria-describedby="shell-source-feedback"
             onChange={(e) => {
               const next = e.target.value;
               setDraft(next);
+              setSourceError('');
               if (next && next !== alias && names.includes(next)) switchAlias(next);
             }}
             onFocus={(e) => e.target.select()}
-            onBlur={() => setDraft(alias ?? '')}
+            onBlur={() => {
+              if (draft !== (alias ?? '') && !names.includes(draft)) {
+                setSourceError(`没有匹配的数据源「${draft || '空名称'}」，当前仍为${alias ?? '未选择'}。`);
+              }
+              setDraft(alias ?? '');
+            }}
           />
           <datalist id="shell-alias-list">
             {names.map((name) => <option key={name} value={name} />)}
           </datalist>
+          <span id="shell-source-feedback" className={sourceError ? 'shell-source-feedback' : 'sr-only'} role="status">
+            {sourceError || '输入完整名称或从列表选择数据源；未匹配时保持当前连接。'}
+          </span>
         </label>
 
         {alias && (

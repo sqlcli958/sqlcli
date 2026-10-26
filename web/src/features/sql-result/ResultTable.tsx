@@ -2,6 +2,8 @@ import type { SqlCellValue, SqlExecuteResultDto } from '../../types/api';
 import { buildCsv, downloadCsv } from '../workbench/workbenchSql';
 import './result-table.css';
 import { Button } from '../../ui/Button';
+import { Dialog } from '../../ui/Dialog';
+import { useState } from 'react';
 
 /**
  * 结构化查询结果表格。
@@ -12,6 +14,12 @@ import { Button } from '../../ui/Button';
  * 那里是“看一眼当时跑出什么”，不是拿数据。
  */
 export function ResultTable({ result, exportName }: { result: SqlExecuteResultDto; exportName?: string }) {
+  const [detail, setDetail] = useState<{ title: string; text: string } | null>(null);
+  const [copyStatus, setCopyStatus] = useState('');
+  function showDetail(title: string, text: string) {
+    setCopyStatus('');
+    setDetail({ title, text });
+  }
   if (result.columns.length === 0) {
     return <p className="rt-foot">语句执行完成，没有返回结果集。耗时 {result.elapsedMs} ms。</p>;
   }
@@ -42,6 +50,9 @@ export function ResultTable({ result, exportName }: { result: SqlExecuteResultDt
                     <span className="rt-col-name">{column.name}</span>
                     {meta?.businessName && <span className="rt-col-biz">{meta.businessName}</span>}
                     <span className="rt-col-type">{column.type}</span>
+                    {meta && <button type="button" className="rt-column-info"
+                      aria-label={`查看 ${column.name} 的列说明`}
+                      onClick={() => showDetail(`列说明：${column.name}`, title)}>列说明</button>}
                   </th>
                 );
               })}
@@ -51,7 +62,8 @@ export function ResultTable({ result, exportName }: { result: SqlExecuteResultDt
             {result.rows.map((row, rowIndex) => (
               <tr key={rowIndex}>
                 {row.map((value, cellIndex) => (
-                  <Cell key={cellIndex} value={value} />
+                  <Cell key={cellIndex} value={value} label={`查看第 ${rowIndex + 1} 行 ${result.columns[cellIndex]?.name ?? cellIndex + 1} 的完整值`}
+                    onOpen={(text) => showDetail(`第 ${rowIndex + 1} 行 · ${result.columns[cellIndex]?.name ?? cellIndex + 1}`, text)} />
                 ))}
               </tr>
             ))}
@@ -71,11 +83,25 @@ export function ResultTable({ result, exportName }: { result: SqlExecuteResultDt
           </Button>
         )}
       </p>
+      <Dialog open={detail !== null} onOpenChange={(open) => { if (!open) setDetail(null); }} title={detail?.title ?? '完整值'}>
+        <pre className="rt-full-value" tabIndex={0}>{detail?.text === '' ? '空字符串（长度 0）' : detail?.text}</pre>
+        <div className="dialog-actions">
+          <Button onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(detail?.text ?? '');
+              setCopyStatus('已复制完整内容');
+            } catch {
+              setCopyStatus('复制失败，请手动选中上方内容复制');
+            }
+          }}>复制完整内容</Button>
+          <span role="status">{copyStatus}</span>
+        </div>
+      </Dialog>
     </div>
   );
 }
 
-function Cell({ value }: { value: SqlCellValue }) {
+function Cell({ value, label, onOpen }: { value: SqlCellValue; label: string; onOpen: (text: string) => void }) {
   if (value === null || value === undefined) {
     return (
       <td className="rt-null">
@@ -84,10 +110,10 @@ function Cell({ value }: { value: SqlCellValue }) {
     );
   }
   const text = String(value);
-  // 截断交给 CSS（text-overflow），title 保留全文，避免为了显示再复制一份字符串。
   return (
     <td className={typeof value === 'number' ? 'rt-num' : undefined} title={text}>
-      {text}
+      <button type="button" className="rt-cell-value" aria-label={label} aria-description={text || '空字符串'}
+        onClick={() => onOpen(text)}>{text === '' ? <span className="rt-null">空字符串</span> : text}</button>
     </td>
   );
 }
