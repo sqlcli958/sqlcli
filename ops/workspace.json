@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "root": "sql-cli",
+  "units": [
+    {
+      "name": "sql-cli",
+      "type": "java",
+      "dir": ".",
+      "tools": {
+        "java": "corretto-17",
+        "maven": "3.8.8"
+      },
+      "port": 9999,
+      "healthPath": "/",
+      "dependsOn": [],
+      "buildCmd": [
+        "mvn",
+        "-q",
+        "-DskipTests",
+        "package"
+      ],
+      "startCmd": [
+        "java",
+        "-Dhttp.nonProxyHosts=172.100.1.*",
+        "-DsocksNonProxyHosts=172.100.1.*",
+        "-jar",
+        "target/sql-cli.jar",
+        "ui",
+        "--no-open"
+      ]
+    },
+    {
+      "name": "ui-screenshots",
+      "type": "python",
+      "dir": ".",
+      "tools": { "python": "3.14.7" },
+      "port": 10018,
+      "healthPath": "/",
+      "dependsOn": [],
+      "buildCmd": null,
+      "startCmd": [
+        "python", "-m", "http.server", "10018", "--bind", "127.0.0.1", "--directory",
+        "docs/UI检查-2026-10-25/evidence/gallery"
+      ]
+    }
+  ]
+}
